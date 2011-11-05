@@ -1,0 +1,32 @@
+<table>
+	<tr>
+		<td>{xl t='Name'}</td>
+		<td>&nbsp;</td>
+		<td>{xl t='Sender ID'}</td>
+		<td>&nbsp;</td>
+		<td>{xl t='Receiver ID'}</td>
+		<td>&nbsp;</td>
+		<td>{xl t='Version'}</td>
+	</tr>
+	{foreach from=$partners item=partner}
+	<tr>
+		<td><a href="{$CURRENT_ACTION}action=edit&x12_partner_id={$partner->id}" onclick="top.restoreSession()">{$partner->get_name()}</a></td>
+		<td></td>
+		<td>{$partner->get_x12_sender_id()}</td>
+		<td></td>
+		<td>{$partner->get_x12_receiver_id()}</td>
+		<td></td>
+		<td>{$partner->get_x12_version()}</td>
+	</tr>
+	{foreachelse}
+	<tr>
+		<td colspan="6">{xl t='No Partners Found'}</td>
+	</tr>
+	{/foreach}
+	<tr>
+		<td>&nbsp;</td>
+	</tr>
+	<tr>
+		<td><a href="{$CURRENT_ACTION}action=edit&id=default" onclick="top.restoreSession()">{xl t='Add New Partner'}</a></td>
+	</tr>
+</table>

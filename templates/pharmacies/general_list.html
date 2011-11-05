@@ -1,0 +1,21 @@
+<table>
+	<tr>
+		<td>{xl t='Name'}</td>
+		<td rowspan="50">&nbsp;</td>
+		<td>{xl t='Address'}</td>
+		<td rowspan="50">&nbsp;</td>
+		<td>{xl t='Default Method'}</td>
+	</tr>
+	{foreach from=$pharmacies item=pharmacy}
+	<tr>
+		<td><a href="{$CURRENT_ACTION}action=edit&id={$pharmacy->id}" onclick="top.restoreSession()">{$pharmacy->name}</a></td>
+		<td>{$pharmacy->address->line1}, {$pharmacy->address->city},
+			{$pharmacy->address->state|upper} {$pharmacy->address->zip}</td>
+		<td>{$pharmacy->get_transmit_method_display()}</td>
+	</tr>
+	{foreachelse}
+	<tr>
+		<td colspan="6">{xl t='No Pharmacies Found'}</td>
+	</tr>
+	{/foreach}
+</table>

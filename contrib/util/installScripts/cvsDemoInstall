@@ -1,0 +1,178 @@
+#!/bin/sh
+#
+#This program is free software; you can redistribute it and/or modify
+#it under the terms of the GNU General Public License as published by
+#the Free Software Foundation; either version 2 of the License, or
+#(at your option) any later version.
+#
+# author Brady Miller
+# email  brady@sparmy.com
+# date   02/20/09
+#
+#
+#This script is called by the the OpenEMR CVS demo and developer appliance.
+# It configures the CVS Demo and the Developer Appliance
+# It will configure OpenEMR (bypassing setup.php).
+# Logs errors
+#
+
+# PATH VARIABLES
+WEB=/var/www/html
+OPENEMR=$WEB/openemr
+SITEDIR=$OPENEMR/sites/default
+LOG=$WEB/log/logSetup.txt
+CVS=/home/openemr/cvs
+TMPDIR=/tmp/openemr-tmp
+
+# OTHER VARIABLES
+setHost="localhost"         #mysql server (if not different from php, then localhost)
+setLoginhost="localhost"    #php/apache server (if not different from mysql, then localhost)
+setPort="3306"              #MySQL port
+setDbname="openemr"         #MySQL openemr database name
+setLogin="openemr"          #username to MySQL openemr database
+setPass="openemr"           #password to MySQL openemr database
+setRoot="root"              #MySQL server root username
+setRootpass=""              #MySQL server root password
+setColl="utf8_general_ci"   #collation for mysql
+setIuser="admin"            #initial user login name
+setIuname="Administrator"   #initial user full name
+setIgroup="Default"         #practice group name
+setOpenemrWebPath=/openemr  #path on browser to openemr
+setInst="1"                 #CONSTANT, don't set
+
+#FIRST DEAL WITH STUFF SPECIFIC TO THE CVS DEMO AND DEVELOPER APPLIANCE
+#Install php-gd (graphics) and php-mbstring (multibyte character support) packages
+#  and restart apache (done after below suhosin patch).
+echo "Installing gd(graphics) and mbstring(multibyte support) php packages..."
+echo "Installing gd(graphics) and mbstring(multibyte support) php packages..." >> $LOG
+urpmi --auto php-gd php-mbstring >> $LOG
+#Patch the suhosin bug
+SUHOSINCONF=/etc/php.d/Z98_suhosin.ini
+echo "Disabling suhosin patch which is not compatible with OpenEMR"
+echo "Disabling suhosin patch which is not compatible with OpenEMR" >> $LOG
+echo "   In /etc/php.d/Z98_suhosin.ini file commenting out:"
+echo "   In /etc/php.d/Z98_suhosin.ini file commenting out:" >> $LOG
+echo "    extension = suhosin.so"
+echo "    extension = suhosin.so" >> $LOG
+echo "   Then will restart apache."
+echo "   Then will restart apache." >> $LOG
+echo ""
+sed -i 's/^extension = suhosin.so/; extension = suhosin.so/' $SUHOSINCONF
+service httpd restart
+echo ""
+#Replace manual with newest version from cvs
+echo "Configuring appliance"
+echo "Configuring appliance" >> $LOG
+cp -f $OPENEMR/contrib/util/installScripts/cvsDemoMisc/developerApplianceManual.txt /home/openemr/docs/manual.txt
+chown openemr:openemr /home/openemr/docs/manual.txt
+cp -f $OPENEMR/contrib/util/installScripts/cvsDemoMisc/developerApplianceManual.txt $WEB/manual.txt
+echo "Done configuring appliance"
+echo "Done configuring appliance" >> $LOG
+#Package the cvs version into a tarball and zip file to be available thru web browser
+# This is basically to allow download of most recent cvs version from the cvs Demo appliance
+# It will also ease transfer/testing openemr on windows systems when using the Developer appliance
+echo "Creating OpenEMR CVS packages"
+echo "Creating OpenEMR CVS packages" >> $LOG
+# Prepare the cvs package
+mkdir -p $TMPDIR
+cp -rf $CVS/openemr $TMPDIR/
+rm -rf `find $TMPDIR -name CVS`
+chmod a+w $TMPDIR/openemr/sites/default/sqlconf.php
+chmod -R a+w $TMPDIR/openemr/sites/default/documents
+chmod -R a+w $TMPDIR/openemr/sites/default/edi
+chmod -R a+w $TMPDIR/openemr/sites/default/era
+chmod -R a+w $TMPDIR/openemr/library/freeb
+chmod -R a+w $TMPDIR/openemr/sites/default/letter_templates
+chmod -R a+w $TMPDIR/openemr/interface/main/calendar/modules/PostCalendar/pntemplates/cache
+chmod -R a+w $TMPDIR/openemr/interface/main/calendar/modules/PostCalendar/pntemplates/compiled
+chmod -R a+w $TMPDIR/openemr/gacl/admin/templates_c
+# Create the web file directory
+mkdir $WEB/files
+# Save the tar.gz cvs package
+cd $TMPDIR
+tar -czf $WEB/files/openemr-cvs.tar.gz openemr
+cd $WEB/files
+md5sum openemr-cvs.tar.gz > openemr-linux-md5.txt
+# Save the .zip cvs package
+cd $TMPDIR
+zip -rq $WEB/files/openemr-cvs.zip openemr
+cd $WEB/files
+md5sum openemr-cvs.zip > openemr-windows-md5.txt
+# Create the time stamp
+date > date-cvs.txt
+# Clean up
+rm -fr $TMPDIR
+echo "Done creating OpenEMR CVS packages"
+echo "Done creating OpenEMR CVS packages" >> $LOG
+#Edit some php.ini settings and restart apache (pending)
+
+#INSTALL AND CONFIGURE OPENEMR
+echo "Configuring OpenEMR"
+echo "Configuring OpenEMR" >> $LOG
+# Set file and directory permissions
+chmod 666 $OPENEMR/library/sqlconf.php
+chmod 666 $OPENEMR/gacl/gacl.ini.php
+chmod 666 $OPENEMR/gacl/gacl.class.php
+chown -R apache:apache $SITEDIR/documents
+chown -R apache:apache $SITEDIR/edi
+chown -R apache:apache $SITEDIR/era
+chown -R apache:apache $OPENEMR/library/freeb
+chown -R apache:apache $SITEDIR/letter_templates
+chown -R apache:apache $OPENEMR/interface/main/calendar/modules/PostCalendar/pntemplates/cache
+chown -R apache:apache $OPENEMR/interface/main/calendar/modules/PostCalendar/pntemplates/compiled
+chown -R apache:apache $OPENEMR/gacl/admin/templates_c
+#
+# CONVERT setup.php file to script, then run it
+#
+cp $OPENEMR/setup.php $OPENEMR/TEMPsetup.php
+# Set the path variable in setup.php
+sed -e 's@\$manualPath = \"\"\;@\$manualPath = \"'$OPENEMR'\/\"\;@' <$OPENEMR/TEMPsetup.php >$OPENEMR/TEMP2setup.php
+mv -f $OPENEMR/TEMP2setup.php $OPENEMR/TEMPsetup.php
+# Set the variables in setup.php
+sed -e 's@\/\/END POST VARIABLES@\
+    $host = '\'''$setHost''\'';\
+    $server = '\'''$setHost''\'';\
+    $port = '$setPort';\
+    $dbname = '\'''$setDbname''\'';\
+    $root = '\'''$setRoot''\'';\
+    $login = '\'''$setLogin''\'';\
+    $pass = '\'''$setPass''\'';\
+    $loginhost = '\'''$setLoginhost''\'';\
+    $rootpass = '\'''$setRootpass''\'';\
+    $iuser = '\'''$setIuser''\'';\
+    $iuname = '\'''$setIuname''\'';\
+    $igroup = '\'''$setIgroup''\'';\
+    $collate = '\'''$setColl''\'';\
+    $inst = 1;@' <$OPENEMR/TEMPsetup.php >$OPENEMR/TEMP2setup.php
+mv -f $OPENEMR/TEMP2setup.php $OPENEMR/TEMPsetup.php
+# Remove form functionality
+sed -e 's@<INPUT TYPE='\''SUBMIT'\'' VALUE='\''Continue'\''>@ @' <$OPENEMR/TEMPsetup.php >$OPENEMR/TEMP2setup.php
+mv -f $OPENEMR/TEMP2setup.php $OPENEMR/TEMPsetup.php
+#prepare gacl/setup.php script
+cp $OPENEMR/gacl/setup.php $OPENEMR/gacl/TEMP2setup.php
+sed -e 's@.\/gacl\/gacl.ini.php@'$OPENEMR'\/gacl\/gacl.ini.php@' <$OPENEMR/gacl/setup.php >$OPENEMR/gacl/TEMPsetup.php
+mv -f $OPENEMR/gacl/TEMPsetup.php $OPENEMR/gacl/setup.php
+sed -e 's@.\/gacl\/admin\/gacl_admin.inc.php@'$OPENEMR'\/gacl\/admin\/gacl_admin.inc.php@' <$OPENEMR/gacl/setup.php >$OPENEMR/gacl/TEMPsetup.php
+mv -f $OPENEMR/gacl/TEMPsetup.php $OPENEMR/gacl/setup.php
+sed -e 's@.\/gacl\/schema.xml@'$OPENEMR'\/gacl\/schema.xml@' <$OPENEMR/gacl/setup.php >$OPENEMR/gacl/TEMPsetup.php
+mv -f $OPENEMR/gacl/TEMPsetup.php $OPENEMR/gacl/setup.php
+#prepare library/acl.inc script
+cp $OPENEMR/library/acl.inc $OPENEMR/library/TEMP2acl.inc
+sed -e 's@\$phpgacl_location = \"gacl\";@\$phpgacl_location = \"'$OPENEMR'\/gacl\";@' <$OPENEMR/library/acl.inc >$OPENEMR/library/TEMPacl.inc
+mv -f $OPENEMR/library/TEMPacl.inc $OPENEMR/library/acl.inc
+# (step 3) Set up OpenEMR and MySQL
+sed -e 's@$state = $_POST\["state"\];@$state = 3;@' <$OPENEMR/TEMPsetup.php >$OPENEMR/TEMP2setup.php
+mv -f $OPENEMR/TEMP2setup.php $OPENEMR/TEMPsetup.php
+php -f $OPENEMR/TEMPsetup.php >> $LOG
+# (step 4) Configure sqlconf.php file
+sed -e 's@$state = 3;@$state = 4;@' <$OPENEMR/TEMPsetup.php >$OPENEMR/TEMP2setup.php
+mv -f $OPENEMR/TEMP2setup.php $OPENEMR/TEMPsetup.php
+php -f $OPENEMR/TEMPsetup.php >> $LOG
+rm -f $OPENEMR/TEMPsetup.php
+#reinstitute file permissions
+chmod 644 $SITEDIR/sqlconf.php
+#replace original acl.inc and gacl/setup.php script
+mv $OPENEMR/library/TEMP2acl.inc $OPENEMR/library/acl.inc
+mv $OPENEMR/gacl/TEMP2setup.php $OPENEMR/gacl/setup.php
+echo "Done configuring OpenEMR"
+echo "Done configuring OpenEMR" >> $LOG

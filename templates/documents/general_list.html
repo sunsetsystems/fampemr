@@ -1,0 +1,35 @@
+<html>
+<head>
+{php}html_header_show();{/php}
+
+<link rel="stylesheet" href="{php}echo $GLOBALS['css_header']; {/php}" type="text/css">
+
+{literal}
+{/literal}
+
+<script src="DocumentTreeMenu.js" language="JavaScript" type="text/javascript"></script>
+</head>
+<body bgcolor="{$STYLE.BGCOLOR2}">
+<div id="documents_list">
+<table>
+	<tr>
+		<td height="20" valign="top">{xl t='Document Categories'}<br>
+			&nbsp;&nbsp;&nbsp;<a href="#" onclick="javascript:objTreeMenu_1.collapseAll();return false;">{xl t='collapse all'}</a>
+		</td>
+	</tr>
+	<tr>
+		<td valign="top">{$tree_html}</td>
+	</tr>
+</table>
+</div>
+<div id="documents_actions">
+		{if $message}
+			{$message}<br>
+		{/if}
+		{if $messages}
+			{$messages}<br>
+		{/if}
+		{$activity}
+</div>
+</body>
+</html>

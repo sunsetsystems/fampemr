@@ -1,0 +1,18 @@
+<table>
+	<tr>
+		<td><b>{xl t='Name'}</b></td>
+		<td><b>{xl t='City, State'}</b></td>
+		<td><b>{xl t='Default X12 Partner'}</b></td>
+	</tr>
+	{foreach from=$icompanies item=insurancecompany}
+	<tr>
+		<td><a href="{$CURRENT_ACTION}action=edit&id={$insurancecompany->id}" onsubmit="return top.restoreSession()">{$insurancecompany->name}&nbsp;</a></td>
+		<td>{$insurancecompany->address->city} {$insurancecompany->address->state|upper}&nbsp;</td>
+		<td>{$insurancecompany->get_x12_default_partner_name()}</td>
+	</tr>
+	{foreachelse}
+	<tr>
+		<td colspan="3">{xl t='No Insurance Companies Found'}</td>
+	</tr>
+	{/foreach}
+</table>
