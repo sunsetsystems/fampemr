@@ -425,6 +425,13 @@ $GLOBALS_METADATA = array(
       xl('Discounts at checkout time are entered as money amounts, as opposed to percentage.')
     ),
 
+    'gbl_visit_referral_source' => array(
+      xl('Referral Source for Encounters'),
+      'bool',                           // data type
+      '0',                              // default = false
+      xl('A referral source may be specified for each visit.')
+    ),
+
     'gbl_mask_patient_id' => array(
       xl('Mask for Patient IDs'),
       'text',                           // data type
@@ -526,6 +533,7 @@ $GLOBALS_METADATA = array(
       xl('Maximum idle time in seconds before logout. Default is 7200 (2 hours).')
     ),
 
+    /*****************************************************************
     'secure_password' => array(
       xl('Require Strong Passwords'),
       'bool',                           // data type
@@ -588,6 +596,7 @@ $GLOBALS_METADATA = array(
       '',                               // default
       xl('Email address, if any, to receive emergency login user activation messages.')
     ),
+    *****************************************************************/
 
   ),
 

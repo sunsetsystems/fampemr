@@ -343,7 +343,8 @@ CREATE TABLE `drugs` (
   `name` varchar(255) NOT NULL DEFAULT '',
   `ndc_number` varchar(20) NOT NULL DEFAULT '',
   `on_order` int(11) NOT NULL default '0',
-  `reorder_point` int(11) NOT NULL default '0',
+  `reorder_point` float NOT NULL DEFAULT 0.0,
+  `max_level` float NOT NULL DEFAULT 0.0,
   `last_notify` date NOT NULL default '0000-00-00',
   `reactions` text,
   `form` int(3) NOT NULL default '0',
@@ -489,6 +490,7 @@ CREATE TABLE `form_encounter` (
   `provider_id` INT(11) DEFAULT '0' COMMENT 'default and main provider for this visit',
   `supervisor_id` INT(11) DEFAULT '0' COMMENT 'supervising provider, if any, for this visit',
   `invoice_refno` varchar(31) NOT NULL DEFAULT '',
+  `referral_source` varchar(31) NOT NULL DEFAULT '',
   PRIMARY KEY  (`id`),
   KEY `pid` (`pid`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;

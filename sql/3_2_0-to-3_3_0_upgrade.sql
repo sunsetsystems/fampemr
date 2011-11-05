@@ -365,3 +365,12 @@ ALTER TABLE lists
   ADD injury_grade varchar(31) NOT NULL DEFAULT '';
 #EndIf
 
+#IfMissingColumn form_encounter referral_source
+ALTER TABLE form_encounter ADD referral_source varchar(31) NOT NULL DEFAULT '';
+#EndIf
+
+#IfMissingColumn drugs max_level
+ALTER TABLE drugs ADD max_level float NOT NULL DEFAULT 0.0;
+ALTER TABLE drugs CHANGE reorder_point reorder_point float NOT NULL DEFAULT 0.0;
+#EndIf
+
