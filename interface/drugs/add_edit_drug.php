@@ -158,6 +158,7 @@ if (($_POST['form_save'] || $_POST['form_delete']) && !$alertmsg) {
      "ndc_number = '"     . escapedff('form_ndc_number')    . "', " .
      "on_order = '"       . escapedff('form_on_order')      . "', " .
      "reorder_point = '"  . escapedff('form_reorder_point') . "', " .
+     "max_level = '"      . escapedff('form_max_level')     . "', " .
      "form = '"           . escapedff('form_form')          . "', " .
      "size = '"           . escapedff('form_size')          . "', " .
      "unit = '"           . escapedff('form_unit')          . "', " .
@@ -182,7 +183,7 @@ if (($_POST['form_save'] || $_POST['form_delete']) && !$alertmsg) {
   else if ($_POST['form_save']) { // saving a new drug
    $new_drug = true;
    $drug_id = sqlInsert("INSERT INTO drugs ( " .
-    "name, ndc_number, on_order, reorder_point, form, " .
+    "name, ndc_number, on_order, reorder_point, max_level, form, " .
     "size, unit, route, cyp_factor, related_code, " .
     "allow_multiple, allow_combining, active " .
     ") VALUES ( " .
@@ -190,6 +191,7 @@ if (($_POST['form_save'] || $_POST['form_delete']) && !$alertmsg) {
     "'" . escapedff('form_ndc_number')    . "', " .
     "'" . escapedff('form_on_order')      . "', " .
     "'" . escapedff('form_reorder_point') . "', " .
+    "'" . escapedff('form_max_level')     . "', " .
     "'" . escapedff('form_form')          . "', " .
     "'" . escapedff('form_size')          . "', " .
     "'" . escapedff('form_unit')          . "', " .
@@ -273,6 +275,7 @@ else {
     'ndc_number' => '',
     'on_order' => '0',
     'reorder_point' => '0',
+    'max_level' => '0',
     'form' => '',
     'size' => '',
     'unit' => '',
@@ -331,9 +334,18 @@ else {
  </tr>
 
  <tr>
-  <td valign='top' nowrap><b><?php xl('Reorder At','e'); ?>:</b></td>
+  <td valign='top' nowrap><b><?php xl('Limits','e'); ?>:</b></td>
   <td>
-   <input type='text' size='5' name='form_reorder_point' maxlength='7' value='<?php echo $row['reorder_point'] ?>' />
+   <?php xl('Minimum','e'); ?>
+   <input type='text' size='5' name='form_reorder_point' maxlength='7'
+    value='<?php echo $row['reorder_point'] ?>'
+    title='<?php xl('Reorder point, 0 if not applicable','e'); ?>'
+    />
+   &nbsp;<?php xl('Maximum','e'); ?>
+   <input type='text' size='5' name='form_max_level' maxlength='7'
+    value='<?php echo $row['max_level'] ?>'
+    title='<?php xl('Maximum reasonable inventory, 0 if not applicable','e'); ?>'
+    />
   </td>
  </tr>
 
