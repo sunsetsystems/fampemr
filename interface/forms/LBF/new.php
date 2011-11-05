@@ -289,22 +289,25 @@ function sel_related() {
         echo " /><b>" . xl_layout_label($group_name) . "</b></span>\n";
         echo "<div id='div_$group_seq' class='section' style='display:$display_style;'>\n";
       }
-      echo " <table border='0' cellpadding='0' width='100%'>\n";
+      // echo " <table border='0' cellpadding='0' width='100%'>\n";
+      echo " <table border='0' cellpadding='0'>\n";
       $display_style = 'none';
 
       // NEW: Initialize historical data array and write date headers.
       $historical_ids = array();
       if ($formhistory > 0) {
-        echo "<th colspan='$CPR' align='center'>" . xl('Current') . "</th>\n";
+        echo " <tr>";
+        echo "<td colspan='$CPR' align='right' class='bold'>" . xl('Current') . "</th>\n";
         $hres = sqlStatement("SELECT date, form_id FROM forms WHERE " .
           "pid = '$pid' AND formdir = '$formname' AND " .
           "form_id != '$formid' AND deleted = 0 " .
           "ORDER BY date DESC LIMIT $formhistory");
         while ($hrow = sqlFetchArray($hres)) {
           $historical_ids[$hrow['form_id']] = '';
-          echo "<th colspan='$CPR' align='left'>" . $hrow['date'] . "</th>\n";
+          echo "<td colspan='$CPR' align='right' class='bold'>&nbsp;" . $hrow['date'] . "</th>\n";
           // TBD: Format date per globals.
         }
+        echo " </tr>";
       }
 
     }
@@ -324,7 +327,8 @@ function sel_related() {
     // Handle starting of a new label cell.
     if ($titlecols > 0) {
       end_cell();
-      echo "<td valign='top' colspan='$titlecols' width='1%' nowrap";
+      // echo "<td valign='top' colspan='$titlecols' width='1%' nowrap";
+      echo "<td valign='top' colspan='$titlecols' nowrap";
       echo " class='";
       echo ($frow['uor'] == 2) ? "required" : "bold";
       if ($graphable) echo " graph";
@@ -335,7 +339,8 @@ function sel_related() {
 
       // NEW:
       foreach ($historical_ids as $key => $dummy) {
-        $historical_ids[$key] .= "<td valign='top' colspan='$titlecols' class='text' width='1%' nowrap>";
+        // $historical_ids[$key] .= "<td valign='top' colspan='$titlecols' class='text' width='1%' nowrap>";
+        $historical_ids[$key] .= "<td valign='top' colspan='$titlecols' class='text' nowrap>";
       }
 
       $cell_count += $titlecols;
@@ -351,13 +356,13 @@ function sel_related() {
     // Handle starting of a new data cell.
     if ($datacols > 0) {
       end_cell();
-      echo "<td valign='top' colspan='$datacols' class='text'";
+      echo "<td valign='top' align='right' colspan='$datacols' class='text'";
       if ($cell_count > 0) echo " style='padding-left:5pt'";
       echo ">";
 
       // NEW:
       foreach ($historical_ids as $key => $dummy) {
-        $historical_ids[$key] .= "<td valign='top' colspan='$datacols' class='text'>";
+        $historical_ids[$key] .= "<td valign='top' align='right' colspan='$datacols' class='text'>";
       }
 
       $cell_count += $datacols;

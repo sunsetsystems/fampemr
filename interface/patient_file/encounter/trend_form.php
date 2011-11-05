@@ -99,7 +99,9 @@ $(document).ready(function(){
   );
 
   // show blood pressure graph by default
-<?php if ($is_lbf) { ?>
+<?php if ($formname == 'LBFfms') { ?>
+  show_graph('<?php echo $formname; ?>','total','Sum of Scores');
+<?php } else if ($is_lbf) { ?>
   show_graph('<?php echo $formname; ?>','bp_systolic','');
 <?php } else { ?>
   show_graph('form_vitals','bps','');

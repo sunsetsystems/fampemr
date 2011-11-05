@@ -21,12 +21,12 @@ function vbfComputeBMI() {
  var f = document.forms[0];
  var bmi = 0;
  var stat = '';
- var height = f.form_height_in.value;
- var weight = f.form_weight_lbs.value;
- if(height == 0 || weight == 0) {
+ var height = parseFloat(f.form_height_in.value);
+ var weight = parseFloat(f.form_weight_lbs.value);
+ if(isNaN(height) || isNaN(weight) || height <= 0 || weight <= 0) {
   bmi = '';
  }
- else if((height == parseFloat(height)) && (weight == parseFloat(weight))) {
+ else {
   bmi = weight / height / height * 703;
   bmi = bmi.toFixed(1);
   if      (bmi > 42  ) stat = '" . xl('Obesity III') . "';
@@ -35,9 +35,6 @@ function vbfComputeBMI() {
   else if (bmi > 27  ) stat = '" . xl('Overweight' ) . "';
   else if (bmi > 18.5) stat = '" . xl('Normal'     ) . "';
   else                 stat = '" . xl('Underweight') . "';
- }
- else {
-  bmi = '';
  }
  if (f.form_bmi) f.form_bmi.value = bmi;
  if (f.form_bmi_status) f.form_bmi_status.value = stat;
@@ -207,10 +204,11 @@ if (f.form_height_in && f.form_height_cm) {
  f.form_height_cm.onchange = function () { vbf_height_cm_changed(); };
 }
 if (f.form_temperature_f && f.form_temperature_c) {
- // Set onchange handlers to convert centigrade to farenheiht and vice versa.
+ // Set onchange handlers to convert centigrade to farenheit and vice versa.
  f.form_temperature_f.onchange = function () { vbf_temperature_f_changed(); };
  f.form_temperature_c.onchange = function () { vbf_temperature_c_changed(); };
 }
+// Set computed fields to be readonly.
 if (f.form_bmi) {
  f.form_bmi.readOnly = true;
 }
@@ -220,6 +218,7 @@ if (f.form_bmi_status) {
 if (f.form_body_fat) {
  f.form_body_fat.readOnly = true;
 }
+// More of the same, for skin folds.
 if (f.form_sf_sum) {
  f.form_sf_sum.readOnly = true;
  for (var i = 0; i < f.elements.length; ++i) {
