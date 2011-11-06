@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2008-2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2008-2011 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -21,15 +21,12 @@ $report_type = empty($_GET['t']) ? 'i' : $_GET['t'];
 
 $from_date     = fixDate($_POST['form_from_date']);
 $to_date       = fixDate($_POST['form_to_date'], date('Y-m-d'));
-$form_by       = $_POST['form_by'];     // this is a scalar
+$form_by_arr   = $_POST['form_by'];     // this is an array
 $form_show     = $_POST['form_show'];   // this is an array
 $form_facility = isset($_POST['form_facility']) ? $_POST['form_facility'] : '';
 $form_sexes    = isset($_POST['form_sexes']) ? $_POST['form_sexes'] : '3';
 $form_content  = isset($_POST['form_content']) ? $_POST['form_content'] : '1';
 $form_output   = isset($_POST['form_output']) ? 0 + $_POST['form_output'] : 1;
-
-if (empty($form_by))    $form_by = '1';
-if (empty($form_show))  $form_show = array('1');
 
 // One of these is chosen as the left column, or Y-axis, of the report.
 //
@@ -103,32 +100,11 @@ else {
   );
 }
 
-// This will become the array of reportable values.
-$areport = array();
-
-// This accumulates the bottom line totals.
-$atotals = array();
-
-$arr_show   = array(
-  '.total' => array('title' => 'Total'),
-  '.age2'  => array('title' => 'Age Category (2)'),
-  '.age9'  => array('title' => 'Age Category (9)'),
-); // info about selectable columns
-
-$arr_titles = array(); // will contain column headers
-
-// Query layout_options table to generate the $arr_show table.
-// Table key is the field ID.
-$lres = sqlStatement("SELECT field_id, title, data_type, list_id, description " .
-  "FROM layout_options WHERE " .
-  "form_id = 'DEM' AND uor > 0 AND field_id NOT LIKE 'em%' " .
-  "ORDER BY group_name, seq, title");
-while ($lrow = sqlFetchArray($lres)) {
-  $fid = $lrow['field_id'];
-  if ($fid == 'fname' || $fid == 'mname' || $fid == 'lname') continue;
-  $arr_show[$fid] = $lrow;
-  $arr_titles[$fid] = array();
+if (empty($form_by_arr)) {
+  $tmp = array_keys($arr_by);
+  $form_by_arr = array($tmp[0]);
 }
+if (empty($form_show)) $form_show = array('1');
 
 // Compute age in years given a DOB and "as of" date.
 //
@@ -160,23 +136,6 @@ function genEndRow() {
   }
 }
 
-/*********************************************************************
-function genAnyCell($data, $right=false, $class='') {
-  global $cellcount;
-  if ($_POST['form_csvexport']) {
-    if ($cellcount) echo ',';
-    echo '"' . $data . '"';
-  }
-  else {
-    echo "  <td";
-    if ($class) echo " class='$class'";
-    if ($right) echo " align='right'";
-    echo ">$data</td>\n";
-  }
-  ++$cellcount;
-}
-*********************************************************************/
-
 function getListTitle($list, $option) {
   $row = sqlQuery("SELECT title FROM list_options WHERE " .
     "list_id = '$list' AND option_id = '$option'");
@@ -186,7 +145,7 @@ function getListTitle($list, $option) {
 
 // Usually this generates one cell, but allows for two or more.
 //
-function genAnyCell($data, $right=false, $class='', $colspan=1) {
+function genAnyCell($data, $align='left', $class='', $colspan=1) {
   global $cellcount, $form_output;
   if (!is_array($data)) {
     $data = array(0 => $data);
@@ -199,16 +158,16 @@ function genAnyCell($data, $right=false, $class='', $colspan=1) {
     else {
       echo "  <td";
       if ($class) echo " class='$class'";
-      if ($colspan > 1) echo " colspan='$colspan' align='center'";
-      else if ($right) echo " align='right'";
+      if ($colspan > 1) echo " colspan='$colspan'";
+      if ($align) echo " align='$align'";
       echo ">$datum</td>\n";
     }
     ++$cellcount;
   }
 }
 
-function genHeadCell($data, $right=false, $colspan=1) {
-  genAnyCell($data, $right, 'dehead', $colspan);
+function genHeadCell($data, $align='left', $colspan=1) {
+  genAnyCell($data, $align, 'dehead', $colspan);
 }
 
 // Create an HTML table cell containing a numeric value, and track totals.
@@ -217,7 +176,7 @@ function genNumCell($num, $cnum) {
   global $atotals, $form_output;
   $atotals[$cnum] += $num;
   if (empty($num) && $form_output != 3) $num = '&nbsp;';
-  genAnyCell($num, true, 'detail');
+  genAnyCell($num, 'right', 'detail');
 }
 
 // Translate an IPPF code to the corresponding descriptive name of its
@@ -331,48 +290,6 @@ function getAbortionMethod($code) {
   return $key;
 }
 
-/*********************************************************************
-// Helper function to look up the GCAC issue associated with a visit.
-// Ideally this is the one and only GCAC issue linked to the encounter.
-// However if there are multiple such issues, or if only unlinked issues
-// are found, then we pick the one with its start date closest to the
-// encounter date.
-//
-function getGcacData($row, $what, $morejoins="") {
-  $patient_id = $row['pid'];
-  $encounter_id = $row['encounter'];
-  $encdate = substr($row['encdate'], 0, 10);
-  $query = "SELECT $what " .
-    "FROM lists AS l " .
-    "JOIN lists_ippf_gcac AS lg ON l.type = 'ippf_gcac' AND lg.id = l.id " .
-    "LEFT JOIN issue_encounter AS ie ON ie.pid = '$patient_id' AND " .
-    "ie.encounter = '$encounter_id' AND ie.list_id = l.id " .
-    "$morejoins " .
-    "WHERE l.pid = '$patient_id' AND " .
-    "l.activity = 1 AND l.type = 'ippf_gcac' " .
-    "ORDER BY ie.pid DESC, ABS(DATEDIFF(l.begdate, '$encdate')) ASC " .
-    "LIMIT 1";
-  // Note that reverse-ordering by ie.pid is a trick for sorting
-  // issues linked to the encounter (non-null values) first.
-  return sqlQuery($query);
-}
-
-// Get the "client status" field from the related GCAC issue.
-//
-function getGcacClientStatus($row) {
-  $irow = getGcacData($row, "lo.title", "LEFT JOIN list_options AS lo ON " .
-    "lo.list_id = 'clientstatus' AND lo.option_id = lg.client_status");
-  if (empty($irow['title'])) {
-    $key = xl('Indeterminate');
-  }
-  else {
-    // The client status description should be just fine for this.
-    $key = $irow['title'];
-  }
-  return $key;
-}
-*********************************************************************/
-
 // Determine if a recent gcac service was performed.
 //
 function hadRecentAbService($pid, $encdate) {
@@ -422,18 +339,6 @@ function getGcacClientStatus($row) {
   if (!empty($irow['title'])) return $irow['title'];
 
   // Check for a referred abortion.
-  /*
-  $query = "SELECT COUNT(*) AS count " .
-    "FROM transactions AS t, codes AS c WHERE " .
-    "t.title = 'Referral' AND " .
-    "t.refer_date IS NOT NULL AND " .
-    "t.refer_date <= '$encdate' AND " .
-    "DATE_ADD(t.refer_date, INTERVAL 14 DAY) > '$encdate' AND " .
-    "t.refer_related_code LIKE 'REF:%' AND " .
-    "c.code_type = '16' AND " .
-    "c.code = SUBSTRING(t.refer_related_code, 5) AND " .
-    "( c.related_code LIKE '%IPPF:252223%' OR c.related_code LIKE '%IPPF:252224%' )";
-  */
   $query = "SELECT COUNT(*) AS count " .
     "FROM transactions AS t " .
     "LEFT JOIN codes AS c ON t.refer_related_code LIKE 'REF:%' AND " .
@@ -634,29 +539,6 @@ function process_ippf_code($row, $code, $quantity=1) {
     }
   }
 
-  /*******************************************************************
-  // Contraceptive method for new contraceptive adoption following abortion.
-  // Get it from the IPPF code if an abortion issue is linked to the visit.
-  // Note we are handling this during processing of services rather than
-  // by enumerating issues, because we need the service date.
-  //
-  else if ($form_by === '7') {
-    $key = getContraceptiveMethod($code);
-    if (empty($key)) return;
-    $patient_id = $row['pid'];
-    $encounter_id = $row['encounter'];
-    $query = "SELECT COUNT(*) AS count " .
-      "FROM lists AS l " .
-      "JOIN issue_encounter AS ie ON ie.pid = '$patient_id' AND " .
-      "ie.encounter = '$encounter_id' AND ie.list_id = l.id " .
-      "WHERE l.pid = '$patient_id' AND " .
-      "l.activity = 1 AND l.type = 'ippf_gcac'";
-    // echo "<!-- $key: $query -->\n"; // debugging
-    $irow = sqlQuery($query);
-    if (empty($irow['count'])) return;
-  }
-  *******************************************************************/
-
   // Contraceptive method for new contraceptive adoption following abortion.
   // Get it from the IPPF code if there is a suitable recent GCAC form.
   //
@@ -694,41 +576,6 @@ function process_ippf_code($row, $code, $quantity=1) {
       return;
     }
   }
-
-  /*******************************************************************
-  // Complications of abortion by abortion method and complication type.
-  // These may be noted either during recovery or during a followup visit.
-  // Again, driven by services in order to report by service date.
-  // Note: If there are multiple complications, they will all be reported.
-  //
-  else if ($form_by === '11') {
-    $compl_type = '';
-    if (preg_match('/^25222[345]/', $code)) { // all abortions including incomplete
-      $compl_type = 'rec_compl';
-    }
-    else if (preg_match('/^25222[67]/', $code)) { // all post-abortion care and followup
-      $compl_type = 'fol_compl';
-    }
-    else {
-      return;
-    }
-    $irow = getGcacData($row, "lg.$compl_type, lo.title",
-      "LEFT JOIN list_options AS lo ON lo.list_id = 'in_ab_proc' AND " .
-      "lo.option_id = lg.in_ab_proc");
-    if (empty($irow)) return; // this should not happen
-    if (empty($irow[$compl_type])) return; // ok, no complications
-    // We have one or more complications.
-    $abtype = empty($irow['title']) ? xl('Indeterminate') : $irow['title'];
-    $acompl = explode('|', $irow[$compl_type]);
-    foreach ($acompl as $compl) {
-      $crow = sqlQuery("SELECT title FROM list_options WHERE " .
-        "list_id = 'complication' AND option_id = '$compl'");
-      $key = "$abtype / " . $crow['title'];
-      loadColumnData($key, $row);
-    }
-    return; // because loadColumnData() is already done.
-  }
-  *******************************************************************/
 
   // Pre-Abortion Counseling.  Three possible situations:
   //   Provided abortion in the MA clinics
@@ -872,36 +719,6 @@ function process_visit($row) {
   // loadColumnData() already done as needed.
 }
 
-/*********************************************************************
-// This is called for each issue that is selected.
-//
-function process_issue($row) {
-  global $form_by;
-
-  $key = 'Unspecified';
-
-  // Pre-Abortion Counseling.  Three possible rows:
-  //   Provided abortion in the MA clinics
-  //   Referred to other service providers (govt,private clinics)
-  //   Decided not to have the abortion
-  //
-  if ($form_by === '12') {
-
-    // TBD: Assign one of the 3 keys, or just return.
-
-  }
-
-  // Others TBD
-
-  else {
-    return;
-  }
-
-  // TBD: Load column data from the issue.
-  // loadColumnData($key, $row);
-}
-*********************************************************************/
-
 // This is called for each selected referral.
 // Row keys are the first specified MA code, if any.
 //
@@ -954,6 +771,27 @@ function uses_description($form_by) {
     $form_by === '10' || $form_by === '20' || $form_by === '104');
 }
 
+$arr_show   = array(
+  '.total' => array('title' => 'Total'),
+  '.age2'  => array('title' => 'Age Category (2)'),
+  '.age9'  => array('title' => 'Age Category (9)'),
+); // info about selectable columns
+
+$arr_titles = array(); // will contain column headers
+
+// Query layout_options table to generate the $arr_show table.
+// Table key is the field ID.
+$lres = sqlStatement("SELECT field_id, title, data_type, list_id, description " .
+  "FROM layout_options WHERE " .
+  "form_id = 'DEM' AND uor > 0 AND field_id NOT LIKE 'em%' " .
+  "ORDER BY group_name, seq, title");
+while ($lrow = sqlFetchArray($lres)) {
+  $fid = $lrow['field_id'];
+  if ($fid == 'fname' || $fid == 'mname' || $fid == 'lname') continue;
+  $arr_show[$fid] = $lrow;
+  $arr_titles[$fid] = array();
+}
+
   // If we are doing the CSV export then generate the needed HTTP headers.
   // Otherwise generate HTML.
   //
@@ -1004,12 +842,12 @@ function uses_description($form_by) {
    f.form_by.selectedIndex = -1;
    f['form_show[]'].selectedIndex = -1;
    selectByValue(f.form_content, a[0]);
-   selectByValue(f.form_by, a[1]);
+   selectByValue(f['form_by[]'], a[1]);
    for (var i = 2; i < a.length; ++i) {
     selectByValue(f['form_show[]'], a[i]);
    }
   }
-  f.form_by.style.visibility = isdis;
+  f['form_by[]'].style.visibility = isdis;
   f.form_content.style.visibility = isdis;
   f['form_show[]'].style.visibility = isdis;
  }
@@ -1058,11 +896,12 @@ function uses_description($form_by) {
    <?php xl('Rows','e'); ?>:
   </td>
   <td valign='top' class='detail'>
-   <select name='form_by' title='Left column of report'>
+   <select name='form_by[]' size='3' multiple
+    title='<?php xl('Hold down Ctrl to select multiple reports','e'); ?>'>
 <?php
   foreach ($arr_by as $key => $value) {
     echo "    <option value='$key'";
-    if ($key == $form_by) echo " selected";
+    if (is_array($form_by_arr) && in_array($key, $form_by_arr)) echo " selected";
     echo ">" . $value . "</option>\n";
   }
 ?>
@@ -1086,6 +925,7 @@ function uses_description($form_by) {
    &nbsp;
   </td>
  </tr>
+
  <tr>
   <td valign='top' class='dehead' nowrap>
    <?php xl('Columns','e'); ?>:
@@ -1166,6 +1006,7 @@ function uses_description($form_by) {
    </table>
   </td>
  </tr>
+
  <tr>
   <td valign='top' class='dehead' nowrap>
    <?php xl('To','e'); ?>:
@@ -1192,7 +1033,28 @@ foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $va
 <?php
   } // end not export
 
-  if ($_POST['form_submit']) {
+// If refresh or export...
+//
+if ($_POST['form_submit']) {
+
+  // Start table.
+  if ($form_output != 3) {
+    echo "<table border='0' cellpadding='1' cellspacing='2' width='98%'>\n";
+  } // end not csv export
+
+  $report_col_count = 0;
+
+  // Start report loop.  This loops once for each report selected from the
+  // "Rows" list.
+  //
+  foreach ($form_by_arr as $form_by) {
+
+    // This will become the array of reportable values.
+    $areport = array();
+
+    // This accumulates the bottom line totals.
+    $atotals = array();
+
     $pd_fields = '';
     foreach ($arr_show as $askey => $asval) {
       if (substr($askey, 0, 1) == '.') continue;
@@ -1302,68 +1164,6 @@ foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $va
         process_referral($row);
       }
     }
-    /*****************************************************************
-    else if ($form_by === '12') {
-      // We are reporting on a date range, and assume the applicable date is
-      // the issue start date which is presumably also the date of pre-
-      // abortion counseling.  The issue end date and the surgery date are
-      // not of interest here.
-      $query = "SELECT " .
-        "l.type, l.begdate, l.pid, " .
-        "pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, pd.userlist5, " .
-        "pd.country_code, pd.status, pd.state, pd.occupation, " .
-        "lg.client_status, lg.ab_location " .
-        "FROM lists AS l " .
-        "JOIN patient_data AS pd ON pd.pid = l.pid $sexcond" .
-        "LEFT OUTER JOIN lists_ippf_gcac AS lg ON l.type = 'ippf_gcac' AND lg.id = l.id " .
-        // "LEFT OUTER JOIN lists_ippf_con  AS lc ON l.type = 'contraceptive' AND lc.id = l.id " .
-        "WHERE l.begdate >= '$from_date' AND l.begdate <= '$to_date' AND " .
-        "l.activity = 1 AND l.type = 'ippf_gcac' " .
-        "ORDER BY l.pid, l.id";
-      $res = sqlStatement($query);
-      while ($row = sqlFetchArray($res)) {
-        process_issue($row);
-      }
-    }
-    *****************************************************************/
-
-    // else {
-
-    /*****************************************************************
-    if ($form_by === '104' || $form_by === '105') {
-      $query = "SELECT " .
-        "d.name, d.related_code, ds.pid, ds.quantity, " . 
-        "pd.regdate, pd.referral_source, " .
-        "pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, " .
-        "pd.contrastart$pd_fields " .
-        "FROM drug_sales AS ds " .
-        "JOIN drugs AS d ON d.drug_id = ds.drug_id " .
-        "JOIN patient_data AS pd ON pd.pid = ds.pid $sexcond" .
-        "WHERE ds.sale_date IS NOT NULL AND ds.pid != 0 AND " .
-        "ds.sale_date >= '$from_date' AND ds.sale_date <= '$to_date' " .
-        "ORDER BY ds.pid, ds.sale_id";
-      $res = sqlStatement($query);
-      while ($row = sqlFetchArray($res)) {
-        $key = "(Unspecified)";
-        if (!empty($row['related_code'])) {
-          $relcodes = explode(';', $row['related_code']);
-          foreach ($relcodes as $codestring) {
-            if ($codestring === '') continue;
-            list($codetype, $code) = explode(':', $codestring);
-            if ($codetype !== 'IPPF') continue;
-            $key = getContraceptiveMethod($code);
-            if (!empty($key)) break;
-            $key = "(No Method)";
-          }
-        }
-        if ($form_by === '104') $key .= " / " . $row['name'];
-        loadColumnData($key, $row, $row['quantity']);
-      }
-    }
-
-    if ($form_by !== '9' && $form_by !== '10' && $form_by !== '20' &&
-      $form_by !== '104' && $form_by !== '105')
-    *****************************************************************/
 
     if ($form_content != 5 && $form_by !== '9' && $form_by !== '10' && $form_by !== '20')
     {
@@ -1421,40 +1221,53 @@ foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $va
     ksort($areport);
     foreach ($arr_titles as $atkey => $dummy) ksort($arr_titles[$atkey]);
 
-    if ($form_output != 3) {
-      echo "<table border='0' cellpadding='1' cellspacing='2' width='98%'>\n";
-    } // end not csv export
+    // Generate a blank row to separate from the previous report.
+    if ($report_col_count && $form_output != 3) {
+      genStartRow("bgcolor='#ffffff'");
+      genHeadCell('&nbsp;', 'left', $report_col_count);
+      genEndRow();
+    }
 
     // Generate first column headings line, with category titles.
     //
     genStartRow("bgcolor='#dddddd'");
+    /*****
     // If the key is an MA or IPPF code, then add a column for its description.
     if (uses_description($form_by)) {
       genHeadCell(array('', ''));
     } else {
-      genHeadCell('');
+      genHeadCell('', 'left', 2);
     }
+    *****/
+    genHeadCell($arr_by[$form_by], 'left', 2);
+    $report_col_count = 2;
     // Generate headings for values to be shown.
     foreach ($form_show as $value) {
       if ($value == '.total') { // Total Services
         genHeadCell('');
+        ++$report_col_count;
       }
       else if ($value == '.age2') { // Age
-        genHeadCell($arr_show[$value]['title'], false, 2);
+        genHeadCell($arr_show[$value]['title'], 'center', 2);
+        $report_col_count += 2;
       }
       else if ($value == '.age9') { // Age
-        genHeadCell($arr_show[$value]['title'], false, 9);
+        genHeadCell($arr_show[$value]['title'], 'center', 9);
+        $report_col_count += 9;
       }
       else if ($arr_show[$value]['list_id']) {
-        genHeadCell($arr_show[$value]['title'], false, count($arr_titles[$value]));
+        genHeadCell($arr_show[$value]['title'], 'center', count($arr_titles[$value]));
+        $report_col_count += count($arr_titles[$value]);
       }
       else if (!empty($arr_titles[$value])) {
-        genHeadCell($arr_show[$value]['title'], false, count($arr_titles[$value]));
+        genHeadCell($arr_show[$value]['title'], 'center', count($arr_titles[$value]));
+        $report_col_count += count($arr_titles[$value]);
       }
     }
-    if ($form_output != 3) {
+    // if ($form_output != 3) {
       genHeadCell('');
-    }
+      ++$report_col_count;
+    // }
     genEndRow();
 
     // Generate second column headings line, with individual titles.
@@ -1462,9 +1275,9 @@ foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $va
     genStartRow("bgcolor='#dddddd'");
     // If the key is an MA or IPPF code, then add a column for its description.
     if (uses_description($form_by)) {
-      genHeadCell(array($arr_by[$form_by], xl('Description')));
+      genHeadCell(array(xl('Code'), xl('Description')));
     } else {
-      genHeadCell($arr_by[$form_by]);
+      genHeadCell('', 'left', 2);
     }
     // Generate headings for values to be shown.
     foreach ($form_show as $value) {
@@ -1472,34 +1285,34 @@ foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $va
         genHeadCell(xl('Total'));
       }
       else if ($value == '.age2') { // Age
-        genHeadCell(xl('0-24' ), true);
-        genHeadCell(xl('25+'  ), true);
+        genHeadCell(xl('0-24' ), 'right');
+        genHeadCell(xl('25+'  ), 'right');
       }
       else if ($value == '.age9') { // Age
-        genHeadCell(xl('0-10' ), true);
-        genHeadCell(xl('11-14'), true);
-        genHeadCell(xl('15-19'), true);
-        genHeadCell(xl('20-24'), true);
-        genHeadCell(xl('25-29'), true);
-        genHeadCell(xl('30-34'), true);
-        genHeadCell(xl('35-39'), true);
-        genHeadCell(xl('40-44'), true);
-        genHeadCell(xl('45+'  ), true);
+        genHeadCell(xl('0-10' ), 'right');
+        genHeadCell(xl('11-14'), 'right');
+        genHeadCell(xl('15-19'), 'right');
+        genHeadCell(xl('20-24'), 'right');
+        genHeadCell(xl('25-29'), 'right');
+        genHeadCell(xl('30-34'), 'right');
+        genHeadCell(xl('35-39'), 'right');
+        genHeadCell(xl('40-44'), 'right');
+        genHeadCell(xl('45+'  ), 'right');
       }
       else if ($arr_show[$value]['list_id']) {
         foreach ($arr_titles[$value] as $key => $dummy) {
-          genHeadCell(getListTitle($arr_show[$value]['list_id'],$key), true);
+          genHeadCell(getListTitle($arr_show[$value]['list_id'],$key), 'right');
         }
       }
       else if (!empty($arr_titles[$value])) {
         foreach ($arr_titles[$value] as $key => $dummy) {
-          genHeadCell($key, true);
+          genHeadCell($key, 'right');
         }
       }
     }
-    if ($form_output != 3) {
-      genHeadCell(xl('Total'), true);
-    }
+    // if ($form_output != 3) {
+      genHeadCell(xl('Total'), 'right');
+    // }
     genEndRow();
 
     $encount = 0;
@@ -1508,10 +1321,12 @@ foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $va
       $bgcolor = (++$encount & 1) ? "#ddddff" : "#ffdddd";
 
       $dispkey = $key;
+      $dispspan = 2;
 
       // If the key is an MA or IPPF code, then add a column for its description.
       if (uses_description($form_by)) {
         $dispkey = array($key, '');
+        $dispspan = 1;
         $type = $form_by === '102' ? 12 : 11; // MA or IPPF
         $crow = sqlQuery("SELECT code_text FROM codes WHERE " .
           "code_type = '$type' AND code = '$key' ORDER BY id LIMIT 1");
@@ -1520,7 +1335,7 @@ foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $va
 
       genStartRow("bgcolor='$bgcolor'");
 
-      genAnyCell($dispkey, false, 'detail');
+      genAnyCell($dispkey, 'left', 'detail', $dispspan);
 
       // This is the column index for accumulating column totals.
       $cnum = 0;
@@ -1550,10 +1365,10 @@ foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $va
       }
 
       // Write the Total column data.
-      if ($form_output != 3) {
+      // if ($form_output != 3) {
         $atotals[$cnum] += $totalsvcs;
-        genAnyCell($totalsvcs, true, 'dehead');
-      }
+        genAnyCell($totalsvcs, 'right', 'dehead');
+      // }
 
       genEndRow();
     } // end foreach
@@ -1566,18 +1381,23 @@ foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $va
       if (uses_description($form_by)) {
         genHeadCell(array(xl('Totals'), ''));
       } else {
-        genHeadCell(xl('Totals'));
+        genHeadCell(xl('Totals'), 'left', 2);
       }
 
       for ($cnum = 0; $cnum < count($atotals); ++$cnum) {
-        genHeadCell($atotals[$cnum], true);
+        genHeadCell($atotals[$cnum], 'right');
       }
       genEndRow();
-      // End of table.
-      echo "</table>\n";
     }
 
-  } // end of if refresh or export
+  } // end foreach $form_by_arr
+
+  // End of table.
+  if ($form_output != 3) {
+    echo "</table>\n";
+  }
+
+} // end of if refresh or export
 
   if ($form_output != 3) {
 ?>
