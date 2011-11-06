@@ -467,18 +467,23 @@ function genPopupsList($style='') {
   f.popups.disabled = (active_pid == 0);
  }
 
- //
+ // Reference to the search.php window.
  var my_window;
+
+ // Open the search.php window.
  function initFilter() {
     my_window = window.open("../../custom/search.php", "mywindow","status=1");
  }
 
- function processFilter( fieldString ) {
-    document.getElementById('searchFields').value=fieldString;
-    findPatient( "Filter" );
-        my_window.close();
+ // This is called by the search.php (Filter) window.
+ function processFilter(fieldString, serviceCode) {
+  var f = document.forms[0];
+  document.getElementById('searchFields').value = fieldString;
+  f.search_service_code.value = serviceCode;
+  findPatient("Filter");
+  f.search_service_code.value = '';
+  my_window.close();
  }
-
 
  // Process the click to find a patient by name, id, ssn or dob.
  function findPatient(findby) {
@@ -1179,6 +1184,7 @@ onclick="top.restoreSession()">
 
 <input type='hidden' name='findBy' value='Last' />
 <input type="hidden" name="searchFields" id="searchFields"/>
+<input type="hidden" name="search_service_code" value='' />
 
 </form>
 

@@ -4,9 +4,9 @@
 // as published by the Free Software Foundation; either version 2
 // of the License, or (at your option) any later version.
 
-include_once("../../globals.php");
-include_once("$srcdir/patient.inc");
-include_once("$srcdir/formdata.inc.php");
+require_once("../../globals.php");
+require_once("$srcdir/patient.inc");
+require_once("$srcdir/formdata.inc.php");
 
 $fstart = $_REQUEST['fstart'] + 0;
 $popup  = empty($_REQUEST['popup']) ? 0 : 1;
@@ -111,6 +111,10 @@ $sqllimit = $MAXSHOW;
 $given = "*, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS";
 $orderby = "lname ASC, fname ASC";
 
+$search_service_code = strip_escape_custom(trim($_POST['search_service_code']));
+echo "<input type='hidden' name='search_service_code' value='" .
+  htmlentities($search_service_code) . "' />\n";
+
 if ($popup) {
   echo "<input type='hidden' name='popup' value='1' />\n";
 
@@ -138,8 +142,20 @@ if ($popup) {
     }
   }
 
-  $sql = "SELECT $given FROM patient_data " .
+  // If a non-empty service code was given, then restrict to patients who
+  // have been provided that service.  Since the code is used in a LIKE
+  // clause, % and _ wildcards are supported.
+  if ($search_service_code) $where .=
+    " AND ( SELECT COUNT(*) FROM billing AS b WHERE " .
+    "b.pid = patient_data.pid AND " .
+    "b.activity = 1 AND " .
+    "b.code_type != 'COPAY' AND " .
+    "b.code LIKE '" . add_escape_custom($search_service_code) . "' " .
+    ") > 0";
+
+  $sql = "SELECT $given FROM patient_data AS p " .
     "WHERE $where ORDER BY $orderby LIMIT $fstart, $sqllimit";
+
   $rez = sqlStatement($sql);
   $result = array();
   while ($row = sqlFetchArray($rez)) $result[] = $row;
@@ -166,7 +182,8 @@ else {
   else if ($findBy == "Any")
       $result = getByPatientDemographics("$patient", $given, $orderby, $sqllimit, $fstart);
   else if ($findBy == "Filter") {
-      $result = getByPatientDemographicsFilter($searchFields, "$patient", $given, $orderby, $sqllimit, $fstart);
+    $result = getByPatientDemographicsFilter($searchFields, "$patient",
+    $given, $orderby, $sqllimit, $fstart, $search_service_code);
   }
 }
 ?>

@@ -4,7 +4,8 @@
 // as published by the Free Software Foundation; either version 2
 // of the License, or (at your option) any later version.
 
-include_once("{$GLOBALS['srcdir']}/sql.inc");
+require_once("{$GLOBALS['srcdir']}/sql.inc");
+require_once("{$GLOBALS['srcdir']}/formdata.inc.php");
 require_once(dirname(__FILE__) . "/classes/WSWrapper.class.php");
 
 // These are for sports team use:
@@ -425,23 +426,43 @@ function getByPatientDemographics($searchTerm = "%", $given = "pid, id, lname, f
   return $returnval;
 }
 
-function getByPatientDemographicsFilter($searchFields, $searchTerm = "%", $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS", $orderby = "lname ASC, fname ASC", $limit="all", $start="0" )
+function getByPatientDemographicsFilter($searchFields, $searchTerm = "%",
+  $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS",
+  $orderby = "lname ASC, fname ASC", $limit="all", $start="0", $search_service_code='')
 {
 	$layoutCols = split( '~', $searchFields );
   $where = "";
   $i = 0;
-  foreach ($layoutCols as $val ) {
+  foreach ($layoutCols as $val) {
+    if (empty($val)) continue;
 		if ( $i > 0 ) {
-		   $where .= " or ";
+		   $where .= " OR ";
 		}
     if ($val == 'pid') {
   		$where .= " $val = '$searchTerm' ";
     }
     else {
-  		$where .= " $val like '$searchTerm%' ";
+  		$where .= " $val LIKE '$searchTerm%' ";
     }
 		$i++;
 	}
+
+  // If no search terms, ensure valid syntax.
+  if ($i == 0) $where = "1 = 1";
+
+  // If a non-empty service code was given, then restrict to patients who
+  // have been provided that service.  Since the code is used in a LIKE
+  // clause, % and _ wildcards are supported.
+  if ($search_service_code) {
+    $where = "( $where ) AND " .
+      "( SELECT COUNT(*) FROM billing AS b WHERE " .
+      "b.pid = patient_data.pid AND " .
+      "b.activity = 1 AND " .
+      "b.code_type != 'COPAY' AND " .
+      "b.code LIKE '" . add_escape_custom($search_service_code) . "' " .
+      ") > 0";
+  }
+
   $sql = "SELECT $given FROM patient_data WHERE $where ORDER BY $orderby";
   if ($limit != "all") $sql .= " limit $start, $limit";
   $rez = sqlStatement($sql);
