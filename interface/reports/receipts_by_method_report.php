@@ -176,7 +176,7 @@ $form_cptcode   = trim($_POST['form_cptcode']);
 <html>
 <head>
 <?php if (function_exists('html_header_show')) html_header_show(); ?>
-<title><?xl('Receipts Summary','e')?></title>
+<title><?php xl('Receipts Summary','e') ?></title>
 </head>
 
 <body leftmargin='0' topmargin='0' marginwidth='0' marginheight='0'>
@@ -259,33 +259,33 @@ echo "   </select>\n";
 
  <tr bgcolor="#dddddd">
   <td class="dehead">
-   <?xl('Method','e')?>
+   <?php xl('Method','e') ?>
   </td>
   <td class="dehead">
-   <?xl('Date','e')?>
+   <?php xl('Date','e') ?>
   </td>
   <td class="dehead">
-   <?xl('Invoice','e')?>
+   <?php xl('Invoice','e') ?>
   </td>
 <?php if ($showing_ppd) { ?>
   <td class="dehead">
-   <?xl('Patient','e')?>
+   <?php xl('Patient','e') ?>
   </td>
   <td class="dehead">
-   <?xl('Policy','e')?>
+   <?php xl('Policy','e') ?>
   </td>
   <td class="dehead">
-   <?xl('DOS','e')?>
+   <?php xl('DOS','e') ?>
   </td>
 <?php } ?>
   <td class="dehead">
-   <?xl('Procedure','e')?>
+   <?php xl('Procedure','e') ?>
   </td>
   <td class="dehead" align="right">
-   <?xl('Adjustments','e')?>
+   <?php xl('Adjustments','e') ?>
   </td>
   <td class="dehead" align="right">
-   <?xl('Payments','e')?>
+   <?php xl('Payments','e') ?>
   </td>
  </tr>
 <?php
@@ -327,7 +327,7 @@ if ($_POST['form_refresh']) {
       //
       $res = sqlStatement($query);
       while ($row = sqlFetchArray($res)) {
-        $rowmethod = $form_report_by == 1 ? 'Patient' : 'Co-Pay';
+        $rowmethod = $form_report_by == 1 ? '' : xl('Co-Pay');
         thisLineItem($row['pid'], $row['encounter'], $row['code_text'],
           substr($row['date'], 0, 10), $rowmethod, 0 - $row['fee'], 0, 0, $row['invoice_refno']);
       }
