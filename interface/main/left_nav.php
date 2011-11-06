@@ -812,6 +812,7 @@ function genPopupsList($style='') {
           <?php if (acl_check('admin', 'calendar') && !$GLOBALS['disable_calendar']) genMiscLink('RTop','adm','0',xl('Calendar'),'main/calendar/index.php?module=PostCalendar&type=admin&func=modifyconfig'); ?>
           <?php if (acl_check('admin', 'users'   )) genMiscLink('RTop','adm','0',xl('Logs'),'logview/logview.php'); ?>
           <?php if (acl_check('admin', 'database')) genMiscLink('RTop','adm','0',xl('Database'),'../phpmyadmin/index.php'); ?>
+          <?php if (acl_check('admin', 'super'   )) genMiscLink('RTop','adm','0',xl('Files'),'super/manage_site_files.php'); ?>
           <?php if (acl_check('admin', 'super'   )) genMiscLink('RTop','adm','0',xl('Backup'),'main/backup.php'); ?>
         </ul>
       </li>
@@ -933,6 +934,7 @@ if (!empty($reg)) {
       <?php if (acl_check('admin', 'super'    )) genMiscLink('RTop','adm','0',xl('Layouts'),'super/edit_layout.php'); ?>
       <?php if (acl_check('admin', 'super'    )) genMiscLink('RTop','adm','0',xl('Lists'),'super/edit_list.php'); ?>
       <?php if (acl_check('admin', 'acl'      )) genMiscLink('RTop','adm','0',xl('ACL'),'usergroup/adminacl.php'); ?>
+      <?php if (acl_check('admin', 'super'    )) genMiscLink('RTop','adm','0',xl('Files'),'super/manage_site_files.php'); ?>
       <?php if (acl_check('admin', 'super'    )) genMiscLink('RTop','adm','0',xl('Backup'),'main/backup.php'); ?>
       <?php if (acl_check('admin', 'super') && !empty($GLOBALS['code_types']['IPPF'])) genMiscLink('RTop','adm','0',xl('Export'),'main/ippf_export.php'); ?>
       <li><span><?php xl('Other','e') ?></span>
