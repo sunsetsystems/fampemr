@@ -1156,8 +1156,8 @@ if (!$_POST['form_csvexport']) {
 <script type="text/javascript" src="../../library/dynarch_calendar_en.js"></script>
 <script type="text/javascript" src="../../library/dynarch_calendar_setup.js"></script>
 <script language="Javascript">
- Calendar.setup({inputField:"form_date", ifFormat:"%m/%d/%Y", button:"img_from_date"});
- Calendar.setup({inputField:"form_to_date", ifFormat:"%m/%d/%Y", button:"img_to_date"});
+ Calendar.setup({inputField:"form_date", ifFormat:"%Y-%m-%d", button:"img_from_date"});
+ Calendar.setup({inputField:"form_to_date", ifFormat:"%Y-%m-%d", button:"img_to_date"});
 </script>
 </html>
 <?php
