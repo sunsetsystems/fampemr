@@ -1470,7 +1470,7 @@ UPDATE layout_options SET uor = 0 WHERE form_id = 'DEM' AND field_id = 'provider
 
 -- The following added 2009-10-12
 
-UPDATE layout_options AS a, list_options AS i SET a.group_name = '1Basic Data', a.title = 'Transgender', a.seq = 13, a.data_type = 26, a.uor = 1, a.description = 'Transgender', i.title = 'Transgender' WHERE a.form_id = 'DEM' AND a.field_id = 'userlist6' AND a.uor = 0 AND i.list_id = 'lists' AND i.option_id = 'userlist6';
+UPDATE layout_options AS a, list_options AS i SET a.group_name = '1Who', a.title = 'Transgender', a.seq = 13, a.data_type = 26, a.uor = 1, a.description = 'Transgender', i.title = 'Transgender' WHERE a.form_id = 'DEM' AND a.field_id = 'userlist6' AND a.uor = 0 AND i.list_id = 'lists' AND i.option_id = 'userlist6';
 
 -- The following added 2010-01-17 (duplicated in ippf_upgrade.sql)
 
@@ -1718,4 +1718,14 @@ INSERT INTO `layout_options` VALUES ('DEM', 'usertext17', '6Misc', 'User Defined
 INSERT INTO `layout_options` VALUES ('DEM', 'usertext18', '6Misc', 'User Defined Text 18', 8,2,0,10,63,'',1,1,'','','User Defined');
 INSERT INTO `layout_options` VALUES ('DEM', 'usertext19', '6Misc', 'User Defined Text 19', 8,2,0,10,63,'',1,1,'','','User Defined');
 INSERT INTO `layout_options` VALUES ('DEM', 'usertext20', '6Misc', 'User Defined Text 20', 8,2,0,10,63,'',1,1,'','','User Defined');
+
+-- The following added 2010-12-01:
+
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','actorest','Actual or Estimated', 1,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('actorest','act'  ,'Actual'   ,10,1);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('actorest','est'  ,'Estimated',20,0);
+UPDATE layout_options SET group_name = '1Who', title='', seq = 7, data_type = 1,
+  uor = 1, fld_length = 0, list_id = 'actorest', titlecols = 0, datacols = 0,
+  description = 'Indicates if DOB is estimated' WHERE
+  form_id = 'DEM' AND field_id = 'usertext3' AND uor = 0;
 

@@ -542,3 +542,13 @@ INSERT INTO layout_options VALUES ('REF','reply_rx_refer'    ,'2Counter-Referral
 INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag) VALUES ('REF',16, 5, 0, '', 0, 1, 1, 0);
 #EndIf
 
+#IfNotRow2D list_options list_id lists option_id actorest
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','actorest','Actual or Estimated', 1,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('actorest','act'  ,'Actual'   ,10,1);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('actorest','est'  ,'Estimated',20,0);
+UPDATE layout_options SET group_name = '1Who', title='', seq = 7, data_type = 1,
+  uor = 1, fld_length = 0, list_id = 'actorest', titlecols = 0, datacols = 0,
+  description = 'Indicates if DOB is estimated' WHERE
+  form_id = 'DEM' AND field_id = 'usertext3' AND uor = 0;
+#EndIf
+
