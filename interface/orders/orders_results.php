@@ -70,7 +70,7 @@ if ($_POST['form_submit']) {
         "procedure_type_id = '$restyp_id', " .
         "abnormal = '" . oresData("form_result_abnormal", $lino) . "', " .
         "result = '" . oresData("form_result_result", $lino) . "', " .
-        "range = '" . oresData("form_result_range", $lino) . "', " .
+        "`range` = '" . oresData("form_result_range", $lino) . "', " .
         "facility = '" . oresData("form_facility", $lino) . "', " .
         "comments = '" . oresData("form_comments", $lino) . "', " .
         "result_status = '" . oresData("form_result_status", $lino) . "'";
