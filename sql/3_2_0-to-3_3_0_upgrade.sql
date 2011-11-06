@@ -374,3 +374,11 @@ ALTER TABLE drugs ADD max_level float NOT NULL DEFAULT 0.0;
 ALTER TABLE drugs CHANGE reorder_point reorder_point float NOT NULL DEFAULT 0.0;
 #EndIf
 
+#IfMissingColumn drug_sales distributor_id
+ALTER TABLE drug_sales ADD distributor_id bigint(20) NOT NULL DEFAULT 0;
+#EndIf
+
+#IfNotRow2D list_options list_id abook_type option_id dist
+INSERT INTO list_options (list_id,option_id,title,seq,is_default) VALUES ('abook_type','dist','Distributor',30,0);
+#EndIf
+
