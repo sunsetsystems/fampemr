@@ -987,6 +987,7 @@ if (!empty($reg)) {
         <ul>
           <?php genPopLink(xl('List'),'inventory_list.php'); ?>
           <?php genPopLink(xl('Activity'),'inventory_activity.php'); ?>
+          <?php genPopLink(xl('Transactions'),'inventory_transactions.php'); ?>
         </ul>
       </li>
 <?php } ?>
