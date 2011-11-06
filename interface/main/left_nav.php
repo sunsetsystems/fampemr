@@ -816,7 +816,7 @@ function genPopupsList($style='') {
           <?php if (acl_check('admin', 'forms'   )) genMiscLink('RTop','adm','0',xl('Forms'),'forms_admin/forms_admin.php'); ?>
           <?php if (acl_check('admin', 'calendar') && !$GLOBALS['disable_calendar']) genMiscLink('RTop','adm','0',xl('Calendar'),'main/calendar/index.php?module=PostCalendar&type=admin&func=modifyconfig'); ?>
           <?php if (acl_check('admin', 'users'   )) genMiscLink('RTop','adm','0',xl('Logs'),'logview/logview.php'); ?>
-          <?php if (acl_check('admin', 'database')) genMiscLink('RTop','adm','0',xl('Database'),'../phpmyadmin/index.php'); ?>
+          <?php if (acl_check('admin', 'database') && !$GLOBALS['ippf_specific']) genMiscLink('RTop','adm','0',xl('Database'),'../phpmyadmin/index.php'); ?>
           <?php if (acl_check('admin', 'super'   )) genMiscLink('RTop','adm','0',xl('Files'),'super/manage_site_files.php'); ?>
           <?php if (acl_check('admin', 'super'   )) genMiscLink('RTop','adm','0',xl('Backup'),'main/backup.php'); ?>
         </ul>
@@ -948,7 +948,7 @@ if (!empty($reg)) {
           <?php if (acl_check('admin', 'forms'   )) genMiscLink('RTop','adm','0',xl('Forms'),'forms_admin/forms_admin.php'); ?>
           <?php if (acl_check('admin', 'calendar') && !$GLOBALS['disable_calendar']) genMiscLink('RTop','adm','0',xl('Calendar'),'main/calendar/index.php?module=PostCalendar&type=admin&func=modifyconfig'); ?>
           <?php if (acl_check('admin', 'users'   )) genMiscLink('RTop','adm','0',xl('Logs'),'logview/logview.php'); ?>
-          <?php if (acl_check('admin', 'database')) genMiscLink('RTop','adm','0',xl('Database'),'../phpmyadmin/index.php'); ?>
+          <?php if (acl_check('admin', 'database') && !$GLOBALS['ippf_specific']) genMiscLink('RTop','adm','0',xl('Database'),'../phpmyadmin/index.php'); ?>
         </ul>
       </li>
     </ul>
@@ -1020,6 +1020,7 @@ if (!empty($reg)) {
           <?php genPopLink(xl('MA Stats'),'ippf_statistics.php?t=m'); ?>
           <?php genPopLink(xl('CYP'),'ippf_cyp_report.php'); ?>
           <?php genPopLink(xl('Daily Record'),'ippf_daily.php'); ?>
+          <?php genPopLink(xl('C3'),'ippf_c3.php'); ?>
         </ul>
       </li>
 <?php } // end ippf-specific ?>
