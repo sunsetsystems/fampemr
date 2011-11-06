@@ -538,6 +538,33 @@ INSERT INTO layout_options VALUES ('REF','reply_recommend'   ,'2Counter-Referral
 INSERT INTO layout_options VALUES ('REF','reply_rx_refer'    ,'2Counter-Referral','Prescriptions/Referrals',50, 3,1,30,  3,''         ,1,1,'' ,'' ,'Prescriptions and/or referrals by specialist');
 #EndIf
 
+#IfMissingColumn patient_data usertext11
+ALTER TABLE patient_data
+  ADD usertext11 varchar(255) NOT NULL DEFAULT '',
+  ADD usertext12 varchar(255) NOT NULL DEFAULT '',
+  ADD usertext13 varchar(255) NOT NULL DEFAULT '',
+  ADD usertext14 varchar(255) NOT NULL DEFAULT '',
+  ADD usertext15 varchar(255) NOT NULL DEFAULT '',
+  ADD usertext16 varchar(255) NOT NULL DEFAULT '',
+  ADD usertext17 varchar(255) NOT NULL DEFAULT '',
+  ADD usertext18 varchar(255) NOT NULL DEFAULT '',
+  ADD usertext19 varchar(255) NOT NULL DEFAULT '',
+  ADD usertext20 varchar(255) NOT NULL DEFAULT '';
+#EndIf
+
+#IfNotRow2D layout_options form_id DEM field_id usertext11
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext11', '6Misc', 'User Defined Text 11', 8,2,0,10,63,'',1,1,'','','User Defined');
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext12', '6Misc', 'User Defined Text 12', 8,2,0,10,63,'',1,1,'','','User Defined');
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext13', '6Misc', 'User Defined Text 13', 8,2,0,10,63,'',1,1,'','','User Defined');
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext14', '6Misc', 'User Defined Text 14', 8,2,0,10,63,'',1,1,'','','User Defined');
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext15', '6Misc', 'User Defined Text 15', 8,2,0,10,63,'',1,1,'','','User Defined');
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext16', '6Misc', 'User Defined Text 16', 8,2,0,10,63,'',1,1,'','','User Defined');
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext17', '6Misc', 'User Defined Text 17', 8,2,0,10,63,'',1,1,'','','User Defined');
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext18', '6Misc', 'User Defined Text 18', 8,2,0,10,63,'',1,1,'','','User Defined');
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext19', '6Misc', 'User Defined Text 19', 8,2,0,10,63,'',1,1,'','','User Defined');
+INSERT INTO `layout_options` VALUES ('DEM', 'usertext20', '6Misc', 'User Defined Text 20', 8,2,0,10,63,'',1,1,'','','User Defined');
+#EndIf
+
 #IfNotRow code_types ct_key REF
 INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag) VALUES ('REF',16, 5, 0, '', 0, 1, 1, 0);
 #EndIf
