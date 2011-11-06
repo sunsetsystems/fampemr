@@ -144,10 +144,4 @@ $GLOBALS['oer_config']['druglabels']['logo'] = dirname(__FILE__) .
   "/../../interface/pic/" . $GLOBALS['oer_config']['druglabels']['logo_pic'];
 
 $GLOBALS['oer_config']['documents']['repository'] = $GLOBALS['oer_config']['documents']['repopath'];
-if (strpos($GLOBALS['oer_config']['documents']['repository'],"/") !== 0) {
-	$GLOBALS['oer_config']['documents']['repository'] =
-    realpath(dirname(__FILE__) . "/../../" .
-    $GLOBALS['oer_config']['documents']['repository']) . "/";
-}
-
 ?>
