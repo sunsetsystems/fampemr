@@ -14,6 +14,7 @@ require_once("../../../custom/code_types.inc.php");
 require_once("../../drugs/drugs.inc.php");
 require_once("$srcdir/formatting.inc.php");
 require_once("$srcdir/options.inc.php");
+require_once("$srcdir/calendar_events.inc.php");
 
 // Some table cells will not be displayed unless insurance billing is used.
 $usbillstyle = $GLOBALS['ippf_specific'] ? " style='display:none'" : "";
@@ -45,7 +46,7 @@ function genDiagJS($code_type, $code) {
   }
 }
 
-// For IPPF only.  Returns 0 = none, 1 = nonsurgical, 2 = surgical.
+// For Family Planning only.  Returns 0 = none, 1 = nonsurgical, 2 = surgical.
 //
 function contraceptionClass($code_type, $code) {
   global $code_types;
@@ -171,7 +172,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
       if ($codetype == 'COPAY' || $code_types[$codetype]['fee'] || $fee != 0) {
         echo "  <td class='billcell' align='right'>" .
           "<input type='text' name='bill[$lino][price]' " .
-          "value='$price' size='6'";
+          "value='$price' size='6' onchange='setSaveAndClose()'";
         if (acl_check('acct','disc'))
           echo " style='text-align:right'";
         else
@@ -246,7 +247,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
     echo " </tr>\n";
   }
 
-  // For IPPF.  Track contraceptive services.
+  // For Family Planning.  Track contraceptive services.
   if (!$del) $contraception |= contraceptionClass($codetype, $code);
 
   if ($fee != 0) $hasCharges = true;
@@ -342,7 +343,8 @@ function genProviderSelect($selname, $toptext, $default=0, $disabled=false) {
   echo "   </select>\n";
 }
 
-// This is just for IPPF, to indicate if the visit includes contraceptive services.
+// This is just for Family Planning, to indicate if the visit includes
+// contraceptive services.
 $contraception = 0;
 
 // Possible units of measure for NDC drug quantities.
@@ -498,8 +500,8 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
     "supervisor_id = '$main_supid'  WHERE " .
     "pid = '$pid' AND encounter = '$encounter'");
 
-  // Save-and-Close is currently IPPF-specific but might be more generally
-  // useful.  It provides the ability to mark an encounter as billed
+  // Save-and-Close is currently specific to Family Planning but might be more
+  // generally useful.  It provides the ability to mark an encounter as billed
   // directly from the Fee Sheet, if there are no charges.
   if ($_POST['bn_save_close']) {
     $tmp1 = sqlQuery("SELECT SUM(ABS(fee)) AS sum FROM drug_sales WHERE " .
@@ -521,7 +523,7 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
     }
   }
 
-  // More IPPF stuff.
+  // More Family Planning stuff.
   if (!empty($_POST['contrastart'])) {
     $contrastart = $_POST['contrastart'];
     sqlStatement("UPDATE patient_data SET contrastart = '" .
@@ -531,6 +533,10 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   // Note: Taxes are computed at checkout time (in pos_checkout.php which
   // also posts to SL).  Currently taxes with insurance claims make no sense,
   // so for now we'll ignore tax computation in the insurance billing logic.
+
+  // If appropriate, update the status of the related appointment to
+  // "In exam room".
+  updateAppointmentStatus($pid, $visit_date, '<');
 
   formHeader("Redirecting....");
   formJump();
@@ -666,6 +672,24 @@ function setJustify(seljust) {
   }
  }
  theopts[j++] = new Option('Clear','',false,false);
+}
+
+// Function to check if there are any charges in the form, and to enable
+// or disable the Save and Close button accordingly.
+//
+function setSaveAndClose() {
+ var f = document.forms[0];
+ if (!f.bn_save_close) return;
+ var hascharges = false;
+ for (var i = 0; i < f.elements.length; ++i) {
+  var elem = f.elements[i];
+  if (elem.name.indexOf('[price]') > 0) {
+   var fee = Number(elem.value);
+   // alert('Fee is "' + fee + '"'); // debugging
+   if (!isNaN(fee) && fee != 0) hascharges = true;
+  }
+ }
+ f.bn_save_close.disabled = hascharges;
 }
 
 </script>
@@ -1117,8 +1141,8 @@ if (true) {
 <?php if (!$isBilled) { ?>
 <input type='submit' name='bn_save' value='<?php xl('Save','e');?>' />
 &nbsp;
-<?php if ($GLOBALS['ippf_specific'] && !$hasCharges) { ?>
-<input type='submit' name='bn_save_close' value='<?php xl('Save and Close','e');?>' />
+<?php if ($GLOBALS['ippf_specific']) { ?>
+<input type='submit' name='bn_save_close' value='<?php xl('Save and Close','e');?>'<?php if ($hasCharges) echo " disabled"; ?> />
 &nbsp;
 <?php } ?>
 <input type='submit' name='bn_refresh' value='<?php xl('Refresh','e');?>'>
@@ -1144,6 +1168,7 @@ if (true) {
 ?>
 
 <script language='JavaScript'>
+setSaveAndClose();
 <?php echo $justinit; ?>
 </script>
 

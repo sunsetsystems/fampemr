@@ -520,6 +520,13 @@ $GLOBALS_METADATA = array(
       xl('Automatically create a new encounter when appointment status is set to "@" (arrived).')
     ),
 
+    'gbl_auto_update_appt_status' => array(
+      xl('Auto-Update Appointment Status'),
+      'bool',                           // data type
+      '1',                              // default
+      xl('Set appointment status to < when fee sheet is updated, > when checkout is done.')
+    ),
+
   ),
 
   // Security Tab

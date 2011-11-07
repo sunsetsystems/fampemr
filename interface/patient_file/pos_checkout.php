@@ -47,6 +47,7 @@ require_once("$srcdir/freeb/xmlrpcs.inc");
 require_once("$srcdir/formatting.inc.php");
 require_once("$srcdir/formdata.inc.php");
 require_once("../../custom/code_types.inc.php");
+require_once("$srcdir/calendar_events.inc.php");
 
 $currdecimals = $GLOBALS['currency_decimals'];
 
@@ -781,6 +782,10 @@ if ($_POST['form_save']) {
       "SET invoice_refno = '$invoice_refno' " .
       "WHERE pid = '$form_pid' AND encounter = '$form_encounter'");
   }
+
+  // If appropriate, update the status of the related appointment to
+  // "Checked out".
+  updateAppointmentStatus($form_pid, $dosdate, '>');
 
   generate_receipt($form_pid, $form_encounter);
   exit();
