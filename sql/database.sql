@@ -1640,8 +1640,8 @@ INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_allowsms'  , '3Choices', 'All
 INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_allowemail', '3Choices', 'Allow Email', 5, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Allow Email?');
 
 INSERT INTO layout_options VALUES ('REF','refer_date'      ,'1Referral','Referral Date'                  , 1, 4,2, 0,  0,''         ,1,1,'C','D','Date of referral');
-INSERT INTO layout_options VALUES ('REF','refer_from'      ,'1Referral','Refer By'                       , 2,10,2, 0,  0,''         ,1,1,'' ,'' ,'Referral By');
-INSERT INTO layout_options VALUES ('REF','refer_external'  ,'1Referral','External Referral'              , 3, 1,1, 0,  0,'boolean'  ,1,1,'' ,'' ,'External referral?');
+INSERT INTO layout_options VALUES ('REF','refer_from'      ,'1Referral','Refer By'                       , 2,14,2, 0,  0,''         ,1,1,'' ,'' ,'Referral By');
+INSERT INTO layout_options VALUES ('REF','refer_external'  ,'1Referral','Referral Type'                  , 3, 1,1, 0,  0,'reftype'  ,1,1,'' ,'' ,'External or Internal, and Incoming or Outgoing');
 INSERT INTO layout_options VALUES ('REF','refer_to'        ,'1Referral','Refer To'                       , 4,14,2, 0,  0,''         ,1,1,'' ,'' ,'Referral To');
 INSERT INTO layout_options VALUES ('REF','body'            ,'1Referral','Reason'                         , 5, 3,2,30,  3,''         ,1,1,'' ,'' ,'Reason for referral');
 INSERT INTO layout_options VALUES ('REF','refer_diag'      ,'1Referral','Referrer Diagnosis'             , 6, 2,1,30,255,''         ,1,1,'' ,'X','Referrer diagnosis');
@@ -3153,4 +3153,10 @@ CREATE TABLE `product_warehouse` (
   `pw_max_level` float       DEFAULT 0,
   PRIMARY KEY  (`pw_drug_id`,`pw_warehouse`)
 ) ENGINE=MyISAM;
+
+INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('lists', 'reftype', 'Referral Types', 1);
+INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('reftype','2' ,'Outbound External',10);
+INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('reftype','3' ,'Outbound Internal',20);
+INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('reftype','4' ,'Inbound External',30);
+INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('reftype','5' ,'Inbound Internal',40);
 

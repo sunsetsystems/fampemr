@@ -392,3 +392,15 @@ CREATE TABLE `product_warehouse` (
 ) ENGINE=MyISAM;
 #EndIf
 
+#IfNotRow2D list_options list_id lists option_id reftype
+INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('lists', 'reftype', 'Referral Types', 1);
+INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('reftype','2' ,'Outbound External',10);
+INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('reftype','3' ,'Outbound Internal',20);
+INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('reftype','4' ,'Inbound External' ,30);
+INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('reftype','5' ,'Inbound Internal' ,40);
+UPDATE layout_options SET data_type = 14 WHERE form_id = 'REF' AND field_id = 'refer_from';
+UPDATE layout_options SET title='Referral Type', list_id = 'reftype'  WHERE form_id = 'REF' AND field_id = 'refer_external' AND list_id = 'boolean';
+UPDATE transactions SET refer_external = '2' WHERE title = 'Referral' AND refer_external = '1';
+UPDATE transactions SET refer_external = '3' WHERE title = 'Referral' AND refer_external = '0';
+#EndIf
+
