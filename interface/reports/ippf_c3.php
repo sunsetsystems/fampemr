@@ -75,10 +75,10 @@ function genNumCell($num, $cnum) {
   genAnyCell($num, true, 'detail');
 }
 
-// Get attributes of a single value from the GCAC form for this encounter.
+// Get attributes of a single value from the C3 form for this encounter.
 // This won't work very well for fields that occur multiple times in one form.
 //
-function gcac_query($pid, $encounter, $fldname, $listname='') {
+function c3_query($pid, $encounter, $fldname, $listname='') {
   $query = "SELECT d.form_id, d.field_value, l1.title, l1.notes " .
     "FROM forms AS f " .
     "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
@@ -86,7 +86,7 @@ function gcac_query($pid, $encounter, $fldname, $listname='') {
     "LEFT JOIN list_options AS l1 ON l1.list_id = '$listname' AND l1.option_id = d.field_value " .
     "WHERE f.pid = '$pid' AND " .
     "f.encounter = '$encounter' AND " .
-    "f.formdir = 'LBFgcac' AND " .
+    "f.formdir = 'LBFc3' AND " .
     "f.deleted = 0 " .
     "ORDER BY d.form_id, d.field_value LIMIT 1";
   return sqlQuery($query);
@@ -345,18 +345,18 @@ if ($_POST['form_submit']) {
     genAnyCell(empty($row['refsource_notes']) ? '' : $row['refsource_notes']);
 
     // 15 How Arrived: SEN=alone, DS=w/husband, DK=w/relative, DT=w/friend, DP=w/boyfriend
-    $tmp = gcac_query($thispid, $thisenc, 'gc_howarrived', 'gc_howarrived');
+    $tmp = c3_query($thispid, $thisenc, 'c3_howarrived', 'c3_howarrived');
     genAnyCell($tmp['field_value']); // or 'notes'?
 
     // 16 Services Requested: A 2-digit code
-    $tmp = gcac_query($thispid, $thisenc, 'gc_rtypeserv', 'gc_typeserv');
+    $tmp = c3_query($thispid, $thisenc, 'c3_rtypeserv', 'c3_typeserv');
     genAnyCell($tmp['field_value']);
 
     /*****************************************************************
     // 17 Services Provided: A 2-digit code
     // This might be mapped from MA codes, but that won't work for so we might
     // as well keep it consistent.
-    $tmp = gcac_query($thispid, $thisenc, 'gc_rtypeserv', 'gc_typeserv');
+    $tmp = c3_query($thispid, $thisenc, 'c3_rtypeserv', 'c3_typeserv');
     genAnyCell($tmp['field_value']);
     *****************************************************************/
     // 17 Services Provided: A list of MA codes
@@ -372,45 +372,45 @@ if ($_POST['form_submit']) {
 
     // 18 Menstrual Reg Only: A 1-digit code, 1-7, indicating if pre/post
     // counseling or FP services were provided along with MR
-    $tmp = gcac_query($thispid, $thisenc, 'gc_menreg', 'gc_menreg');
+    $tmp = c3_query($thispid, $thisenc, 'c3_menreg', 'c3_menreg');
     genAnyCell($tmp['field_value']);
 
     // 19 Prev Method bef MR: Another 1-digit code
     // Could use lists/lists_ippf_con.prev_method + "contrameth" list,
     // if they are always using contraceptive issues.
-    $tmp = gcac_query($thispid, $thisenc, 'gc_methods', 'gc_methods');
+    $tmp = c3_query($thispid, $thisenc, 'c3_methods', 'c3_methods');
     genAnyCell($tmp['field_value']);
 
     // 20 Status of Services: DILA=served, DITO=rejected, DITU=postponed, DIRU=referred
-    $tmp = gcac_query($thispid, $thisenc, 'gc_servstat', 'gc_servstat');
+    $tmp = c3_query($thispid, $thisenc, 'c3_servstat', 'c3_servstat');
     genAnyCell($tmp['field_value']);
 
     // 21 Referral Status: 1=IPPA, 2=beyond IPPA, 3=others/not referred
-    $tmp = gcac_query($thispid, $thisenc, 'gc_refstat', 'gc_refstat');
+    $tmp = c3_query($thispid, $thisenc, 'c3_refstat', 'c3_refstat');
     genAnyCell($tmp['field_value']);
 
     // 22 Result of USG/Preg: Number of weeks of pregnancy
-    $tmp = gcac_query($thispid, $thisenc, 'gc_pregweeks');
+    $tmp = c3_query($thispid, $thisenc, 'c3_pregweeks');
     genAnyCell(0 + $tmp['field_value']);
 
     // 23 Reason Rej/Defer: A 1-digit code
-    $tmp = gcac_query($thispid, $thisenc, 'gc_rreason', 'gc_rreason');
+    $tmp = c3_query($thispid, $thisenc, 'c3_rreason', 'c3_rreason');
     genAnyCell($tmp['field_value']);
 
     // 24 Reason Asking MR: A 1-digit code
-    $tmp = gcac_query($thispid, $thisenc, 'gc_reason', 'gc_reason');
+    $tmp = c3_query($thispid, $thisenc, 'c3_reason', 'c3_reason');
     genAnyCell($tmp['field_value']);
 
     // 25 Condition of Abort: A 1-digit code
-    $tmp = gcac_query($thispid, $thisenc, 'gc_condition', 'gc_condition');
+    $tmp = c3_query($thispid, $thisenc, 'c3_condition', 'c3_condition');
     genAnyCell($tmp['field_value']);
 
     // 26 Other Client Efforts: A 1-digit code
-    $tmp = gcac_query($thispid, $thisenc, 'gc_efforts', 'gc_efforts');
+    $tmp = c3_query($thispid, $thisenc, 'c3_efforts', 'c3_efforts');
     genAnyCell($tmp['field_value']);
 
     // 27 Client Complaint: A 1-digit code
-    $tmp = gcac_query($thispid, $thisenc, 'gc_complaint', 'gc_complaint');
+    $tmp = c3_query($thispid, $thisenc, 'c3_complaint', 'c3_complaint');
     genAnyCell($tmp['field_value']);
 
     // 28 Charge of Service: A 1-digit code indicating a range
