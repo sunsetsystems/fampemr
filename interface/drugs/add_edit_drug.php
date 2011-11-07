@@ -1,5 +1,5 @@
 <?php
- // Copyright (C) 2006-2010 Rod Roark <rod@sunsetsystems.com>
+ // Copyright (C) 2006-2011 Rod Roark <rod@sunsetsystems.com>
  //
  // This program is free software; you can redistribute it and/or
  // modify it under the terms of the GNU General Public License
@@ -245,6 +245,18 @@ if (($_POST['form_save'] || $_POST['form_delete']) && !$alertmsg) {
      } // end foreach price
     } // end if selector is present
    } // end for each selector
+   // Save warehouse-specific mins and maxes for this drug.
+   sqlStatement("DELETE FROM product_warehouse WHERE pw_drug_id = '$drug_id'");
+   foreach ($_POST['form_wh_min'] as $whid => $whmin) {
+    if (!get_magic_quotes_gpc()) $whid = addslashes($whid);
+    $whmin = 0 + $whmin;
+    $whmax = 0 + $_POST['form_wh_max'][$whid];
+    if ($whmin != 0 || $whmax != 0) {
+      sqlStatement("INSERT INTO product_warehouse ( " .
+        "pw_drug_id, pw_warehouse, pw_min_level, pw_max_level ) VALUES ( " .
+        "'$drug_id', '$whid', '$whmin', '$whmax' )");
+    }
+   }
   } // end if saving a drug
 
   // Close this window and redisplay the updated list of drugs.
@@ -336,16 +348,66 @@ else {
  <tr>
   <td valign='top' nowrap><b><?php xl('Limits','e'); ?>:</b></td>
   <td>
-   <?php xl('Minimum','e'); ?>
-   <input type='text' size='5' name='form_reorder_point' maxlength='7'
-    value='<?php echo $row['reorder_point'] ?>'
-    title='<?php xl('Reorder point, 0 if not applicable','e'); ?>'
-    />
-   &nbsp;<?php xl('Maximum','e'); ?>
-   <input type='text' size='5' name='form_max_level' maxlength='7'
-    value='<?php echo $row['max_level'] ?>'
-    title='<?php xl('Maximum reasonable inventory, 0 if not applicable','e'); ?>'
-    />
+   <table>
+    <tr>
+     <td valign='top' nowrap>&nbsp;</td>
+     <td valign='top' nowrap><?php xl('Global','e'); ?></td>
+<?php
+  // One column header per warehouse title.
+  $pwarr = array();
+  $pwres = sqlStatement("SELECT lo.option_id, lo.title, " .
+    "pw.pw_min_level, pw.pw_max_level " .
+    "FROM list_options AS lo " .
+    "LEFT JOIN product_warehouse AS pw ON " .
+    "pw.pw_drug_id = '$drug_id' AND " .
+    "pw.pw_warehouse = lo.option_id WHERE " .
+    "lo.list_id = 'warehouse' ORDER BY lo.seq, lo.title");
+  while ($pwrow = sqlFetchArray($pwres)) {
+    $pwarr[] = $pwrow;
+    echo "     <td valign='top' nowrap>" .
+      htmlspecialchars($pwrow['title']) . "</td>\n";
+  }
+?>
+    </tr>
+    <tr>
+     <td valign='top' nowrap><?php xl('Min','e'); ?>&nbsp;</td>
+     <td valign='top'>
+      <input type='text' size='5' name='form_reorder_point' maxlength='7'
+       value='<?php echo $row['reorder_point'] ?>'
+       title='<?php xl('Reorder point, 0 if not applicable','e'); ?>'
+       />&nbsp;&nbsp;
+     </td>
+<?php
+  foreach ($pwarr as $pwrow) {
+    echo "     <td valign='top'>";
+    echo "<input type='text' name='form_wh_min[" .
+      htmlspecialchars($pwrow['option_id']) .
+      "]' value='" . (0 + $pwrow['pw_min_level']) . "' size='5' " .
+      "title='" . xl('Warehouse minimum, 0 if not applicable') . "' />";
+    echo "&nbsp;&nbsp;</td>\n";
+  }
+?>
+    </tr>
+    <tr>
+     <td valign='top' nowrap><?php xl('Max','e'); ?>&nbsp;</td>
+     <td>
+      <input type='text' size='5' name='form_max_level' maxlength='7'
+       value='<?php echo $row['max_level'] ?>'
+       title='<?php xl('Maximum reasonable inventory, 0 if not applicable','e'); ?>'
+       />
+     </td>
+<?php
+  foreach ($pwarr as $pwrow) {
+    echo "     <td valign='top'>";
+    echo "<input type='text' name='form_wh_max[" .
+      htmlspecialchars($pwrow['option_id']) .
+      "]' value='" . (0 + $pwrow['pw_max_level']) . "' size='5' " .
+      "title='" . xl('Warehouse maximum, 0 if not applicable') . "' />";
+    echo "</td>\n";
+  }
+?>
+    </tr>
+   </table>
   </td>
  </tr>
 
