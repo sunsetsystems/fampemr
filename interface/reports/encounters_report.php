@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2007-2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2007-2011 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -40,6 +40,7 @@ $form_provider  = $_POST['form_provider'];
 $form_facility  = $_POST['form_facility'];
 $form_details   = $_POST['form_details'] ? true : false;
 $form_new_patients = $_POST['form_new_patients'] ? true : false;
+$form_related_code = $_POST['form_related_code'];
 
 $form_orderby = $ORDERHASH[$_REQUEST['form_orderby']] ?
   $_REQUEST['form_orderby'] : 'doctor';
@@ -69,6 +70,20 @@ if ($form_facility) {
 }
 if ($form_new_patients) {
   $query .= "AND fe.date = (SELECT MIN(fe2.date) FROM form_encounter AS fe2 WHERE fe2.pid = fe.pid) ";
+}
+if ($form_related_code) {
+  // If one or more service codes were specified, then require at least one.
+  $qsvc = "";
+  $arel = explode(';', $form_related_code);
+  foreach ($arel as $tmp) {
+    list($reltype, $relcode) = explode(':', $tmp);
+    if (empty($relcode) || empty($reltype)) continue;
+    if ($qsvc) $qsvc .= " OR ";
+    $qsvc .= "(SELECT COUNT(*) FROM billing AS b WHERE b.pid = fe.pid AND " .
+      "b.encounter = fe.encounter AND b.code_type = '$reltype' AND " .
+      "b.code = '$relcode' AND b.activity = 1) > 0";
+  }
+  if ($qsvc) $query .= "AND ( $qsvc ) ";
 }
 $query .= "ORDER BY $orderby";
 
@@ -140,12 +155,15 @@ $res = sqlStatement($query);
 </style>
 
 <script type="text/javascript" src="../../library/textformat.js"></script>
+<script type="text/javascript" src="../../library/topdialog.js"></script>
 <script type="text/javascript" src="../../library/dialog.js"></script>
 <script type="text/javascript" src="../../library/dynarch_calendar.js"></script>
 <script type="text/javascript" src="../../library/dynarch_calendar_en.js"></script>
 <script type="text/javascript" src="../../library/dynarch_calendar_setup.js"></script>
 
 <script LANGUAGE="JavaScript">
+
+<?php require($GLOBALS['srcdir'] . "/restoreSession.php"); ?>
 
  var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
 
@@ -158,6 +176,25 @@ $res = sqlStatement($query);
 
  function refreshme() {
   document.forms[0].submit();
+ }
+
+ // This is for callback by the find-code popup.
+ // Appends to or erases the current list of related codes.
+ function set_related(codetype, code, selector, codedesc) {
+  var f = document.forms[0];
+  var s = f.form_related_code.value;
+  if (code) {
+   if (s.length > 0) s += ';';
+   s += codetype + ':' + code;
+  } else {
+   s = '';
+  }
+  f.form_related_code.value = s;
+ }
+
+ // This invokes the find-code popup.
+ function sel_related() {
+  dlgopen('../patient_file/encounter/find_code_popup.php', '_blank', 500, 400);
  }
 
 </script>
@@ -229,7 +266,16 @@ $res = sqlStatement($query);
     id='img_to_date' border='0' alt='[?]' style='cursor:pointer'
     title='<?php xl('Click here to choose a date','e'); ?>'>
 
-   &nbsp;
+  </td>
+ </tr>
+ <tr>
+  <td>
+
+   <?php xl('Service Filter','e'); ?>
+   <input type='text' size='30' name='form_related_code'
+    value='<?php echo $form_related_code ?>' onclick="sel_related()"
+    title='<?php xl('Click to select a code for filtering','e'); ?>' readonly />
+
    <input type='checkbox' name='form_new_patients' title='First-time visits only'<?php  if ($form_new_patients) echo ' checked'; ?>>
    <?php  xl('New','e'); ?>
 
