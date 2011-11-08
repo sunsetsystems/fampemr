@@ -183,7 +183,7 @@ function sel_related(e) {
  // This case wants to force specific referral code types.
  var f = document.forms[0];
  var rtval = f.form_refer_external.value;
- if (rtval == '3' || rtval == '4')
+ if (rtval == '4' || rtval == '5')
   parms = '?codetype=MA';  // inbound referrals
  else
   parms = '?codetype=REF'; // outbound referrals
@@ -222,6 +222,24 @@ function validate() {
 <?php generate_layout_validation('REF'); ?>
  }
  return true;
+}
+
+// Open the add-event dialog.
+function newEvt() {
+ var f = document.forms[0];
+ var rtval = f.form_refer_external.value;
+ var url = '../../main/calendar/add_edit_event.php?patientid=<?php echo $pid ?>';
+ if (rtval == '4' || rtval == '5') { // inbound referral
+  if (f.form_refer_reply_date && f.form_refer_reply_date.value) {
+   var dt = f.form_refer_reply_date.value.replace(/\D/g, '');
+   url += '&date=' + dt;
+  }
+  if (f.form_refer_to && f.form_refer_to.value) {
+   url += '&userid=' + parseInt(f.form_refer_to.value);
+  }
+ }
+ dlgopen(url, '_blank', 600, 300);
+ return false;
 }
 
 <?php if (function_exists('REF_javascript')) call_user_func('REF_javascript'); ?>
@@ -356,6 +374,9 @@ end_group();
 </p>
 
 <p>
+<a href='#' onclick='return newEvt()' class='link_submit'>
+[<?php xl('New Appointment','e'); ?>]</a>
+&nbsp;
 <a href="javascript:document.new_transaction.submit();" class='link_submit'
  onclick='return validate()'>
 [<?php xl('Save Transaction','e'); ?>]</a>
