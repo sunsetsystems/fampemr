@@ -201,9 +201,11 @@ function exportEncounter($pid, $encounter, $date) {
 
   // Export referrals.  Match by date.  Export code type 3 and
   // the Requested Service which should be an IPPF code.
+  // Ignore inbound referrals (refer_external = 3 and 4) because the
+  // services for those will appear in the tally sheet.
   $query = "SELECT refer_related_code FROM transactions WHERE " .
     "pid = '$pid' AND refer_date = '$date' AND " .
-    "refer_related_code != '' " .
+    "refer_related_code != '' AND refer_external < 4 " .
     "ORDER BY id";
   $tres = sqlStatement($query);
   while ($trow = sqlFetchArray($tres)) {
