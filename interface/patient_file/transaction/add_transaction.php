@@ -178,7 +178,17 @@ function set_related(codetype, code, selector, codedesc) {
 // This invokes the find-code popup.
 function sel_related(e) {
  current_sel_name = e.name;
- dlgopen('../encounter/find_code_popup.php<?php if ($GLOBALS['ippf_specific']) echo '?codetype=REF' ?>', '_blank', 500, 400);
+ var parms = '';
+<?php if ($GLOBALS['ippf_specific']) { ?>
+ // This case wants to force specific referral code types.
+ var f = document.forms[0];
+ var rtval = f.form_refer_external.value;
+ if (rtval == '3' || rtval == '4')
+  parms = '?codetype=MA';  // inbound referrals
+ else
+  parms = '?codetype=REF'; // outbound referrals
+<?php } ?>
+ dlgopen('../encounter/find_code_popup.php' + parms, '_blank', 500, 400);
 }
 
 // Process click on Delete link.
