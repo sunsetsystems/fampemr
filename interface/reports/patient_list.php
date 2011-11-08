@@ -1,13 +1,13 @@
 <?php
- // Copyright (C) 2006-2010 Rod Roark <rod@sunsetsystems.com>
+ // Copyright (C) 2006-2011 Rod Roark <rod@sunsetsystems.com>
  //
  // This program is free software; you can redistribute it and/or
  // modify it under the terms of the GNU General Public License
  // as published by the Free Software Foundation; either version 2
  // of the License, or (at your option) any later version.
 
- // This report lists patients that were seen within a given date
- // range, or all patients if no date range is entered.
+ // This report lists patients that were seen or not seen within a given
+ // date range.
 
  require_once("../globals.php");
  require_once("$srcdir/patient.inc");
@@ -19,10 +19,11 @@
  $to_date   = fixDate($_POST['form_to_date'], '');
  if (empty($to_date) && !empty($from_date)) $to_date = date('Y-12-31');
  if (empty($from_date) && !empty($to_date)) $from_date = date('Y-01-01');
+ $form_having = isset($_POST['form_having']) ? ($_POST['form_having'] ? 1 : 0) : 1;
 ?>
 <html>
 <head>
-<?php html_header_show();?>
+<?php html_header_show(); ?>
 <title><?php xl('Patient List','e'); ?></title>
 <script type="text/javascript" src="../../library/overlib_mini.js"></script>
 <script type="text/javascript" src="../../library/textformat.js"></script>
@@ -114,6 +115,10 @@
 <table>
  <tr>
   <td>
+   <select name='form_having'>
+    <option value='1'<?php if ( $form_having) echo ' selected'; ?>><?php xl('Having','e'); ?></option>
+    <option value='0'<?php if (!$form_having) echo ' selected'; ?>><?php xl('Not Having','e'); ?></option>
+   </select>
    <?php xl('Visits From','e'); ?>:
    <input type='text' name='form_from_date' id="form_from_date" size='10' value='<?php echo $from_date ?>'
     onkeyup='datekeyup(this,mypcc)' onblur='dateblur(this,mypcc)' title='yyyy-mm-dd'>
@@ -157,17 +162,11 @@
    "p.fname, p.mname, p.lname, p.street, p.city, p.state, " .
    "p.postal_code, p.phone_home, p.phone_biz, p.pid, p.pubpid, " .
    "count(e.date) AS ecount, max(e.date) AS edate, " .
+   "sum(e.date >= '$from_date 00:00:00' AND e.date <= '$to_date 23:59:59') AS inrange, " .
    "i1.date AS idate1, i2.date AS idate2, " .
    "c1.name AS cname1, c2.name AS cname2 " .
-   "FROM patient_data AS p ";
-  if (!empty($from_date)) $query .=
-   "JOIN form_encounter AS e ON " .
-   "e.pid = p.pid AND " .
-   "e.date >= '$from_date 00:00:00' AND " .
-   "e.date <= '$to_date 23:59:59' ";
-  else $query .=
-   "LEFT OUTER JOIN form_encounter AS e ON e.pid = p.pid ";
-  $query .=
+   "FROM patient_data AS p " .
+   "LEFT OUTER JOIN form_encounter AS e ON e.pid = p.pid " .
    "LEFT OUTER JOIN insurance_data AS i1 ON " .
    "i1.pid = p.pid AND i1.type = 'primary' " .
    "LEFT OUTER JOIN insurance_companies AS c1 ON " .
@@ -182,11 +181,10 @@
 
   $prevpid = 0;
   while ($row = sqlFetchArray($res)) {
+   if ($form_having && !$row['inrange']) continue;
+   if (!$form_having && $row['inrange']) continue;
    if ($row['pid'] == $prevpid) continue;
    $prevpid = $row['pid'];
-
-  /****/
-
    $age = '';
    if ($row['DOB']) {
     $dob = $row['DOB'];
@@ -199,8 +197,8 @@
    }
 ?>
  <tr>
-  <td>
-   <?php echo oeFormatShortDate(substr($row['edate'], 0, 10)) ?>
+  <td nowrap>
+   <?php echo oeFormatShortDate(substr($row['edate'], 0, 10)) ?>&nbsp;
   </td>
   <td>
    <?php echo $row['lname'] . ', ' . $row['fname'] . ' ' . $row['mname'] ?>
