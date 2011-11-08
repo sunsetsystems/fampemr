@@ -439,7 +439,13 @@ function writeFieldLine($linedata) {
     echo "</td>\n";
   
     echo "  <td align='center' class='optcell' title='" .
-      xl('C = Capitalize, D = Dup Check, N = New Patient Form, O = Order Processor, V = Vendor') .
+      "C = "   . xl('Capitalize') .
+      ", D = " . xl('Dup Check') .
+      ", N = " . xl('New Patient Form') .
+      ", O = " . xl('Order Processor') .
+      ", R = " . xl('Distributor') .
+      ", V = " . xl('Vendor') .
+      ", 1 = " . xl('Write Once') .
       "'>";
     echo "<input type='text' name='fld[$fld_line_no][edit_options]' value='" .
          htmlspecialchars($linedata['edit_options'], ENT_QUOTES) . "' size='3' maxlength='36' class='optin' />";
