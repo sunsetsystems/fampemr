@@ -1021,6 +1021,7 @@ if (!empty($reg)) {
           <?php genPopLink(xl('CYP'),'ippf_cyp_report.php'); ?>
           <?php genPopLink(xl('Daily Record'),'ippf_daily.php'); ?>
           <?php genPopLink(xl('C3'),'ippf_c3.php'); ?>
+          <?php if (!empty($GLOBALS['code_types']['REPORT'])) genPopLink(xl('Visits by Item'),'famp_services_products_visits.php'); ?>
         </ul>
       </li>
 <?php } // end ippf-specific ?>
