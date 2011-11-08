@@ -66,6 +66,12 @@ function print_as_money($money) {
   return false;
  }
 
+ // Process click on Print link.
+ function printme() {
+  dlgopen('demographics_print.php?patientid=<?php echo $pid ?>', '_blank', 600, 500);
+  return false;
+ }
+
  // Called by the deleteme.php window on a successful delete.
  function imdeleted() {
 <?php if ($GLOBALS['concurrent_layout']) { ?>
@@ -138,6 +144,8 @@ function sendimage(pid, what) {
   echo " onclick='top.restoreSession()'><span class='title'>" .
    xl('Demographics') . "</span>" .
    " <span class='more'>$tmore</span></a>";
+   echo "&nbsp;&nbsp;<a href='' onclick='return printme()'>" .
+    "<span class='more'>(" . xl('Print') . ")</span></a>";
   if (acl_check('admin', 'super')) {
    echo "&nbsp;&nbsp;<a href='' onclick='return deleteme()'>" .
     "<span class='more' style='color:red'>(".xl('Delete').")</span></a>";
