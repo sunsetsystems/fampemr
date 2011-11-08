@@ -262,7 +262,9 @@ function generate_form_field($frow, $currvalue) {
         if ($urow['fname']) $uname .= ", " . $urow['fname'];
       }
       echo "<option value='" . $urow['id'] . "'";
-      $title = $urow['username'] ? xl('Local') : xl('External');
+      // Failure to translate Local and External is not an error here;
+      // they are only used as internal flags and must not be translated!
+      $title = $urow['username'] ? 'Local' : 'External';
       echo " title='$title'";
       if ($urow['id'] == $currvalue) echo " selected";
       echo ">$uname</option>";

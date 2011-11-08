@@ -1727,3 +1727,8 @@ UPDATE layout_options SET group_name = '1Who', title='', seq = 7, data_type = 1,
   description = 'Indicates if DOB is estimated' WHERE
   form_id = 'DEM' AND field_id = 'usertext3' AND uor = 0;
 
+-- The following added 2011-04-04:
+
+UPDATE layout_options SET data_type = 14 WHERE form_id = 'REF' AND field_id = 'refer_from';
+UPDATE layout_options SET title='Referral Type', list_id = 'reftype'  WHERE form_id = 'REF' AND field_id = 'refer_external' AND list_id = 'boolean';
+

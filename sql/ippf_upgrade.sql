@@ -517,8 +517,8 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default, option_va
 #IfNotRow2D layout_options form_id REF field_id reply_related_code
 DELETE FROM layout_options WHERE form_id = 'REF';
 INSERT INTO layout_options VALUES ('REF','refer_date'        ,'1Referral','Referral Date'                  , 5, 4,2, 0,  0,''         ,1,1,'C','D','Date of referral');
-INSERT INTO layout_options VALUES ('REF','refer_from'        ,'1Referral','Referred By'                    ,10,10,2, 0,  0,''         ,1,1,'' ,'' ,'Referral By');
-INSERT INTO layout_options VALUES ('REF','refer_external'    ,'1Referral','External Referral'              ,15, 1,2, 0,  0,'boolean'  ,1,1,'' ,'' ,'External referral?');
+INSERT INTO layout_options VALUES ('REF','refer_from'        ,'1Referral','Referred By'                    ,10,14,2, 0,  0,''         ,1,1,'' ,'' ,'Referral By');
+INSERT INTO layout_options VALUES ('REF','refer_external'    ,'1Referral','Referral Type'                  ,15, 1,2, 0,  0,'reftype'  ,1,1,'' ,'' ,'Type of referral');
 INSERT INTO layout_options VALUES ('REF','refer_to'          ,'1Referral','Referred To'                    ,20,14,2, 0,  0,''         ,1,1,'' ,'' ,'Referral To');
 INSERT INTO layout_options VALUES ('REF','body'              ,'1Referral','Reason'                         ,25, 3,2,30,  3,''         ,1,1,'' ,'' ,'Reason for referral');
 INSERT INTO layout_options VALUES ('REF','refer_risk_level'  ,'1Referral','Risk Level'                     ,30, 1,1, 0,  0,'risklevel',1,1,'' ,'' ,'Level of urgency');
