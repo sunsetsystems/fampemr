@@ -1,5 +1,5 @@
 <?php
- // Copyright (C) 2008, 2010 Rod Roark <rod@sunsetsystems.com>
+ // Copyright (C) 2008-2011 Rod Roark <rod@sunsetsystems.com>
  //
  // This program is free software; you can redistribute it and/or
  // modify it under the terms of the GNU General Public License
@@ -11,10 +11,12 @@
  require_once("../globals.php");
  require_once("$srcdir/patient.inc");
  require_once("$srcdir/formatting.inc.php");
+ require_once("$srcdir/options.inc.php");
 
  $from_date = fixDate($_POST['form_from_date'], date('Y-m-d'));
  $to_date   = fixDate($_POST['form_to_date'], date('Y-m-d'));
  $form_facility = isset($_POST['form_facility']) ? $_POST['form_facility'] : '';
+ $form_referral_type = isset($_POST['form_referral_type']) ? $_POST['form_referral_type'] : '';
 ?>
 <html>
 <head>
@@ -122,6 +124,11 @@
  <tr>
   <td>
 <?php
+ // Build a drop-down list of referral types.
+ //
+ echo generate_select_list('form_referral_type', 'reftype',
+  $form_referral_type, 'Referral Type', 'All Types');
+ echo '&nbsp;';
  // Build a drop-down list of facilities.
  //
  $query = "SELECT id, name FROM facility ORDER BY name";
@@ -168,6 +175,7 @@
 <div id="referreport_results">
 <table>
  <thead>
+  <th> <?php xl('Refer By','e'); ?> </th>
   <th> <?php xl('Refer To','e'); ?> </th>
   <th> <?php xl('Refer Date','e'); ?> </th>
   <th> <?php xl('Reply Date','e'); ?> </th>
@@ -187,8 +195,10 @@
     "LEFT OUTER JOIN users AS ut ON ut.id = t.refer_to " .
     "LEFT OUTER JOIN users AS uf ON uf.id = t.refer_from " .
     "WHERE t.title = 'Referral' AND " .
-    "t.refer_date >= '$from_date' AND t.refer_date <= '$to_date' " .
-    "ORDER BY ut.organization, t.refer_date, t.id";
+    "t.refer_date >= '$from_date' AND t.refer_date <= '$to_date' ";
+  if ($form_referral_type) $query .=
+    "AND t.refer_external = '$form_referral_type' ";
+  $query .= "ORDER BY ut.organization, t.refer_date, t.id";
 
   // echo "<!-- $query -->\n"; // debugging
   $res = sqlStatement($query);
@@ -205,6 +215,9 @@
     }
 ?>
  <tr>
+  <td>
+   <?php echo $row['referer_name'] ?>
+  </td>
   <td>
    <?php echo $row['organization'] ?>
   </td>

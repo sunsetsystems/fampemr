@@ -38,8 +38,10 @@ if ($report_type == 'm') {
     // 6   => xl('Contraceptive Method'),
     // 104 => xl('Specific Contraceptive Service');
     17  => xl('Patient'),
-    9   => xl('Internal Referrals'),
-    10  => xl('External Referrals'),
+    9   => xl('Outbound Internal Referrals'),
+    10  => xl('Outbound External Referrals'),
+    14  => xl('Inbound Internal Referrals'),
+    15  => xl('Inbound External Referrals'),
     103 => xl('Referral Source'),
     2   => xl('Total'),
   );
@@ -67,7 +69,7 @@ else if ($report_type == 'g') {
     8  => xl('Post-Abortion Followup'),
     7  => xl('Post-Abortion Contraception'),
     11 => xl('Complications of Abortion'),
-    10  => xl('External Referrals'),
+    10  => xl('Outbound External Referrals'),
     20  => xl('External Referral Followups'),
   );
   $arr_content = array(
@@ -88,8 +90,10 @@ else {
     4  => xl('Specific Service'),
     104 => xl('Specific Contraceptive Service'),
     6  => xl('Contraceptive Method'),
-    9   => xl('Internal Referrals'),
-    10  => xl('External Referrals'),
+    9   => xl('Outbound Internal Referrals'),
+    10  => xl('Outbound External Referrals'),
+    14  => xl('Inbound Internal Referrals'),
+    15  => xl('Inbound External Referrals'),
   );
   $arr_content = array(
     1 => xl('Services'),
@@ -338,7 +342,7 @@ function getGcacClientStatus($row) {
   $irow = sqlQuery($query);
   if (!empty($irow['title'])) return $irow['title'];
 
-  // Check for a referred abortion.
+  // Check for a referred-out abortion.
   $query = "SELECT COUNT(*) AS count " .
     "FROM transactions AS t " .
     "LEFT JOIN codes AS c ON t.refer_related_code LIKE 'REF:%' AND " .
@@ -346,6 +350,7 @@ function getGcacClientStatus($row) {
     "c.code = SUBSTRING(t.refer_related_code, 5) " .
     "WHERE " .
     "t.title = 'Referral' AND " .
+    "t.refer_external < '4' AND " .
     "t.refer_date IS NOT NULL AND " .
     "t.refer_date <= '$encdate' AND " .
     "DATE_ADD(t.refer_date, INTERVAL 14 DAY) > '$encdate' AND " .
@@ -756,7 +761,7 @@ function process_referral($row) {
           break;
         }
       }
-      else { // $form_by is 9 (internal) or 10 or 20 (external) referrals
+      else { // $form_by is 9/14 (internal) or 10/15/20 (external) referrals
         $key = $code;
         break;
       }
@@ -768,7 +773,8 @@ function process_referral($row) {
 
 function uses_description($form_by) {
   return ($form_by === '4'  || $form_by === '102' || $form_by === '9' ||
-    $form_by === '10' || $form_by === '20' || $form_by === '104');
+    $form_by === '10' || $form_by === '14' || $form_by === '15' ||
+    $form_by === '20' || $form_by === '104');
 }
 
 $arr_show   = array(
@@ -1137,13 +1143,21 @@ if ($_POST['form_submit']) {
     }
 
     // Get referrals and related patient data.
-    if ($form_content != 5 && ($form_by === '9' || $form_by === '10' || $form_by === '20' || $form_by === '1')) {
-
-      $exttest = "t.refer_external = '1'";
+    if ($form_content != 5 && ($form_by === '9' || $form_by === '10' ||
+      $form_by === '14' || $form_by === '15' || $form_by === '20' ||
+      $form_by === '1'))
+    {
+      $exttest = "t.refer_external = '3'"; // outbound external
       $datefld = "t.refer_date";
 
       if ($form_by === '9') {
-        $exttest = "t.refer_external = '0'";
+        $exttest = "t.refer_external = '2'"; // outbound internal
+      }
+      else if ($form_by === '14') {
+        $exttest = "t.refer_external = '5'"; // inbound internal
+      }
+      else if ($form_by === '15') {
+        $exttest = "t.refer_external = '4'"; // inbound external
       }
       else if ($form_by === '20') {
         $datefld = "t.reply_date";
@@ -1165,7 +1179,8 @@ if ($_POST['form_submit']) {
       }
     }
 
-    if ($form_content != 5 && $form_by !== '9' && $form_by !== '10' && $form_by !== '20')
+    if ($form_content != 5 && $form_by !== '9' && $form_by !== '10' &&
+      $form_by !== '14' && $form_by !== '15' && $form_by !== '20')
     {
       // This gets us all MA codes, with encounter and patient
       // info attached and grouped by patient and encounter.
