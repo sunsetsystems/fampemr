@@ -9,7 +9,8 @@ include_once("../../library/acl.inc");
 //
 if (! acl_check('acct', 'rep')) die("Unauthorized access.");
 
-$from_date     = fixDate($_POST['form_from_date']);
+$from_date     = fixDate($_POST['form_from_date'], date('Y-m-d'));
+$to_date       = fixDate($_POST['form_to_date'], $from_date);
 $form_facility = isset($_POST['form_facility']) ? $_POST['form_facility'] : '';
 $form_output   = isset($_POST['form_output']) ? 0 + $_POST['form_output'] : 1;
 
@@ -155,20 +156,28 @@ else { // not export
  echo "   </select>\n";
 ?>
   </td>
-  <td colspan='2' class='detail' nowrap>
-   <?php xl('Date','e'); ?>:
+  <td class='detail' nowrap>
+   <?php xl('From','e'); ?>:
    <input type='text' name='form_from_date' id='form_from_date' size='10' value='<?php echo $from_date ?>'
-    onkeyup='datekeyup(this,mypcc)' onblur='dateblur(this,mypcc)' title='Report date yyyy-mm-dd' />
+    onkeyup='datekeyup(this,mypcc)' onblur='dateblur(this,mypcc)' title='Report start date yyyy-mm-dd' />
    <img src='../pic/show_calendar.gif' align='absbottom' width='24' height='22'
     id='img_from_date' border='0' alt='[?]' style='cursor:pointer'
     title='<?php xl('Click here to choose a date','e'); ?>' />
   </td>
   <td class='detail' nowrap>
-   &nbsp;<?php xl('To','e'); ?>:
+   <?php xl('To','e'); ?>:
+   <input type='text' name='form_to_date' id='form_to_date' size='10' value='<?php echo $to_date ?>'
+    onkeyup='datekeyup(this,mypcc)' onblur='dateblur(this,mypcc)' title='Report end date yyyy-mm-dd' />
+   <img src='../pic/show_calendar.gif' align='absbottom' width='24' height='22'
+    id='img_to_date' border='0' alt='[?]' style='cursor:pointer'
+    title='<?php xl('Click here to choose a date','e'); ?>' />
   </td>
-  <td colspan='3' valign='top' class='detail' nowrap>
+  <td class='detail' nowrap>
+   &nbsp;<?php xl('Output','e'); ?>:
+  </td>
+  <td valign='top' class='detail' nowrap>
 <?php
-foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $value) {
+foreach (array(1 => xl('Screen'), 2 => xl('Printer'), 3 => xl('Export')) as $key => $value) {
   echo "   <input type='radio' name='form_output' value='$key'";
   if ($key == $form_output) echo ' checked';
   echo " />$value &nbsp;";
@@ -181,7 +190,7 @@ foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $va
   </td>
  </tr>
  <tr>
-  <td colspan='5' height="1">
+  <td colspan='7' height="1">
   </td>
  </tr>
 </table>
@@ -215,6 +224,7 @@ if ($_POST['form_submit']) {
   genHeadCell(xl('Services Provided'   ));
   genHeadCell(xl('Menstrual Reg Only'  ));
   genHeadCell(xl('Prev Method bef MR'  ));
+  genHeadCell(xl('Method after MR'     ));
   genHeadCell(xl('Status of Services'  ));
   genHeadCell(xl('Referral Status'     ));
   genHeadCell(xl('Result of USG/Preg'  ));
@@ -233,6 +243,8 @@ if ($_POST['form_submit']) {
   $query = "SELECT " .
     "fe.pid, fe.encounter, fe.date AS encdate, fe.facility_id, " .
     "pd.pubpid, pd.fname, pd.mname, pd.lname, pd.DOB, pd.sex, pd.status, " .
+    "pd.userlist5 AS religion, pd.country_code AS country, pd.userlist2 AS education, " .
+    "pd.occupation, pd.referral_source AS refsource, " .
     "fy.facility_npi, " .
     "l1.notes AS religion_notes, " .
     "l2.notes AS country_notes, " .
@@ -248,7 +260,7 @@ if ($_POST['form_submit']) {
     "LEFT JOIN list_options AS l4 ON l4.list_id = 'occupations'  AND l4.option_id = pd.occupation " .
     "LEFT JOIN list_options AS l5 ON l5.list_id = 'refsource'    AND l5.option_id = pd.referral_source " .
     "WHERE fe.date >= '$from_date 00:00:00' AND " .
-    "fe.date <= '$from_date 23:59:59' ";
+    "fe.date <= '$to_date 23:59:59' ";
 
   if ($form_facility) {
     $query .= "AND fe.facility_id = '$form_facility' ";
@@ -326,23 +338,23 @@ if ($_POST['form_submit']) {
 
     // 10 Religion: IS, KR, KT, HD, BD, LA=other
     // This comes from the "Notes" column of the "userlist5" list.
-    genAnyCell(empty($row['religion_notes']) ? '' : $row['religion_notes']);
+    genAnyCell(empty($row['religion_notes']) ? $row['religion'] : $row['religion_notes']);
 
     // 11 Residence: DKO, LKO, LPRO, LN
     // This comes from the "Notes" column of the "country" list.
-    genAnyCell(empty($row['country_notes']) ? '' : $row['country_notes']);
+    genAnyCell(empty($row['country_notes']) ? $row['country'] : $row['country_notes']);
 
     // 12 Education: TS=no school, SD=elementary, SLP=junior high, SLA=senior high, PT=college
     // This comes from the "Notes" column of the "userlist2" list.
-    genAnyCell(empty($row['education_notes']) ? '' : $row['education_notes']);
+    genAnyCell(empty($row['education_notes']) ? $row['education'] : $row['education_notes']);
 
     // 13 Title: K=work, TK=unemployed, SK=in school
     // This comes from the "Notes" column of the "occupations" list.
-    genAnyCell(empty($row['occupation_notes']) ? '' : $row['occupation_notes']);
+    genAnyCell(empty($row['occupation_notes']) ? $row['occupation'] : $row['occupation_notes']);
 
     // 14 Referred By: TMN=friend, KEL=family, DOK=doctor/midwife, LA=other
     // This comes from the "Notes" column of the "refsource" list.
-    genAnyCell(empty($row['refsource_notes']) ? '' : $row['refsource_notes']);
+    genAnyCell(empty($row['refsource_notes']) ? $row['refsource'] : $row['refsource_notes']);
 
     // 15 How Arrived: SEN=alone, DS=w/husband, DK=w/relative, DT=w/friend, DP=w/boyfriend
     $tmp = c3_query($thispid, $thisenc, 'c3_howarrived', 'c3_howarrived');
@@ -379,6 +391,11 @@ if ($_POST['form_submit']) {
     // Could use lists/lists_ippf_con.prev_method + "contrameth" list,
     // if they are always using contraceptive issues.
     $tmp = c3_query($thispid, $thisenc, 'c3_methods', 'c3_methods');
+    genAnyCell($tmp['field_value']);
+
+    // Method after MR: Another 1-digit code
+    // Same comments as above.
+    $tmp = c3_query($thispid, $thisenc, 'c3_methodsaft', 'c3_methods');
     genAnyCell($tmp['field_value']);
 
     // 20 Status of Services: DILA=served, DITO=rejected, DITU=postponed, DIRU=referred
@@ -443,6 +460,7 @@ if ($form_output != 3) {
 
 <script language='JavaScript'>
  Calendar.setup({inputField:"form_from_date", ifFormat:"%Y-%m-%d", button:"img_from_date"});
+ Calendar.setup({inputField:"form_to_date"  , ifFormat:"%Y-%m-%d", button:"img_to_date"  });
 <?php if ($form_output == 2) { ?>
  window.print();
 <?php } ?>

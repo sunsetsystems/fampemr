@@ -27,12 +27,13 @@ DELETE FROM list_options WHERE list_id = 'gc_complaint';
 DELETE FROM list_options WHERE list_id = 'lbfnames' AND option_id = 'LBFc3';
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, option_value ) VALUES ('lbfnames','LBFc3','IPPF C3',1,0,0);
 DELETE FROM layout_options WHERE form_id = 'LBFc3';
---                                 form_id   field_id        group               title                          seq T UOR FL ML list_id       TC DC DV EO Desc
+--                                 form_id   field_id        group               title        seq T UOR FL ML list_id       TC DC DV EO Desc
 INSERT INTO layout_options VALUES ('LBFc3','c3_howarrived','1','How Arrived at the Clinic'    ,15, 1,1, 0, 0,'c3_howarrived',1,3,'','', 'Reason for rejecting or referring services');
 INSERT INTO layout_options VALUES ('LBFc3','c3_rtypeserv' ,'1','Services Requested'           ,16, 1,1, 0, 0,'c3_typeserv'  ,1,3,'','', 'Type of services requested');
 INSERT INTO layout_options VALUES ('LBFc3','c3_ptypeserv' ,'1','Services Provided'            ,17, 1,0, 0, 0,'c3_typeserv'  ,1,3,'','', 'Type of services actually provided');
 INSERT INTO layout_options VALUES ('LBFc3','c3_menreg'    ,'1','For Menstrual Regulation'     ,18, 1,1, 0, 0,'c3_menreg'    ,1,3,'','', 'Services provided for menstrual regulation');
 INSERT INTO layout_options VALUES ('LBFc3','c3_methods'   ,'1','Previous Method before MR'    ,19, 1,1, 0, 0,'c3_methods'   ,1,3,'','', 'Method prior to menstrual regulation');
+INSERT INTO layout_options VALUES ('LBFc3','c3_methodsaft','1','Contraception Use After MR'   ,20, 1,1, 0, 0,'c3_methods'   ,1,3,'','', 'Method after menstrual regulation');
 INSERT INTO layout_options VALUES ('LBFc3','c3_servstat'  ,'1','Status of Services'           ,20, 1,1, 0, 0,'c3_servstat'  ,1,3,'','', 'Status of services');
 INSERT INTO layout_options VALUES ('LBFc3','c3_refstat'   ,'1','Referral Status'              ,21, 1,1, 0, 0,'c3_refstat'   ,1,3,'','', 'Referral status');
 INSERT INTO layout_options VALUES ('LBFc3','c3_pregweeks' ,'1','Result of USG/Preg'           ,22, 2,1, 2, 2,''             ,1,3,'','', 'Number of weeks of pregnancy');
