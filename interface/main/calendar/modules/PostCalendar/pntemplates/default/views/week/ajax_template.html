@@ -622,6 +622,8 @@ foreach ($providers as $provider) {
             $content = "";
 
             if ($comment && $GLOBALS['calendar_appt_style'] < 4) $title .= " " . $comment;
+            if ($event['apptstatus'] != '-' && $event['apptstatus_title'])
+              $title .= " (" . addslashes($event['apptstatus_title']) . ")";
 
             // the divTitle is what appears when the user hovers the mouse over the DIV
             $divTitle = date("D, d M Y", strtotime($date));

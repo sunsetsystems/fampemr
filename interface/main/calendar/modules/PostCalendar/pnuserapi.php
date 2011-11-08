@@ -983,11 +983,12 @@ function &postcalendar_userapi_pcQueryEvents($args)
     "concat(u.fname,' ',u.lname) as provider_name, " .
     "concat(pd.lname,', ',pd.fname) as patient_name, " .
     "concat(u2.fname, ' ', u2.lname) as owner_name, " .
-    "DOB as patient_dob, pd.pubpid " .
+    "DOB as patient_dob, pd.pubpid, lo.title AS apptstatus_title " .
     "FROM  ( $table AS a, $cattable AS b ) " .
     "LEFT JOIN users as u ON a.pc_aid = u.id " .
     "LEFT JOIN users as u2 ON a.pc_aid = u2.id " .
     "LEFT JOIN patient_data as pd ON a.pc_pid = pd.pid " .
+    "LEFT JOIN list_options AS lo ON lo.list_id = 'apptstat' AND lo.option_id = a.pc_apptstatus " .
     "WHERE  b.pc_catid = a.pc_catid " .
     "AND a.pc_eventstatus = $eventstatus " .
     "AND ((a.pc_endDate >= '$start' AND a.pc_eventDate <= '$end') OR " .
@@ -1089,7 +1090,7 @@ function &postcalendar_userapi_pcQueryEvents($args)
          $tmp['catname'],      $tmp['catdesc'],     $tmp['pid'],
          $tmp['apptstatus'],   $tmp['aid'],         $tmp['provider_name'],
          $tmp['patient_name'], $tmp['owner_name'],  $tmp['patient_dob'],
-         $tmp['pubpid']) = $result->fields;
+         $tmp['pubpid'],       $tmp['apptstatus_title']) = $result->fields;
 
     // grab the name of the topic
     $topicname = pcGetTopicName($tmp['topic']);
@@ -1140,6 +1141,7 @@ function &postcalendar_userapi_pcQueryEvents($args)
     $events[$i]['catdesc']     = $tmp['catdesc'];
     $events[$i]['pid']         = $tmp['pid'];
     $events[$i]['apptstatus']  = $tmp['apptstatus'];
+    $events[$i]['apptstatus_title'] = $tmp['apptstatus_title'];
     $events[$i]['pubpid']      = $tmp['pubpid'];
     $events[$i]['patient_name']= $tmp['patient_name'];
     $events[$i]['provider_name'] = $tmp['provider_name'];

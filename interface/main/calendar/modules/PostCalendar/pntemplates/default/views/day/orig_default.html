@@ -509,6 +509,8 @@ if ($MULTIDAY) {
      $catname = $event['catname'];
      if ($comment && $GLOBALS['calendar_appt_style'] < 4)
       $title .= " " . $comment;
+     if ($event['apptstatus'] != '-' && $event['apptstatus_title'])
+      $title .= " (" . addslashes($event['apptstatus_title']) . ")";
      if ($catid == 2 || $catid == 3 || $catid == 4 || $catid == 8 || $catid == 11) {
       if      ($catid ==  2) $catname = xl('IN');
       else if ($catid ==  3) $catname = xl('OUT');
