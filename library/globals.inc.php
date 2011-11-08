@@ -432,6 +432,13 @@ $GLOBALS_METADATA = array(
       xl('A referral source may be specified for each visit.')
     ),
 
+    'gbl_auto_create_rx' => array(
+      xl('Automatically Create Prescriptions'),
+      'bool',                           // data type
+      '0',                              // default = false
+      xl('Prescriptions may be created from the Fee Sheet.')
+    ),
+
     'gbl_mask_patient_id' => array(
       xl('Mask for Patient IDs'),
       'text',                           // data type

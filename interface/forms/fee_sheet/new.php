@@ -15,6 +15,7 @@ require_once("../../drugs/drugs.inc.php");
 require_once("$srcdir/formatting.inc.php");
 require_once("$srcdir/options.inc.php");
 require_once("$srcdir/calendar_events.inc.php");
+require_once("$srcdir/classes/Prescription.class.php");
 
 // Some table cells will not be displayed unless insurance billing is used.
 $usbillstyle = $GLOBALS['ippf_specific'] ? " style='display:none'" : "";
@@ -156,6 +157,9 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
     echo "</td>\n";
     echo "  <td class='billcell' align='center'$usbillstyle><input type='checkbox'" .
       ($auth ? " checked" : "") . " disabled /></td>\n";
+    if ($GLOBALS['gbl_auto_create_rx']) {
+      echo "  <td class='billcell' align='center'>&nbsp;</td>\n";
+    }
     echo "  <td class='billcell' align='center'><input type='checkbox'" .
       " disabled /></td>\n";
   }
@@ -208,6 +212,9 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
     echo "</td>\n";
     echo "  <td class='billcell' align='center'$usbillstyle><input type='checkbox' name='bill[$lino][auth]' " .
       "value='1'" . ($auth ? " checked" : "") . " /></td>\n";
+    if ($GLOBALS['gbl_auto_create_rx']) {
+      echo "  <td class='billcell' align='center'>&nbsp;</td>\n";
+    }
     echo "  <td class='billcell' align='center'><input type='checkbox' name='bill[$lino][del]' " .
       "value='1'" . ($del ? " checked" : "") . " /></td>\n";
   }
@@ -255,7 +262,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
 
 // This writes a product (drug_sales) line item to the output page.
 //
-function echoProdLine($lino, $drug_id, $del = FALSE, $units = NULL,
+function echoProdLine($lino, $drug_id, $rx = FALSE, $del = FALSE, $units = NULL,
   $fee = NULL, $sale_id = 0, $billed = FALSE)
 {
   global $code_types, $ndc_applies, $pid, $usbillstyle, $hasCharges;
@@ -289,6 +296,10 @@ function echoProdLine($lino, $drug_id, $del = FALSE, $units = NULL,
     }
     echo "  <td class='billcell' align='center'>&nbsp;</td>\n";             // provider
     echo "  <td class='billcell' align='center'$usbillstyle>&nbsp;</td>\n"; // auth
+    if ($GLOBALS['gbl_auto_create_rx']) {
+      echo "  <td class='billcell' align='center'><input type='checkbox'" . // rx
+        " disabled /></td>\n";
+    }
     echo "  <td class='billcell' align='center'><input type='checkbox'" .   // del
       " disabled /></td>\n";
   } else {
@@ -309,6 +320,11 @@ function echoProdLine($lino, $drug_id, $del = FALSE, $units = NULL,
     }
     echo "  <td class='billcell' align='center'>&nbsp;</td>\n"; // provider
     echo "  <td class='billcell' align='center'$usbillstyle>&nbsp;</td>\n"; // auth
+    if ($GLOBALS['gbl_auto_create_rx']) {
+      echo "  <td class='billcell' align='center'>" .
+        "<input type='checkbox' name='prod[$lino][rx]' value='1'" .
+        ($rx ? " checked" : "") . " /></td>\n";
+    }
     echo "  <td class='billcell' align='center'><input type='checkbox' name='prod[$lino][del]' " .
       "value='1'" . ($del ? " checked" : "") . " /></td>\n";
   }
@@ -488,6 +504,48 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
         $visit_date, '', $default_warehouse);
       if (!$sale_id) die(xl('Insufficient inventory for product ID') . " \"$drug_id\".");
     }
+
+    // If a new prescription is requested, create it.
+    if (!empty($iter['rx'])) {
+      // If an active rx already exists for this drug and date we will
+      // replace it, otherwise we'll make a new one.
+      $rxrow = sqlQuery("SELECT id FROM prescriptions WHERE " .
+        "patient_id = '$pid' AND drug_id = '$drug_id' AND " .
+        "start_date = '$visit_date' AND active = 1 " .
+        "ORDER BY id DESC LIMIT 1");
+      $rxid = empty($rxrow['id']) ? '' : $rxrow['id'];
+      // Get default drug attributes.
+      $drow = sqlQuery("SELECT dt.*, " .
+        "d.name, d.form, d.size, d.unit, d.route, d.substitute " .
+        "FROM drugs AS d, drug_templates AS dt WHERE " .
+        "d.drug_id = '$drug_id' AND dt.drug_id = d.drug_id " .
+        "ORDER BY dt.quantity, dt.dosage, dt.selector LIMIT 1");
+      if (!empty($drow)) {
+        $rxobj = new Prescription($rxid);
+        $rxobj->set_patient_id($pid);
+        $rxobj->set_provider_id($main_provid);
+        $rxobj->set_drug_id($drug_id);
+        $rxobj->set_quantity($units);
+        $rxobj->set_per_refill($units);
+        $rxobj->set_start_date_y(substr($visit_date,0,4));
+        $rxobj->set_start_date_m(substr($visit_date,5,2));
+        $rxobj->set_start_date_d(substr($visit_date,8,2));
+        $rxobj->set_date_added($visit_date);
+        // Remaining attributes are the drug and template defaults.
+        $rxobj->set_drug($drow['name']);
+        $rxobj->set_unit($drow['unit']);
+        $rxobj->set_dosage($drow['dosage']);
+        $rxobj->set_form($drow['form']);
+        $rxobj->set_refills($drow['refills']);
+        $rxobj->set_size($drow['size']);
+        $rxobj->set_route($drow['route']);
+        $rxobj->set_interval($drow['period']);
+        $rxobj->set_substitute($drow['substitute']);
+        //
+        $rxobj->persist();
+      }
+    }
+
   } // end for
 
   // Set the main/default service provider in the new-encounter form.
@@ -880,6 +938,9 @@ echo " </tr>\n";
 <?php } ?>
   <td class='billcell' align='center'><b><?php xl('Provider','e');?></b></td>
   <td class='billcell' align='center'<?php echo $usbillstyle; ?>><b><?php xl('Auth','e');?></b></td>
+<?php if ($GLOBALS['gbl_auto_create_rx']) { ?>
+  <td class='billcell' align='center'><b><?php xl('Rx','e');?></b></td>
+<?php } ?>
   <td class='billcell' align='center'><b><?php xl('Delete','e');?></b></td>
   <td class='billcell'><b><?php xl('Description','e');?></b></td>
  </tr>
@@ -965,6 +1026,7 @@ $prod_lino = 0;
 while ($srow = sqlFetchArray($sres)) {
   ++$prod_lino;
   $pline = $_POST['prod']["$prod_lino"];
+  $rx    = !empty($pline['rx']); // preserve Rx if checked
   $del   = $pline['del']; // preserve Delete if checked
   $sale_id = $srow['sale_id'];
   $drug_id = $srow['drug_id'];
@@ -978,7 +1040,7 @@ while ($srow = sqlFetchArray($sres)) {
     $units = max(1, intval(trim($pline['units'])));
     $fee   = sprintf('%01.2f',(0 + trim($pline['price'])) * $units);
   }
-  echoProdLine($prod_lino, $drug_id, $del, $units, $fee, $sale_id, $billed);
+  echoProdLine($prod_lino, $drug_id, $rx, $del, $units, $fee, $sale_id, $billed);
 }
 
 // Echo new product items from this form here, but omit any line
@@ -991,7 +1053,8 @@ if ($_POST['prod']) {
     // $fee = 0 + trim($iter['fee']);
     $units = max(1, intval(trim($iter['units'])));
     $fee   = sprintf('%01.2f',(0 + trim($iter['price'])) * $units);
-    echoProdLine(++$prod_lino, $iter['drug_id'], FALSE, $units, $fee);
+    $rx    = !empty($iter['rx']); // preserve Rx if checked
+    echoProdLine(++$prod_lino, $iter['drug_id'], $rx, FALSE, $units, $fee);
   }
 }
 
@@ -1013,9 +1076,13 @@ if ($_POST['newcodes']) {
         sprintf('%01.2f', 0 - $code));
     }
     else if ($newtype == 'PROD') {
-      $result = sqlQuery("SELECT * FROM drug_templates WHERE " .
-        "drug_id = '$newcode' AND selector = '$newsel'");
+      $result = sqlQuery("SELECT dt.quantity, d.route " .
+        "FROM drug_templates AS dt, drugs AS d WHERE " .
+        "dt.drug_id = '$newcode' AND dt.selector = '$newsel' AND " .
+        "d.drug_id = dt.drug_id");
       $units = max(1, intval($result['quantity']));
+      // By default create a prescription if drug route is set.
+      $rx = !empty($result['route']);
       $prrow = sqlQuery("SELECT prices.pr_price " .
         "FROM patient_data, prices WHERE " .
         "patient_data.pid = '$pid' AND " .
@@ -1024,7 +1091,7 @@ if ($_POST['newcodes']) {
         "prices.pr_level = patient_data.pricelevel " .
         "LIMIT 1");
       $fee = empty($prrow) ? 0 : $prrow['pr_price'];
-      echoProdLine(++$prod_lino, $newcode, FALSE, $units, $fee);
+      echoProdLine(++$prod_lino, $newcode, $rx, FALSE, $units, $fee);
     }
     else {
       list($code, $modifier) = explode(":", $newcode);
