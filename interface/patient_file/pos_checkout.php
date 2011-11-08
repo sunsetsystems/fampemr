@@ -937,6 +937,23 @@ while ($urow = sqlFetchArray($ures)) {
   return true;
  }
 
+ // Function to compute and show discount from total charges less payment.
+ function computeDiscount() {
+  var f = document.forms[0];
+  var charges = computeDiscountedTotals(0, false);
+  var payment = parseFloat(f.form_amount.value);
+  if (isNaN(payment)) payment = 0;
+  var discount = charges - payment;
+<?php if (!$GLOBALS['discount_by_money']) { ?>
+  // This site discounts by percentage, so convert to that.
+  discount = charges ? (100 * discount / charges) : 0;
+  f.form_discount.value = discount.toFixed(4);
+<?php } else { ?>
+  f.form_discount.value = discount.toFixed(<?php echo $currdecimals ?>);
+<?php } ?>
+  return false;
+ }
+
 </script>
 </head>
 
@@ -1074,6 +1091,8 @@ if ($inv_encounter) {
   <td>
    <input type='text' name='form_discount' size='6' maxlength='8' value=''
     style='text-align:right' onkeyup='computeTotals()'>
+    &nbsp;
+   <a href='#' onclick='return computeDiscount()'>[<?php xl('Compute','e'); ?>]</a>
   </td>
  </tr>
 
