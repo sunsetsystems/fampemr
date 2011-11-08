@@ -1027,6 +1027,7 @@ if (!empty($reg)) {
       <li><span><?php xl('Blank Forms','e') ?></span>
         <ul>
           <?php genPopLink(xl('Demographics'),'../patient_file/summary/demographics_print.php'); ?>
+          <?php genPopLink(xl('Patient'),'../patient_file/summary/demographics_print.php?patientid=-1'); ?>
           <?php genPopLink(xl('Fee Sheet'),'../patient_file/printed_fee_sheet.php'); ?>
           <?php genPopLink(xl('Referral'),'../patient_file/transaction/print_referral.php'); ?>
 <?php

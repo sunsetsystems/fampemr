@@ -178,7 +178,11 @@ while ($frow = sqlFetchArray($fres)) {
   if ($datacols > 0) {
     end_cell();
     echo "<td colspan='$datacols' width='40%'";
-    if ($data_type < 21 || $data_type > 25) echo " class='under'";
+    // if ($data_type < 21 || $data_type > 25) echo " class='under'";
+    // Underline is wanted only for fill-in-the-blank data types.
+    if ($data_type < 21 && $data_type != 1 && $data_type != 3) {
+      echo " class='under'";
+    }
     if ($cell_count > 0) echo " style='padding-left:5pt;'";
     echo ">";
     $cell_count += $datacols;

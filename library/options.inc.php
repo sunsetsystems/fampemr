@@ -541,7 +541,7 @@ function generate_print_field($frow, $currvalue) {
   $fld_length  = $frow['fld_length'];
 
   $description = htmlspecialchars(xl_layout_label($frow['description']), ENT_QUOTES);
-      
+
   // Can pass $frow['empty_title'] with this variable, otherwise
   //  will default to 'Unassigned'.
   // If it is 'SKIP' then an empty text title is completely skipped.
@@ -561,6 +561,11 @@ function generate_print_field($frow, $currvalue) {
   }
 
   // generic single-selection list
+  //
+  // We treat this instead as radio buttons (see code for type 27 below),
+  // since a printed <select> list will not show the individual items.
+  //
+  /*******************************************************************
   if ($data_type == 1 || $data_type == 26) {
     if (empty($fld_length)) {
       if ($list_id == 'titles') {
@@ -576,26 +581,13 @@ function generate_print_field($frow, $currvalue) {
       $tmp = xl_list_label($lrow['title']);
       if (empty($tmp)) $tmp = "($currvalue)";
     }
-    /*****************************************************************
-    echo "<input type='text'" .
-      " size='$fld_length'" .
-      " value='$tmp'" .
-      " class='under'" .
-      " />";
-    *****************************************************************/
     if ($tmp === '') $tmp = '&nbsp;';
     echo $tmp;
   }
+  *******************************************************************/
 
   // simple text field
-  else if ($data_type == 2 || $data_type == 15) {
-    /*****************************************************************
-    echo "<input type='text'" .
-      " size='$fld_length'" .
-      " value='$currescaped'" .
-      " class='under'" .
-      " />";
-    *****************************************************************/
+  if ($data_type == 2 || $data_type == 15) {
     if ($currescaped === '') $currescaped = '&nbsp;';
     echo $currescaped;
   }
@@ -610,13 +602,6 @@ function generate_print_field($frow, $currvalue) {
 
   // date
   else if ($data_type == 4) {
-    /*****************************************************************
-    echo "<input type='text' size='10'" .
-      " value='$currescaped'" .
-      " title='$description'" .
-      " class='under'" .
-      " />";
-    *****************************************************************/
     if ($currescaped === '') $currescaped = '&nbsp;';
     echo oeFormatShortDate($currescaped);
   }
@@ -630,13 +615,6 @@ function generate_print_field($frow, $currvalue) {
       $tmp = ucwords($urow['fname'] . " " . $urow['lname']);
       if (empty($tmp)) $tmp = "($currvalue)";
     }
-    /*****************************************************************
-    echo "<input type='text'" .
-      " size='$fld_length'" .
-      " value='$tmp'" .
-      " class='under'" .
-      " />";
-    *****************************************************************/
     if ($tmp === '') $tmp = '&nbsp;';
     echo $tmp;
   }
@@ -656,13 +634,6 @@ function generate_print_field($frow, $currvalue) {
       }
       if (empty($tmp)) $tmp = "($currvalue)";
     }
-    /*****************************************************************
-    echo "<input type='text'" .
-      " size='$fld_length'" .
-      " value='$tmp'" .
-      " class='under'" .
-      " />";
-    *****************************************************************/
     if ($tmp === '') $tmp = '&nbsp;';
     echo $tmp;
   }
@@ -681,13 +652,6 @@ function generate_print_field($frow, $currvalue) {
       }
       if (empty($tmp)) $tmp = "($currvalue)";
     }
-    /*****************************************************************
-    echo "<input type='text'" .
-      " size='$fld_length'" .
-      " value='$tmp'" .
-      " class='under'" .
-      " />";
-    *****************************************************************/
     if ($tmp === '') $tmp = '&nbsp;';
     echo $tmp;
   }
@@ -703,13 +667,6 @@ function generate_print_field($frow, $currvalue) {
       $tmp = $uname;
       if (empty($tmp)) $tmp = "($currvalue)";
     }
-    /*****************************************************************
-    echo "<input type='text'" .
-      " size='$fld_length'" .
-      " value='$tmp'" .
-      " class='under'" .
-      " />";
-    *****************************************************************/
     if ($tmp === '') $tmp = '&nbsp;';
     echo $tmp;
   }
@@ -855,8 +812,8 @@ function generate_print_field($frow, $currvalue) {
     echo "</table>";
   }
 
-  // a set of labeled radio buttons
-  else if ($data_type == 27) {
+  // a set of labeled radio buttons or a generic single-selection list
+  else if ($data_type == 27 || $data_type == 1 || $data_type == 26) {
     // In this special case, fld_length is the number of columns generated.
     $cols = max(1, $frow['fld_length']);
     $lres = sqlStatement("SELECT * FROM list_options " .
@@ -871,9 +828,10 @@ function generate_print_field($frow, $currvalue) {
       }
       echo "<td width='$tdpct%'>";
       echo "<input type='radio'";
-      if ((strlen($currvalue) == 0 && $lrow['is_default']) ||
-          (strlen($currvalue)  > 0 && $option_id == $currvalue))
-      {
+      // if ((strlen($currvalue) == 0 && $lrow['is_default']) ||
+      //     (strlen($currvalue)  > 0 && $option_id == $currvalue)) {
+      if (strlen($currvalue)  > 0 && $option_id == $currvalue) {
+        // Do not use defaults for these printable forms.
         echo " checked";
       }
       echo ">" . xl_list_label($lrow['title']);

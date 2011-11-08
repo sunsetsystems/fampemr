@@ -1,14 +1,13 @@
 <?php
-// Copyright (C) 2009 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2009-2011 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; either version 2
 // of the License, or (at your option) any later version.
 
-// Currently this will print only a blank form, but some code was
-// preserved here and in options.inc.php to ease future support for
-// data for a specified patient.
+// This will print a blank form, and if "patientid" is specified then
+// any existing data for the specified patient is included.
 
 require_once("../../globals.php");
 require_once("$srcdir/acl.inc");
@@ -17,19 +16,24 @@ require_once("$srcdir/patient.inc");
 
 $CPR = 4; // cells per row
 
-/*********************************************************************
-$result = getPatientData($pid, "*, DATE_FORMAT(DOB,'%Y-%m-%d') as DOB_YMD"); 
-$result2 = getEmployerData($pid);
-// Check authorization.
-$thisauth = acl_check('patients', 'demo');
-if ($pid) {
-  if (!$thisauth != 'write')
-    die(xl('Demographics not authorized.'));
-  if ($result['squad'] && ! acl_check('squads', $result['squad']))
-    die(xl('You are not authorized to access this squad.'));
+$patientid = empty($_REQUEST['patientid']) ? 0 : 0 + $_REQUEST['patientid'];
+if ($patientid < 0) $patientid = 0 + $pid; // -1 means current pid
+
+$prow = array();
+$erow = array();
+$irow = array();
+
+if ($patientid) {
+  $prow = getPatientData($pid, "*, DATE_FORMAT(DOB,'%Y-%m-%d') as DOB_YMD"); 
+  $erow = getEmployerData($pid);
+  // Check authorization.
+  $thisauth = acl_check('patients', 'demo');
+  if (!$thisauth)
+    die(xl('Demographics not authorized'));
+  if ($prow['squad'] && ! acl_check('squads', $prow['squad']))
+    die(xl('You are not authorized to access this squad'));
+  // $irow = getInsuranceProviders(); // needed?
 }
-$insurancei = getInsuranceProviders();
-*********************************************************************/
 
 $fres = sqlStatement("SELECT * FROM layout_options " .
   "WHERE form_id = 'DEM' AND uor > 0 " .
@@ -137,10 +141,10 @@ while ($frow = sqlFetchArray($fres)) {
 
   if (strpos($field_id, 'em_') === 0) {
     $tmp = substr($field_id, 3);
-    // if (isset($result2[$tmp])) $currvalue = $result2[$tmp];
+    if (isset($erow[$tmp])) $currvalue = $erow[$tmp];
   }
   else {
-    // if (isset($result[$field_id])) $currvalue = $result[$field_id];
+    if (isset($prow[$field_id])) $currvalue = $prow[$field_id];
   }
 
   // Handle a data category (group) change.
@@ -183,7 +187,11 @@ while ($frow = sqlFetchArray($fres)) {
   // Handle starting of a new data cell.
   if ($datacols > 0) {
     end_cell();
-    echo "<td colspan='$datacols' width='40%' class='under'";
+    echo "<td colspan='$datacols' width='40%'";
+    // Underline is wanted only for fill-in-the-blank data types.
+    if ($data_type < 21 && $data_type != 1 && $data_type != 3) {
+      echo " class='under'";
+    }
     if ($cell_count > 0) echo " style='padding-left:5pt;'";
     echo ">";
     $cell_count += $datacols;
