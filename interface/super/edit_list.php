@@ -210,7 +210,8 @@ function writeOptionLine($option_id, $title, $seq, $default, $value, $mapping=''
   if ($GLOBALS['ippf_specific'] || $list_id == 'fitness') {
     echo "  <td align='center' class='optcell'>";
     echo "<input type='text' name='opt[$opt_line_no][mapping]' value='" .
-        htmlspecialchars($mapping, ENT_QUOTES) . "' size='12' maxlength='15' class='optin' />";
+        htmlspecialchars($mapping, ENT_QUOTES) .
+        "' size='12' maxlength='15' class='optin' />";
     echo "</td>\n";
   }
 
@@ -477,6 +478,20 @@ function mysubmit() {
    }
   }
  }
+<?php if ($GLOBALS['ippf_specific']) { ?>
+ // This case requires the mapping for education to be numeric.
+ if (f.list_id.value == 'userlist2') {
+  for (var i = 1; f['opt[' + i + '][mapping]']; ++i) {
+   if (f['opt[' + i + '][id]'].value) {
+    var m = f['opt[' + i + '][mapping]'].value;
+    if (m.length != 1 || m < '0' || m > '9') {
+     alert('<?php echo xl('Error: Global ID must be a digit on line') ?>' + ' ' + i);
+     return;
+    }
+   }
+  }
+ }
+<?php } ?>
  f.submit();
 }
 
