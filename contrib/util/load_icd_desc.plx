@@ -25,7 +25,7 @@ use HTML::TokeParser; # libhtml-parser-perl
 #                 Parameters that you may customize                   #
 #######################################################################
 
-# Change this as needed for years other than 2009.
+# Change this as needed for years other than 2010.
 #
 my $START_URL = "http://www.icd9data.com/2010/Volume1/default.htm";
 
@@ -81,6 +81,7 @@ sub scrape {
     # that must be followed.  We handle those recursively.
     if ($tag->[0] eq "li") {
       $tag = $parser->get_tag;
+      $tag = $parser->get_tag if ($tag->[0] eq "strong");
       next unless ($tag->[0] eq "a");
       my $nexturl = $browser->base();
       # $nexturl =~ s'/[^/]+$'/';
