@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2008-2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2008-2011 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -12,6 +12,9 @@
 require_once("../globals.php");
 require_once("$srcdir/acl.inc");
 require_once("$srcdir/patient.inc");
+
+// Make this true when Daniel wants multiple facility support.
+$MULTIPLE = false;
 
 if (!acl_check('admin', 'super')) die("Not authorized!");
 
@@ -59,11 +62,6 @@ function Digits($field) {
 
 // Translate sex.
 function Sex($field) {
-  /*******************************************************************
-  $sex = strtoupper(substr(trim($field), 0, 1));
-  if ($sex != "M" && $sex != "F") $sex = "U";
-  return $sex;
-  *******************************************************************/
   return mappedOption('sex', $field);
 }
 
@@ -237,6 +235,7 @@ function exportEncounter($pid, $encounter, $date) {
 }
 
 function endClient($pid, &$encarray) {
+  global $beg_year, $beg_month, $end_year, $end_month;
   // Output issues.
   $ires = sqlStatement("SELECT " .
     "l.id, l.type, l.begdate, l.enddate, l.title, l.diagnosis, " .
@@ -252,7 +251,10 @@ function endClient($pid, &$encarray) {
     "FROM lists AS l " .
     "LEFT JOIN lists_ippf_con  AS c ON l.type = 'contraceptive' AND c.id = l.id " .
     "LEFT JOIN lists_ippf_gcac AS g ON l.type = 'ippf_gcac' AND g.id = l.id " .
-    "WHERE l.pid = '$pid' " .
+    "WHERE l.pid = '$pid' AND " .
+    sprintf("l.begdate >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
+    sprintf("l.begdate <  '%04u-%02u-01 00:00:00' AND ", $end_year, $end_month) .
+    "l.type != 'ippf_gcac' " .
     "ORDER BY l.begdate");
 
   while ($irow = sqlFetchArray($ires)) {
@@ -386,10 +388,10 @@ if (!empty($form_submit)) {
     sprintf("fe.date < '%04u-%02u-01 00:00:00' ", $end_year, $end_month) .
     "ORDER BY fe.facility_id, fe.pid";
   *******************************************************************/
-
   // $last_pid = -1;
   // $last_facility = -1;
 
+  /*******************************************************************
   // Dump info for the main facility.
   $facrow = sqlQuery("SELECT * FROM facility ORDER BY " .
     "billing_location DESC, id ASC LIMIT 1");
@@ -404,7 +406,6 @@ if (!empty($form_submit)) {
   Add('Address2'                 , '');
   Add('City'                     , $facrow['city']);
   Add('PostCode'                 , $facrow['postal_code']);
-
   $query = "SELECT DISTINCT " .
     "fe.pid, " .
     "p.regdate, p.date AS last_update, p.contrastart, p.DOB, p.sex, " .
@@ -419,45 +420,78 @@ if (!empty($form_submit)) {
     sprintf("fe.date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
     sprintf("fe.date < '%04u-%02u-01 00:00:00' ", $end_year, $end_month) .
     "ORDER BY fe.pid";
+  *******************************************************************/
+
+  if ($MULTIPLE) {
+    $query = "SELECT DISTINCT " .
+      "fe.facility_id, fe.pid, " .
+      "f.name, f.street, f.city AS fac_city, f.state AS fac_state, f.postal_code, " .
+      "f.country_code, f.federal_ein, f.domain_identifier, f.pos_code, " .
+      "p.regdate, p.date AS last_update, p.contrastart, p.DOB, p.sex, " .
+      "p.city, p.state, p.occupation, p.status, p.ethnoracial, " .
+      "p.interpretter, p.monthly_income, p.referral_source, p.pricelevel, " .
+      "p.userlist1, p.userlist3, p.userlist4, p.userlist5, " .
+      "p.usertext11, p.usertext12, p.usertext13, p.usertext14, p.usertext15, " .
+      "p.usertext16, p.usertext17, p.usertext18, p.usertext19, p.usertext20, " .
+      "p.userlist2 AS education " .
+      "FROM form_encounter AS fe " .
+      "LEFT OUTER JOIN facility AS f ON f.id = fe.facility_id " .
+      "LEFT OUTER JOIN patient_data AS p ON p.pid = fe.pid WHERE " .
+      sprintf("fe.date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
+      sprintf("fe.date <  '%04u-%02u-01 00:00:00'     ", $end_year, $end_month) .
+      "ORDER BY fe.facility_id, fe.pid";
+  }
+  else {
+    $facrow = sqlQuery("SELECT id AS facility_id, name, street, city AS fac_city, " .
+      "state AS fac_state, postal_code, country_code, federal_ein, " .
+      "domain_identifier, pos_code FROM facility " .
+      "ORDER BY billing_location DESC, id ASC LIMIT 1");
+    $query = "SELECT DISTINCT " .
+      "fe.pid, " .
+      "p.regdate, p.date AS last_update, p.contrastart, p.DOB, p.sex, " .
+      "p.city, p.state, p.occupation, p.status, p.ethnoracial, " .
+      "p.interpretter, p.monthly_income, p.referral_source, p.pricelevel, " .
+      "p.userlist1, p.userlist3, p.userlist4, p.userlist5, " .
+      "p.usertext11, p.usertext12, p.usertext13, p.usertext14, p.usertext15, " .
+      "p.usertext16, p.usertext17, p.usertext18, p.usertext19, p.usertext20, " .
+      "p.userlist2 AS education " .
+      "FROM form_encounter AS fe " .
+      "LEFT OUTER JOIN patient_data AS p ON p.pid = fe.pid WHERE " .
+      sprintf("fe.date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
+      sprintf("fe.date < '%04u-%02u-01 00:00:00' ", $end_year, $end_month) .
+      "ORDER BY fe.pid";
+  }
+
+  $last_pid = -1;
+  $last_facility = -1;
+
   $res = sqlStatement($query);
 
   while ($row = sqlFetchArray($res)) {
+    if ($MULTIPLE) $facrow =& $row;
 
-    /*****************************************************************
-    if ($row['facility_id'] != $last_facility) {
+    if ($facrow['facility_id'] != $last_facility) {
       if ($last_facility >= 0) {
         endFacility();
       }
-      $last_facility = $row['facility_id'];
+      $last_facility = $facrow['facility_id'];
       // Starting a new facility.
       OpenTag('IMS_eMRUpload_Point');
-      Add('ServiceDeliveryPointName' , $row['name']);
-      Add('EmrServiceDeliveryPointId', $row['facility_id']);
-//    Add('EntityId'                 , $row['federal_ein']);
-      Add('Channel'                  , '01');
+      Add('ServiceDeliveryPointName' , $facrow['name']);
+      // Add('EmrServiceDeliveryPointId', $facrow['facility_id']);
+      Add('EmrServiceDeliveryPointId', $facrow['domain_identifier']);
+      // Add('Channel'                  , '01');
+      Add('Channel'                  , $facrow['pos_code']);
       Add('Latitude'                 , '222222'); // TBD: Add this to facility attributes
       Add('Longitude'                , '433333'); // TBD: Add this to facility attributes
-      Add('Address'                  , $row['street']);
+      Add('Address'                  , $facrow['street']);
       Add('Address2'                 , '');
-      Add('City'                     , $row['city']);
-      Add('PostCode'                 , $row['postal_code']);
+      Add('City'                     , $facrow['fac_city']);
+      Add('PostCode'                 , $facrow['postal_code']);
     }
-    *****************************************************************/
 
-    $last_pid = $row['pid'];
+    $last_pid = 0 + $row['pid'];
 
-    /*****************************************************************
-    // Compute education: 0 = none, 1 = some, 9 = unassigned.
-    // The MAs should be told to use "none" for no education.
-    $education = 9;
-    if (!empty($row['education'])) {
-      if (preg_match('/^il/i', $row['education']) ||
-          preg_match('/^no/i', $row['education']))
-        $education = 0;
-      else
-        $education = 1;
-    }
-    *****************************************************************/
     $education = mappedOption('userlist2', $row['education']);
 
     // Get most recent contraceptive issue.
@@ -485,17 +519,6 @@ if (!empty($form_submit)) {
     $methodvalue = -999;
     if (!empty($crow['new_method'])) {
       $methods = explode('|', $crow['new_method']);
-      /***************************************************************
-      foreach ($methods as $method) {
-        $lorow = sqlQuery("SELECT option_value FROM list_options WHERE " .
-          "list_id = 'contrameth' AND option_id = '$method' LIMIT 1");
-        $value = empty($lorow) ? 0 : (0 + $lorow['option_value']);
-        if ($value > $methodvalue) {
-          $methodid = $method;
-          $methodvalue = $value;
-        }
-      }
-      ***************************************************************/
       $methodid = mappedOption('contrameth', $methods[0]);
     }
     Add('CurrentMethod', $methodid);
@@ -537,14 +560,14 @@ if (!empty($form_submit)) {
     $query = "SELECT " .
       "encounter, date " .
       "FROM form_encounter WHERE " .
-      // "pid = '$last_pid' AND facility_id = '$last_facility' " .
-      "pid = '$last_pid' ";
+      "pid = '$last_pid' AND facility_id = '$last_facility' ";
+      // "pid = '$last_pid' ";
     if (true) {
       // The new logic here is to restrict to the given date range.
       // Set the above to false if all visits are wanted.
       $query .= "AND " .
       sprintf("date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
-      sprintf("date < '%04u-%02u-01 00:00:00' ", $end_year, $end_month);
+      sprintf("date <  '%04u-%02u-01 00:00:00'     ", $end_year, $end_month);
     }
     $query .= "ORDER BY encounter";
 
@@ -560,8 +583,8 @@ if (!empty($form_submit)) {
     endClient($last_pid, $encarray);
   }
 
-  // if ($last_facility >= 0) endFacility();
-  endFacility();
+  if ($last_facility >= 0) endFacility();
+  // endFacility();
 
   header("Pragma: public");
   header("Expires: 0");
