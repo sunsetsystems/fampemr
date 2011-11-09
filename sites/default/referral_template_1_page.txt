@@ -22,7 +22,7 @@ body, td {
  width: 504pt;
 }
 .linetable {
- margin: 11pt 0 0 0;
+ margin: 2pt 0 0 0;
 }
 .mainhead {
  font-weight: bold;
@@ -151,7 +151,7 @@ body, td {
   </tr>
  </table>
 
- <hr style='border:0;height:6pt;color:#999999;background-color:#999999;margin:12pt 0 12pt 0;' />
+ <hr style='border:0;height:6pt;color:#999999;background-color:#999999;margin:6pt 0 6pt 0;' />
 
  <table cellspacing='0' cellpadding='0' class='bigtable'>
   <tr>
@@ -247,10 +247,14 @@ body, td {
   </tr>
  </table>
 
+<!--
 </div></div>
-<br clear='all' /><!-- kludge to fix bizarre Firefox problem with page breaks -->
+<br clear='all' />
 <p style='page-break-after: always' />
 <div class='borderdiv'><div class='paddingdiv'>
+-->
+ <hr style='border:0;height:6pt;color:#999999;background-color:#999999;margin:6pt 0 6pt 0;' />
+ <!-- The above removal and addition accommodates the 1-page layout. -->
 
  <table cellspacing='0' cellpadding='0' class='bigtable'>
   <tr>

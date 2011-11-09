@@ -15,6 +15,7 @@ $template_file = $GLOBALS['OE_SITE_DIR'] . "/referral_template.html";
 
 $TEMPLATE_LABELS = array(
   'label_clinic_id'             => xl('Clinic ID'),
+  'label_client_id'             => xl('Client ID'),
   'label_control_no'            => xl('Control No.'),
   'label_date'                  => xl('Date'),
   'label_webpage_title'         => xl('Referral Form'),
