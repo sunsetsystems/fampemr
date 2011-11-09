@@ -376,6 +376,20 @@ function getGcacClientStatus($row) {
 function loadColumnData($key, $row, $quantity=1) {
   global $areport, $arr_titles, $form_content, $from_date, $to_date, $arr_show;
 
+  // If we are counting new acceptors, then require a contraceptive start date
+  // within the reporting period.
+  if ($form_content == '3') {
+    if (!$row['contrastart'] || $row['contrastart'] < $from_date ||
+      $row['contrastart'] > $to_date) return;
+  }
+
+  // If we are counting new clients, then require a registration date
+  // within the reporting period.
+  if ($form_content == '4') {
+    if (!$row['regdate'] || $row['regdate'] < $from_date ||
+      $row['regdate'] > $to_date) return;
+  }
+
   // If first instance of this key, initialize its arrays.
   if (empty($areport[$key])) {
     $areport[$key] = array();
@@ -390,27 +404,10 @@ function loadColumnData($key, $row, $quantity=1) {
     }
   }
 
-  // Skip this key if we are counting unique patients and the key
-  // has already seen this patient.
-  if ($form_content == '2' && $row['pid'] == $areport[$key]['.prp']) return;
-
-  // If we are counting new acceptors, then require a unique patient
-  // whose contraceptive start date is within the reporting period.
-  if ($form_content == '3') {
-    // if ($row['pid'] == $areport[$key]['prp']) return;
+  // If we are counting unique clients, new acceptors or new clients, then
+  // require a unique patient.
+  if ($form_content == '2' || $form_content == '3' || $form_content == '4') {
     if ($row['pid'] == $areport[$key]['.prp']) return;
-    // Check contraceptive start date.
-    if (!$row['contrastart'] || $row['contrastart'] < $from_date ||
-      $row['contrastart'] > $to_date) return;
-  }
-
-  // If we are counting new clients, then require a unique patient
-  // whose registration date is within the reporting period.
-  if ($form_content == '4') {
-    if ($row['pid'] == $areport[$key]['.prp']) return;
-    // Check registration date.
-    if (!$row['regdate'] || $row['regdate'] < $from_date ||
-      $row['regdate'] > $to_date) return;
   }
 
   // Flag this patient as having been encountered for this report row.
@@ -426,7 +423,7 @@ function loadColumnData($key, $row, $quantity=1) {
   // Increment the correct age categories.
   $age = getAge(fixDate($row['DOB']), $row['encdate']);
   $i = min(intval(($age - 5) / 5), 8);
-  if ($age < 11) $i = 0;
+  if ($age < 10) $i = 0;
   $areport[$key]['.age9'][$i] += $quantity;
   $i = $age < 25 ? 0 : 1;
   $areport[$key]['.age2'][$i] += $quantity;
@@ -534,6 +531,7 @@ function process_ippf_code($row, $code, $quantity=1) {
   else if ($form_by === '5') {
     $key = getAbortionMethod($code);
     if (empty($key)) {
+      // If not an abortion service then skip unless counting contraceptive products.
       if ($form_content != 5) return;
       $key = 'Unspecified';
     }
@@ -544,6 +542,7 @@ function process_ippf_code($row, $code, $quantity=1) {
   else if ($form_by === '6') {
     $key = getContraceptiveMethod($code);
     if (empty($key)) {
+      // If not a contraceptive service then skip unless counting contraceptive products.
       if ($form_content != 5) return;
       $key = 'Unspecified';
     }
@@ -1157,11 +1156,11 @@ if ($_POST['form_submit']) {
       $form_by === '14' || $form_by === '15' || $form_by === '20' ||
       $form_by === '1'))
     {
-      $exttest = "t.refer_external = '3'"; // outbound external
+      $exttest = "t.refer_external = '2'"; // outbound external
       $datefld = "t.refer_date";
 
       if ($form_by === '9') {
-        $exttest = "t.refer_external = '2'"; // outbound internal
+        $exttest = "t.refer_external = '3'"; // outbound internal
       }
       else if ($form_by === '14') {
         $exttest = "t.refer_external = '5'"; // inbound internal
@@ -1188,6 +1187,107 @@ if ($_POST['form_submit']) {
         process_referral($row);
       }
     }
+
+    // Reporting New Acceptors by Contraceptive Method (or method after abortion)
+    // is a special case that gets one method on the contraceptive start date.
+    // Note this cannot filter by facility.
+    //
+    if ($form_content == 3 && ($form_by === '6' || $form_by === '7'))
+    {
+      // This gets us all MA codes, with encounter and patient
+      // info attached and grouped by patient and encounter.
+      $query = "SELECT " .
+        "pd.pid, pd.regdate, " .
+        "pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, " .
+        "pd.contrastart, pd.ippfconmeth, pd.referral_source$pd_fields " .
+        "FROM patient_data AS pd " .
+        "WHERE pd.contrastart IS NOT NULL AND " .
+        "pd.contrastart != '0000-00-00' AND " .
+        "pd.contrastart >= '$from_date' AND " .
+        "pd.contrastart <= '$to_date' $sexcond";
+      $query .= "ORDER BY pd.pid";
+      $res = sqlStatement($query);
+      //
+      while ($row = sqlFetchArray($res)) {
+        $contrastart = $row['contrastart'];
+        $ippfconmeth = $row['ippfconmeth'];
+        $thispid     = $row['pid'];
+        $row['encdate'] = "$contrastart 00:00:00";
+        //
+        if ($ippfconmeth) {
+          process_ippf_code($row, $ippfconmeth);
+        }
+        // If no method saved in patient_data, get it from the visit.
+        else {
+          $contraception_code = '';
+          $contraception_cyp  = -1;
+          $query = "SELECT " .
+            "pd.regdate, " .
+            "pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, " .
+            "pd.contrastart, pd.ippfconmeth, pd.referral_source$pd_fields, " .
+            "fe.pid, fe.encounter, fe.date AS encdate, " .
+            "f.user AS provider, " .
+            "b.code_type, b.code, c.related_code, lo.title AS lo_title " .
+            "FROM form_encounter AS fe " .
+            "JOIN forms AS f ON f.pid = fe.pid AND f.encounter = fe.encounter AND " .
+            "f.formdir = 'newpatient' AND f.form_id = fe.id AND f.deleted = 0 " .
+            "JOIN patient_data AS pd ON pd.pid = fe.pid $sexcond" .
+            "LEFT OUTER JOIN billing AS b ON " .
+            "b.pid = fe.pid AND b.encounter = fe.encounter AND b.activity = 1 " .
+            "AND b.code_type = 'MA' " .
+            "LEFT OUTER JOIN codes AS c ON b.code_type = 'MA' AND c.code_type = '12' AND " .
+            "c.code = b.code AND c.modifier = b.modifier " .
+            "LEFT OUTER JOIN list_options AS lo ON " .
+            "lo.list_id = 'superbill' AND lo.option_id = c.superbill " .
+            "WHERE fe.pid = '$thispid' AND fe.date >= '$contrastart 00:00:00' AND " .
+            "fe.date <= '$contrastart 23:59:59' ";
+          if ($form_facility) {
+            $query .= "AND fe.facility_id = '$form_facility' ";
+          }
+          $query .= "ORDER BY fe.encounter, b.code";
+          // echo "<!-- $query -->\n"; // debugging
+          $bres = sqlStatement($query);
+          while ($brow = sqlFetchArray($bres)) {
+            if ($brow['code_type'] === 'MA') {
+              if (!empty($brow['related_code'])) {
+                $relcodes = explode(';', $brow['related_code']);
+                foreach ($relcodes as $codestring) {
+                  if ($codestring === '') continue;
+                  list($codetype, $relcode) = explode(':', $codestring);
+                  if ($codetype !== 'IPPF') continue;
+                  // Code below borrowed from function contraceptionClass() in the Fee Sheet.
+                  if (
+                    preg_match('/^11....110/'    , $relcode) ||
+                    preg_match('/^11...[1-5]999/', $relcode) ||
+                    preg_match('/^112152010/'    , $relcode) ||
+                    preg_match('/^11317[1-2]111/', $relcode) ||
+                    preg_match('/^12118[1-2].13/', $relcode) ||
+                    preg_match('/^121181999/'    , $relcode) ||
+                    preg_match('/^122182.13/'    , $relcode) ||
+                    preg_match('/^122182999/'    , $relcode)
+                  ) {
+                    $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
+                      "code_type = '11' AND code = '$relcode' LIMIT 1");
+                    $cyp = 0 + $tmprow['cyp_factor'];
+                    if ($cyp > $contraception_cyp) {
+                      $contraception_cyp = $cyp;
+                      $contraception_code = $relcode;
+                    }
+                  }
+                  // End borrowed code.
+                }
+              }
+            }
+          } // end while
+          if ($contraception_code) {
+            process_ippf_code($row, $contraception_code);
+            // echo "<!-- process_ippf_code(row, $contraception_code) -->\n"; // debugging
+          }
+        }
+      }
+    } // end if
+
+    else
 
     if ($form_content != 5 && $form_by !== '9' && $form_by !== '10' &&
       $form_by !== '14' && $form_by !== '15' && $form_by !== '20')
@@ -1314,8 +1414,8 @@ if ($_POST['form_submit']) {
         genHeadCell(xl('25+'  ), 'right');
       }
       else if ($value == '.age9') { // Age
-        genHeadCell(xl('0-10' ), 'right');
-        genHeadCell(xl('11-14'), 'right');
+        genHeadCell(xl('0-9'  ), 'right');
+        genHeadCell(xl('10-14'), 'right');
         genHeadCell(xl('15-19'), 'right');
         genHeadCell(xl('20-24'), 'right');
         genHeadCell(xl('25-29'), 'right');
@@ -1398,7 +1498,10 @@ if ($_POST['form_submit']) {
       genEndRow();
     } // end foreach
 
-    if ($form_output != 3) {
+    // If we are exporting or counting unique clients, new acceptors or new clients,
+    // then the totals line is skipped.
+    //
+    if ($form_output != 3 && $form_content != '2' && $form_content != '3' && $form_content != '4') {
       // Generate the line of totals.
       genStartRow("bgcolor='#dddddd'");
 
