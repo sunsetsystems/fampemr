@@ -10,6 +10,13 @@
 // any existing data for the specified patient is included.
 
 require_once("../../globals.php");
+
+// Option to substitute a custom version of this script.
+if (!empty($GLOBALS['gbl_rapid_workflow']) && file_exists('../../../custom/demographics_print.php')) {
+  include('../../../custom/demographics_print.php');
+  exit();
+}
+
 require_once("$srcdir/acl.inc");
 require_once("$srcdir/options.inc.php");
 require_once("$srcdir/patient.inc");
