@@ -179,7 +179,7 @@ function set_related(codetype, code, selector, codedesc) {
 function sel_related(e) {
  current_sel_name = e.name;
  var parms = '';
-<?php if ($GLOBALS['ippf_specific']) { ?>
+<?php if (false) { // ($GLOBALS['ippf_specific']) ?>
  // This case wants to force specific referral code types.
  var f = document.forms[0];
  var rtval = f.form_refer_external.value;
