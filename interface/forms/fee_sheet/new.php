@@ -9,6 +9,7 @@
 require_once("../../globals.php");
 require_once("$srcdir/acl.inc");
 require_once("$srcdir/api.inc");
+require_once("$srcdir/forms.inc");
 require_once("codes.php");
 require_once("../../../custom/code_types.inc.php");
 require_once("../../drugs/drugs.inc.php");
@@ -390,6 +391,21 @@ function justify_is_used() {
  return false;
 }
 
+
+function insert_lbf_item($form_id, $field_id, $field_value) {
+  if ($form_id) {
+    sqlInsert("INSERT INTO lbf_data (form_id, field_id, field_value) " .
+      "VALUES ($form_id, '$field_id', '$field_value')");
+  }
+  else {
+    $form_id = sqlInsert("INSERT INTO lbf_data (field_id, field_value) " .
+      "VALUES ('$field_id', '$field_value')");
+  }
+  return $form_id;
+}
+
+
+
 // This is just for Family Planning, to indicate if the visit includes
 // contraceptive services and to compute the service with highest CYP.
 $contraception_code = '';
@@ -623,13 +639,28 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   }
 
   // More Family Planning stuff.
-  if (!empty($_POST['contrastart']) && !empty($_POST['contrasel'])) {
+  if (!empty($_POST['contrasel']) && !empty($_POST['contrastart']) && $_POST['contrasel'] != 5) {
+    $contrasel   = $_POST['contrasel'];
     $contrastart = $_POST['contrastart'];
     $ippfconmeth = $_POST['ippfconmeth'];
+    /*****************************************************************
     sqlStatement("UPDATE patient_data SET " .
       "contrastart = '$contrastart', " .
       "ippfconmeth = '$ippfconmeth' " .
       "WHERE pid = '$pid'");
+    *****************************************************************/
+    // Add contraception form but only if it does not already exist
+    // (if it does, must be 2 users working on the visit concurrently).
+    $csrow = sqlQuery("SELECT COUNT(*) AS count FROM forms AS f WHERE " .
+      "f.pid = '$pid' AND f.encounter = '$encounter' AND " .
+      "f.formdir = 'LBFcontra' AND f.deleted = 0");
+    if ($csrow['count'] == 0) {
+      $newid = insert_lbf_item(0, 'contratype', $contrasel);
+      insert_lbf_item($newid, 'contrastart', $contrastart);
+      insert_lbf_item($newid, 'ippfconmeth', $ippfconmeth);
+      addForm($encounter, 'Contraception Start', $newid, 'LBFcontra', $pid, $userauthorized);
+    }
+    /****************************************************************/
   }
 
   // Note: Taxes are computed at checkout time (in pos_checkout.php which
@@ -806,7 +837,7 @@ function setSaveAndClose() {
 // This applies only to family planning installations.
 function contrasel_changed(selobj) {
  document.getElementById('contrasel_span').style.visibility =
-  selobj.value == '' ? 'hidden' : 'visible';
+  selobj.value > '3' ? 'hidden' : 'visible';
 }
 
 // Open the add-event dialog.
@@ -1212,6 +1243,7 @@ echo "</b></span>\n";
 &nbsp;
 
 <?php
+/*********************************************************************
 // If applicable, ask for the contraceptive services start date.
 $trow = sqlQuery("SELECT count(*) AS count FROM layout_options WHERE " .
   "form_id = 'DEM' AND field_id = 'contrastart' AND uor > 0");
@@ -1259,6 +1291,67 @@ if ($trow['count'] && $contraception_code && !$isBilled) {
     }
   }
 }
+*********************************************************************/
+// If applicable, ask for the contraceptive services start date.
+if ($contraception_code && !$isBilled) {
+  $csrow = sqlQuery("SELECT COUNT(*) AS count FROM forms AS f WHERE " .
+    "f.pid = '$pid' AND f.encounter = '$encounter' AND " .
+    "f.formdir = 'LBFcontra' AND f.deleted = 0");
+  // Do it only if a contraception form does not already exist for this visit.
+  // Otherwise assume that whoever created it knows what they were doing.
+  if ($csrow['count'] == 0) {
+    $date1 = substr($visit_row['date'], 0, 10);
+    $servicemeth = '';
+    // If surgical
+    if (preg_match('/^12/', $contraception_code)) {
+      // Identify the method with the IPPF code for the corresponding surgical procedure.
+      $servicemeth = substr($contraception_code, 0, 7) . '13';
+    }
+    else {
+      // Determine if this client ever started contraception with the MA.
+      $csrow = sqlQuery("SELECT f.form_id FROM forms AS f " .
+        "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'contratype' AND " .
+        "(d1.field_value = '2' OR d1.field_value = 3) " .
+        // "JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'contrastart' " .
+        "WHERE f.pid = '$pid' AND " .
+        "f.formdir = 'LBFcontra' AND " .
+        "f.deleted = 0 " .
+        "ORDER BY f.form_id DESC LIMIT 1");
+      if (empty($csrow)) {
+        // Identify the method with its IPPF code for Initial Consultation.
+        $servicemeth = substr($contraception_code, 0, 6) . '110';
+      }
+    }
+    if ($servicemeth) {
+      // Xavier confirms that the codes for Cervical Cap (112152010 and 112152011) are
+      // an unintended change in pattern, but at this point we have to live with it.
+      // -- Rod 2011-09-26
+      if ($servicemeth == '112152110') $servicemeth = '112152010';
+      // Contraception visit form types are:
+      // 1 - starting for lifetime, not ma (not applicable here)
+      // 2 - starting for ma, not lifetime
+      // 3 - starting for both lifetime and ma (default)
+      // 4 - change of method, not a new user (not applicable here)
+      // 5 - not choosing contraception (contrastart is null)
+      echo "   <select name='contrasel' onchange='contrasel_changed(this);'>\n";
+      echo "    <option value='3'>" . xl('Starting contraception for lifetime') . "</option>\n";
+      echo "    <option value='2'>" . xl('Starting for MA but not lifetime') . "</option>\n";
+      echo "    <option value='5'>" . xl('Refusing contraception') . "</option>\n";
+      echo "   </select>\n";
+      //
+      echo "<span id='contrasel_span' style='visibility:visible'> " . xl('on') . " ";
+      echo "<input type='text' name='contrastart' id='contrastart' size='10' value='$date1' " .
+        "onkeyup='datekeyup(this,mypcc)' onblur='dateblur(this,mypcc)' /> " .
+        "<img src='../../pic/show_calendar.gif' align='absbottom' width='24' height='22' " .
+        "id='img_contrastart' border='0' alt='[?]' style='cursor:pointer' " .
+        "title='" . xl('Click here to choose a date') . "' />\n";
+      echo ' ' . xl('using') . ' ';
+      echo generate_select_list('ippfconmeth', 'ippfconmeth', $servicemeth, '');
+      echo "</span><p>&nbsp;\n";
+    }
+  }
+}
+/********************************************************************/
 
 // If there is a choice of warehouses, allow override of user default.
 if ($prod_lino > 0) { // if any products are in this form

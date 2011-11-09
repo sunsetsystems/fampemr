@@ -1811,3 +1811,18 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 ALTER TABLE patient_data ADD ippfconmeth varchar(255) NOT NULL DEFAULT '';
 INSERT INTO `layout_options` VALUES ('DEM','ippfconmeth','5Stats','Contraceptives Start Method',9,1,0,10,10,'ippfconmeth',1,1,'','','Method provided on contraceptives start date');
 
+-- The following revised/added 2011-10-12:
+
+INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('lbfnames','LBFcontra','Contraception',1);
+DELETE FROM layout_options WHERE form_id = 'LBFcontra';
+INSERT INTO layout_options VALUES ('LBFcontra','contratype' ,'1','Action'    , 1,1,2, 0, 0,'contratype' ,1,3,'','' ,'Contraception action');
+INSERT INTO layout_options VALUES ('LBFcontra','ippfconmeth','1','Method'    , 2,1,1, 0, 0,'ippfconmeth',1,3,'','' ,'Contraception method');
+INSERT INTO layout_options VALUES ('LBFcontra','contrastart','1','Start Date', 3,4,1,10,10,''           ,1,3,'','D','Contraception start date');
+
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','contratype','Contraception Event Types', 1,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','1','Starting for lifetime but not MA' ,1,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','2','Starting for MA but not lifetime' ,2,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','3','Starting for both lifetime and MA',3,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','4','Change of method, not starting'   ,4,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','5','Not choosing contraception'       ,5,0);
+
