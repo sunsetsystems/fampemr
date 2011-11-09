@@ -122,6 +122,37 @@ $GLOBALS_METADATA = array(
       xl('Type of columns displayed for patient search results')
     ),
 
+    'patient_search_results_sort' => array(
+      xl('Patient Search Results Sorting'),
+      array(
+        '0' => xl('Alphabetical'),
+        '1' => xl('Open visits then alphabetical'),
+      ),
+      '0',                              // default
+      xl('Type of columns displayed for patient search results')
+    ),
+
+    'gbl_patient_initial_bottom' => array(
+      xl('Patient Initial Bottom View'),
+      array(
+        '0' => xl('Summary Panel'),
+        '1' => xl('Encounters List'),
+      ),
+      '0',                              // default
+      xl('Bottom frame contents when a new patient is selected')
+    ),
+
+    'gbl_encounters_default_view' => array(
+      xl('Encounters List Default View'),
+      array(
+        '0' => xl('Clinical for providers, otherwise Billing'),
+        '1' => xl('Clinical'),
+        '2' => xl('Billing'),
+      ),
+      '0',                              // default
+      xl('Default view style for list of encounters')
+    ),
+
     'simplified_demographics' => array(
       xl('Simplified Demographics'),
       'bool',                           // data type
@@ -320,6 +351,16 @@ $GLOBALS_METADATA = array(
       ),
       '0',                              // default
       xl('Indicator for specialized usage')
+    ),
+
+    'gbl_rapid_workflow' => array(
+      xl('Rapid Workflow Option'),
+      array(
+        '0'        => xl('None'),
+        'LBFmsivd' => xl('MSI (requires LBFmsivd form)'),
+      ),
+      '0',                              // default
+      xl('Activates custom work flow logic')
     ),
 
     'inhouse_pharmacy' => array(

@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2006-2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2006-2011 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -25,18 +25,6 @@
 // (5) Receipt printing must be a separate operation from payment,
 //     and repeatable.
 
-
-// TBD:
-// If this user has 'irnpool' set
-//   on display of checkout form
-//     show pending next invoice number
-//   on applying checkout
-//     save next invoice number to form_encounter
-//     compute new next invoice number
-//   on receipt display
-//     show invoice number
-
-
 require_once("../globals.php");
 require_once("$srcdir/acl.inc");
 require_once("$srcdir/patient.inc");
@@ -56,6 +44,9 @@ $INTEGRATED_AR = $GLOBALS['oer_config']['ws_accounting']['enabled'] === 2;
 $details = empty($_GET['details']) ? 0 : 1;
 
 $patient_id = empty($_GET['ptid']) ? $pid : 0 + $_GET['ptid'];
+
+// This flag comes from the Fee Sheet form and perhaps later others.
+$rapid_data_entry = empty($_GET['rde']) ? 0 : 1;
 
 // Get the patient's name and chart number.
 $patdata = getPatientData($patient_id, 'fname,mname,lname,pubpid,street,city,state,postal_code');
@@ -273,7 +264,7 @@ function receiptPaymentLine($paydate, $amount, $description='') {
 // or for the encounter specified as a GET parameter.
 //
 function generate_receipt($patient_id, $encounter=0) {
-  global $sl_err, $sl_cash_acc, $css_header, $details, $INTEGRATED_AR;
+  global $sl_err, $sl_cash_acc, $css_header, $details, $INTEGRATED_AR, $rapid_data_entry;
 
   // Get details for what we guess is the primary facility.
   $frow = sqlQuery("SELECT * FROM facility " .
@@ -540,6 +531,15 @@ function generate_receipt($patient_id, $encounter=0) {
 <?php } ?>
 </p>
 </div>
+
+<?php if ($rapid_data_entry && $GLOBALS['concurrent_layout']) { ?>
+<script language="JavaScript">
+ top.restoreSession();
+ parent.left_nav.setRadio('RTop', 'new');
+ parent.left_nav.loadFrame('new1', 'RTop', 'new/new.php');
+</script>
+<?php } ?>
+
 </body>
 </html>
 <?php
@@ -959,7 +959,7 @@ while ($urow = sqlFetchArray($ures)) {
 
 <body class="body_top">
 
-<form method='post' action='pos_checkout.php'>
+<form method='post' action='pos_checkout.php?rde=<?php echo $rapid_data_entry; ?>'>
 <input type='hidden' name='form_pid' value='<?php echo $patient_id ?>' />
 
 <center>
@@ -1182,7 +1182,9 @@ else if (!empty($GLOBALS['gbl_mask_invoice_number'])) {
  <tr>
   <td colspan='2' align='center'>
    &nbsp;<br>
-   <input type='submit' name='form_save' value='<?php xl('Save','e'); ?>' /> &nbsp;
+   <input type='submit' name='form_save' value='<?php xl('Save','e'); ?>'
+<?php if ($rapid_data_entry) echo "    style='background-color:#cc0000';color:#ffffff'"; ?>
+   /> &nbsp;
 <?php if (empty($_GET['framed'])) { ?>
    <input type='button' value='Cancel' onclick='window.close()' />
 <?php } ?>

@@ -22,6 +22,9 @@ require_once("$srcdir/classes/Prescription.class.php");
 $usbillstyle = $GLOBALS['ippf_specific'] ? " style='display:none'" : "";
 $justifystyle = justify_is_used() ? "" : " style='display:none'";
 
+// This flag comes from the LBFmsivd form and perhaps later others.
+$rapid_data_entry = empty($_GET['rde']) ? 0 : 1;
+
 function alphaCodeType($id) {
   global $code_types;
   foreach ($code_types as $key => $value) {
@@ -671,8 +674,15 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   // "In exam room".
   updateAppointmentStatus($pid, $visit_date, '<');
 
-  formHeader("Redirecting....");
-  formJump();
+  if ($rapid_data_entry) {
+    // In rapid data entry mode we go directly to the Checkout page.
+    formJump("{$GLOBALS['rootdir']}/patient_file/pos_checkout.php?framed=1&rde=1");
+  }
+  else {
+    // Otherwise return to the normal encounter summary frameset.
+    formHeader("Redirecting....");
+    formJump();
+  }
   formFooter();
   exit;
 }
@@ -855,7 +865,7 @@ function newEvt() {
 </head>
 
 <body class="body_top">
-<form method="post" action="<?php echo $rootdir; ?>/forms/fee_sheet/new.php"
+<form method="post" action="<?php echo $rootdir; ?>/forms/fee_sheet/new.php?rde=<?php echo $rapid_data_entry; ?>"
  onsubmit="return validate(this)">
 <span class="title"><?php xl('Fee Sheet','e'); ?></span><br>
 <input type='hidden' name='newcodes' value=''>
@@ -1391,7 +1401,9 @@ if (true) {
 &nbsp; &nbsp; &nbsp;
 
 <?php if (!$isBilled) { ?>
-<input type='submit' name='bn_save' value='<?php xl('Save','e');?>' />
+<input type='submit' name='bn_save' value='<?php xl('Save','e');?>'
+<?php if ($rapid_data_entry) echo " style='background-color:#cc0000';color:#ffffff'"; ?>
+/>
 &nbsp;
 <?php if ($GLOBALS['ippf_specific']) { ?>
 <input type='submit' name='bn_save_close' value='<?php xl('Save and Close','e');?>'<?php if ($hasCharges) echo " disabled"; ?> />

@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2009-2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2009-2011 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -78,6 +78,9 @@ $formhistory = 0 + $tmp['option_value'];
 
 $newid = 0;
 
+$fname = $GLOBALS['OE_SITE_DIR'] . "/LBF/$formname.plugin.php";
+if (file_exists($fname)) include_once($fname);
+
 // If Save was clicked, save the info.
 //
 if ($_POST['bn_save']) {
@@ -121,15 +124,17 @@ if ($_POST['bn_save']) {
     addForm($encounter, $formtitle, $newid, $formname, $pid, $userauthorized);
   }
 
-  formHeader("Redirecting....");
-  formJump();
-  formFooter();
+  // Support custom behavior at save time, such as going to another form.
+  if (function_exists($formname . '_save_exit')) {
+    call_user_func($formname . '_save_exit');
+  }
+  else {
+    formHeader("Redirecting....");
+    formJump();
+    formFooter();
+  }
   exit;
 }
-
-$fname = $GLOBALS['OE_SITE_DIR'] . "/LBF/$formname.plugin.php";
-// echo "<!-- Looking for plugin '$fname' -->\n"; // debugging
-if (file_exists($fname)) include_once($fname);
 
 $enrow = sqlQuery("SELECT p.fname, p.mname, p.lname, fe.date FROM " .
   "form_encounter AS fe, forms AS f, patient_data AS p WHERE " .

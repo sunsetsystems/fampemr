@@ -59,6 +59,7 @@ form {
 .srDateLast { width: 11%; }
 .srDateNext { width: 11%; }
 .srMisc { width: 10%; }
+.srIsOpen { font-weight: bold; }
 
 #searchResults table {
     width: 100%;
@@ -111,6 +112,30 @@ $sqllimit = $MAXSHOW;
 $given = "*, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS";
 $orderby = "lname ASC, fname ASC";
 
+$today = date('Y-m-d');
+if ($GLOBALS['patient_search_results_sort']) {
+  /*******************************************************************
+  $given .= ", (SELECT COUNT(*) " .
+    "FROM form_encounter AS fe, billing AS b WHERE " .
+    "fe.pid = patient_data.pid AND substring(fe.date, 1, 10) = '$today' AND " .
+    "b.pid = fe.pid AND b.encounter = fe.encounter AND " .
+    "b.activity = 1 AND b.billed = 0) AS isopen";
+  *******************************************************************/
+  $given .=
+    ", (SELECT COUNT(*) " .
+    "FROM form_encounter AS fe WHERE " .
+    "fe.pid = patient_data.pid AND substring(fe.date, 1, 10) = '$today') " .
+    "AS hasvisit" .
+    ", (SELECT COUNT(*) " .
+    "FROM form_encounter AS fe, billing AS b WHERE " .
+    "fe.pid = patient_data.pid AND substring(fe.date, 1, 10) = '$today' AND " .
+    "b.pid = fe.pid AND b.encounter = fe.encounter AND " .
+    "b.activity = 1 AND b.billed = 1) " .
+    "AS hasclosed";
+
+  $orderby = "hasclosed OR NOT hasvisit, $orderby";
+}
+
 $search_service_code = strip_escape_custom(trim($_POST['search_service_code']));
 echo "<input type='hidden' name='search_service_code' value='" .
   htmlentities($search_service_code) . "' />\n";
@@ -153,7 +178,8 @@ if ($popup) {
     "b.code LIKE '" . add_escape_custom($search_service_code) . "' " .
     ") > 0";
 
-  $sql = "SELECT $given FROM patient_data AS p " .
+  // $sql = "SELECT $given FROM patient_data AS p " .
+  $sql = "SELECT $given FROM patient_data " .
     "WHERE $where ORDER BY $orderby LIMIT $fstart, $sqllimit";
 
   $rez = sqlStatement($sql);
@@ -284,8 +310,10 @@ else {
 <?php
 if ($result) {
     foreach ($result as $iter) {
+        // $extcls = empty($iter['isopen']) ? '' : ' srIsOpen';
+        $extcls = (!empty($iter['hasvisit']) && empty($iter['hasclosed'])) ? ' srIsOpen' : '';
         echo "<tr class='oneresult' id='".$iter['pid']."'>";
-        echo  "<td class='srName'>" . $iter['lname'] . ", " . $iter['fname'] . "</td>\n";
+        echo  "<td class='srName$extcls'>" . $iter['lname'] . ", " . $iter['fname'] . "</td>\n";
         //other phone number display setup for tooltip
         $phone_biz = '';
         if ($iter{"phone_biz"} != "") {
@@ -302,20 +330,20 @@ if ($result) {
         $all_other_phones = $phone_biz.$phone_contact.$phone_cell;
         if ($all_other_phones == '') {$all_other_phones = 'No other phone numbers listed';}
         //end of phone number display setup, now display the phone number(s)
-        echo "<td class='srPhone' title='$all_other_phones'>" . $iter['phone_home']. "</td>\n";
+        echo "<td class='srPhone$extcls' title='$all_other_phones'>" . $iter['phone_home']. "</td>\n";
         
-        echo "<td class='srSS'>" . $iter['ss'] . "</td>";
+        echo "<td class='srSS$extcls'>" . $iter['ss'] . "</td>";
         if ($iter{"DOB"} != "0000-00-00 00:00:00") {
-            echo "<td class='srDOB'>" . $iter['DOB_TS'] . "</td>";
+            echo "<td class='srDOB$extcls'>" . $iter['DOB_TS'] . "</td>";
         } else {
-            echo "<td class='srDOB'>&nbsp;</td>";
+            echo "<td class='srDOB$extcls'>&nbsp;</td>";
         }
         
-        echo "<td class='srID'>" . $iter['pubpid'] . "</td>";
+        echo "<td class='srID$extcls'>" . $iter['pubpid'] . "</td>";
 
         if (empty($GLOBALS['patient_search_results_style'])) {
 
-          echo "<td class='srPID'>" . $iter['pid'] . "</td>";
+          echo "<td class='srPID$extcls'>" . $iter['pid'] . "</td>";
           
           //setup for display of encounter date info
           $encounter_count = 0;
@@ -372,15 +400,15 @@ if ($result) {
           if ($results = mysql_fetch_array($statement, MYSQL_ASSOC)) {
               $encounter_count = $results['encounter_count'];
           }
-          echo "<td class='srNumEnc'>" . $encounter_count . "</td>\n";
-          echo "<td class='srNumDay'>" . $day_diff . "</td>\n";
-          echo "<td class='srDateLast'>" . $last_date_seen . "</td>\n";
-          echo "<td class='srDateNext'>" . $next_appt_date . "</td>\n";
+          echo "<td class='srNumEnc$extcls'>" . $encounter_count . "</td>\n";
+          echo "<td class='srNumDay$extcls'>" . $day_diff . "</td>\n";
+          echo "<td class='srDateLast$extcls'>" . $last_date_seen . "</td>\n";
+          echo "<td class='srDateNext$extcls'>" . $next_appt_date . "</td>\n";
         }
 
         else { // alternate search results style
           foreach ($extracols as $field_id => $title) {
-            echo "<td class='srMisc'>" . $iter[$field_id] . "</td>\n";
+            echo "<td class='srMisc$extcls'>" . $iter[$field_id] . "</td>\n";
           }
         }
     }

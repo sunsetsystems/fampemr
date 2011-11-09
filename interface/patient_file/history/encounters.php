@@ -44,11 +44,18 @@ require_once("../../../custom/code_types.inc.php");
 
 // Perhaps the view choice should be saved as a session variable.
 //
-$tmp = sqlQuery("select authorized from users " .
-  "where id = '" . $_SESSION['authUserID'] . "'");
-$billing_view = ($tmp['authorized'] || $GLOBALS['athletic_team']) ? 0 : 1;
-if (isset($_GET['billing']))
+$billing_view = false;
+if (isset($_GET['billing'])) {
   $billing_view = empty($_GET['billing']) ? 0 : 1;
+}
+else if (empty($GLOBALS['gbl_encounters_default_view'])) {
+  $tmp = sqlQuery("select authorized from users " .
+    "where id = '" . $_SESSION['authUserID'] . "'");
+  $billing_view = ($tmp['authorized']) ? 0 : 1;
+}
+else if ($GLOBALS['gbl_encounters_default_view'] == 2) {
+  $billing_view = true;
+}
 
 // This is called to generate a line of output for a patient document.
 //

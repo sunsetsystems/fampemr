@@ -117,6 +117,29 @@ function sendimage(pid, what) {
   '_blank', 500, 400);
  return false;
 }
+
+function toencounter(enc, datestr) {
+ top.restoreSession();
+<?php if ($GLOBALS['concurrent_layout']) { ?>
+ var othername = window.name == 'RBot' ? 'RTop' : 'RBot';
+ parent.left_nav.setEncounter(datestr, enc, window.name);
+ parent.left_nav.setRadio(othername, 'enc');
+ parent.left_nav.loadFrame('enc2', othername, 'patient_file/encounter/encounter_top.php?set_encounter=' + enc);
+<?php } else { ?>
+ top.Title.location.href = '../encounter/encounter_title.php?set_encounter='   + enc;
+ top.Main.location.href  = '../encounter/patient_encounter.php?set_encounter=' + enc;
+<?php } ?>
+ return false;
+}
+
+function newencounter() {
+<?php if ($GLOBALS['concurrent_layout']) { ?>
+ return parent.left_nav.loadFrame2('nen1','RBot','forms/newpatient/new.php?autoloaded=1&calenc=');
+<?php } else { ?>
+ // TBD
+ return false;
+<?php } ?>
+}
 </script>
 </head>
 
@@ -435,6 +458,30 @@ if ($document_id) {
     "onclick='top.restoreSession()'>Click for ID card</a><br />";
 }
 
+// Determine if an encounter exists for today.
+// If no, present a "New Visit" link.
+// If yes and it's unbilled, present a "Today's Visit" link.
+//
+$today = date('Y-m-d');
+$query = "SELECT encounter FROM form_encounter WHERE " .
+  "pid = '$pid' AND date >= '$today 00:00:00' AND date <= '$today 23:59:59' " .
+  "ORDER BY encounter DESC LIMIT 1";
+$tmp = sqlQuery($query);
+if (!empty($tmp['encounter'])) {
+  $todaysenc = $tmp['encounter'];
+  $query = "SELECT COUNT(*) AS count FROM billing WHERE " .
+      "pid = '$pid' AND encounter = '$todaysenc' AND billed = 1 AND " .
+      "activity = 1";
+  $tmp = sqlQuery($query);
+  if (empty($tmp['count'])) {
+    $datestr = oeFormatShortDate($today);
+    echo "<a href='' onclick=\"return toencounter($todaysenc,'$datestr')\">" . xl('Today`s Visit') . "</a>\n";
+  }
+}
+else {
+  echo "<a href='' onclick='return newencounter()'>" . xl('New Visit') . "</a>\n";
+}
+
 // Show current and upcoming appointments.
 if (isset($pid) && !$GLOBALS['disable_calendar']) {
  $query = "SELECT e.pc_eid, e.pc_aid, e.pc_title, e.pc_eventDate, " .
@@ -487,8 +534,13 @@ if (isset($pid) && !$GLOBALS['disable_calendar']) {
 <?php if (!$_GET['is_new']) { // if new pt, do not load other frame ?>
  var othername = (window.name == 'RTop') ? 'RBot' : 'RTop';
  parent.left_nav.forceDual();
+<?php if (empty($GLOBALS['gbl_patient_initial_bottom'])) { ?>
  parent.left_nav.setRadio(othername, 'sum');
  parent.left_nav.loadFrame('sum1', othername, 'patient_file/summary/summary_bottom.php');
+<?php } else { ?>
+ parent.left_nav.setRadio(othername, 'ens');
+ parent.left_nav.loadFrame('ens1', othername, 'patient_file/history/encounters.php');
+<?php } ?>
 <?php } ?>
 </script>
 <?php } ?>
