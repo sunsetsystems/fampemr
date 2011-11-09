@@ -484,6 +484,15 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
           "di.inventory_id = ds.inventory_id");
         // And delete the sale for good measure.
         sqlStatement("DELETE FROM drug_sales WHERE sale_id = '$sale_id'");
+
+        // If Rx was checked and there is a prescription for this
+        // product/patient/date, delete it also.
+        if (!empty($iter['rx'])) {
+          sqlStatement("DELETE FROM prescriptions WHERE " .
+            "patient_id = '$pid' AND drug_id = '$drug_id' AND " .
+            "start_date = '$visit_date' AND active = 1 " .
+            "ORDER BY id DESC LIMIT 1");
+        }
       }
       else {
         // Modify the sale and adjust inventory accordingly.
@@ -506,7 +515,7 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
     }
 
     // If a new prescription is requested, create it.
-    if (!empty($iter['rx'])) {
+    if (!empty($iter['rx']) && !$del) {
       // If an active rx already exists for this drug and date we will
       // replace it, otherwise we'll make a new one.
       $rxrow = sqlQuery("SELECT id FROM prescriptions WHERE " .
