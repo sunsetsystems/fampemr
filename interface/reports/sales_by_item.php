@@ -121,17 +121,16 @@ function thisLineItem($patient_id, $encounter_id, $rowcat, $description, $transd
   <td class="detail">
    <?php echo display_desc($productleft); $productleft = "&nbsp;"; ?>
   </td>
-  <td class="dehead">
+  <td class="detail">
    <?php echo oeFormatShortDate($transdate); ?>
   </td>
-  <td class="detail">
-   <a href='../patient_file/pos_checkout.php?ptid=<?php echo $patient_id; ?>&enc=<?php echo $encounter_id; ?>'>
-   <?php echo $invnumber; ?></a>
+  <td class='delink' onclick='doinvopen(<?php echo "$patient_id,$encounter_id"; ?>)'>
+   <?php echo $invnumber; ?>
   </td>
-  <td class="dehead" align="right">
+  <td class="detail" align="right">
    <?php echo $qty; ?>
   </td>
-  <td class="dehead" align="right">
+  <td class="detail" align="right">
    <?php bucks($rowamount); ?>
   </td>
  </tr>
@@ -185,6 +184,23 @@ function thisLineItem($patient_id, $encounter_id, $rowcat, $description, $transd
 <head>
 <?php html_header_show();?>
 <title><?php xl('Sales by Item','e') ?></title>
+
+<style type="text/css">
+ .dehead { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:bold }
+ .detail { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:normal }
+ .delink { color:#0000cc; font-family:sans-serif; font-size:10pt; font-weight:normal; cursor:pointer }
+</style>
+
+<script type="text/javascript" src="../../library/topdialog.js"></script>
+<script type="text/javascript" src="../../library/dialog.js"></script>
+<script language="JavaScript">
+<?php require($GLOBALS['srcdir'] . "/restoreSession.php"); ?>
+// Process click to pop up the add/edit window.
+function doinvopen(ptid,encid) {
+ dlgopen('../patient_file/pos_checkout.php?ptid=' + ptid + '&enc=' + encid, '_blank', 750, 550);
+}
+</script>
+
 </head>
 
 <body leftmargin='0' topmargin='0' marginwidth='0' marginheight='0'>

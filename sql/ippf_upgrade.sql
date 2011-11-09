@@ -579,3 +579,30 @@ UPDATE layout_options SET group_name = '1Who', title='', seq = 7, data_type = 1,
   form_id = 'DEM' AND field_id = 'usertext3' AND uor = 0;
 #EndIf
 
+#IfNotRow lang_constants constant_name CLIA Number
+insert into lang_constants ( constant_name ) values ( 'CLIA Number' );
+#EndIf
+insert into lang_definitions ( cons_id, lang_id, definition ) select lc.cons_id, 1, 'SDP ID' from lang_constants as lc left join lang_definitions as ld on ld.cons_id = lc.cons_id and ld.lang_id = 1 where lc.constant_name = 'CLIA Number' and ld.cons_id is null;
+
+# 2011-08-01 we decided not to do this.
+# 2011-08-10 decided to do it again.
+UPDATE facility SET domain_identifier = facility_npi WHERE facility_npi != '' AND ( domain_identifier IS NULL OR domain_identifier = '' );
+
+# The following re-added 2011-08-15 because LV asked for it. --Rod
+#IfNotRow2D list_options list_id lists option_id posref
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','posref','Channels of Distribution', 1,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('posref','01','Static Clinic'         ,01,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('posref','02','Mobile/Outreach Clinic',02,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('posref','03','Associated Clinics'    ,03,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('posref','04','Private Physicians'    ,04,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('posref','05','CBD / CBS'             ,05,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('posref','06','MA Social Marketing'   ,06,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('posref','07','Commercial Marketing'  ,07,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('posref','08','Government'            ,08,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('posref','09','Other Agencies'        ,09,0);
+#EndIf
+#IfNotRow lang_constants constant_name POS Code
+INSERT INTO lang_constants ( constant_name ) VALUES ( 'POS Code' );
+#EndIf
+INSERT INTO lang_definitions ( cons_id, lang_id, definition ) SELECT lc.cons_id, 1, 'COD Code' FROM lang_constants AS lc LEFT JOIN lang_definitions AS ld ON ld.cons_id = lc.cons_id AND ld.lang_id = 1 WHERE lc.constant_name = 'POS Code' AND ld.cons_id IS NULL;
+
