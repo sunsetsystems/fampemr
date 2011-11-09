@@ -13,14 +13,19 @@ require_once("../globals.php");
 require_once("$srcdir/acl.inc");
 require_once("$srcdir/patient.inc");
 
+// Make this true for MSI, otherwise it's IPPF.
+$msi_specific = false;
+
 // Set this to:
 // 0 = Select all visits and use one (Billing) facility
 // 1 = Output a separate facility for each OpenEMR facility
 // 2 = Output the facilities having a given SDP ID, merged into one facility
 //
-$MULTIPLE = 2;
+$MULTIPLE = $msi_specific ? 0 : 2;
 
 if (!acl_check('admin', 'super')) die("Not authorized!");
+
+$alertmsg = '';
 
 //////////////////////////////////////////////////////////////////////
 //                            XML Stuff                             //
@@ -115,6 +120,17 @@ function mappedOption($list_id, $option_id, $default='9') {
   return ($maparr[0] === '') ? $option_id : $maparr[0];
 }
 
+// Specific to MSI:
+//
+function describedOption($list_id, $option_id, $default='9') {
+  if ($option_id === '') return $default;
+  $row = sqlQuery("SELECT title FROM list_options WHERE " .
+    "list_id = '$list_id' AND option_id = '$option_id' LIMIT 1");
+  if (empty($row)) return $option_id; // should not happen
+  $maparr = explode(':', $row['title']);
+  return ($maparr[0] === '') ? $option_id : $maparr[0];
+}
+
 // Like the above but given a layout item form and field name.
 // Or return 9 for a list whose id is empty (unspecified).
 //
@@ -140,10 +156,60 @@ function mappedFieldOption($form_id, $field_id, $option_id) {
 }
 
 function exportEncounter($pid, $encounter, $date) {
+  global $msi_specific;
+
   // Starting a new visit (encounter).
   OpenTag('IMS_eMRUpload_Visit');
   Add('VisitDate' , xmlTime($date));
   Add('emrVisitId', $encounter);
+
+  // Specific to MSI:
+  if ($msi_specific) {
+    // Get LBF_Data entries
+    $lbfres = sqlStatement("SELECT f.form_id, ld.field_id, ld.field_value FROM forms f " .
+      "INNER JOIN lbf_data ld ON f.form_id = ld.form_id " . 
+      "WHERE " .
+      "f.pid = '$pid' AND " .
+      "f.encounter = '$encounter' AND " .
+      "f.formdir = 'LBF1' AND " .
+      "f.deleted = 0 " .
+      "ORDER BY f.id, ld.field_id");
+    while ($lbfrow = sqlFetchArray($lbfres)) {
+      switch ($lbfrow['field_id']) {
+        case "Child":
+          Add('Child', mappedOption('Parity', $lbfrow['field_value'], ''));
+          break;
+        case "CurrentContraceptive":
+          Add('CurrentMethod', describedOption('Current_form_of_contraception', $lbfrow['field_value'], ''));
+          break;
+        case "FollowUp":
+          Add('FollowUp', describedOption('FollowUp', $lbfrow['field_value']), '');
+          break;
+        case "gestation":
+          Add('GestationalAge', $lbfrow['field_value']);
+          break;
+        case "ReferredBy":
+          Add('MedicalReferral', describedOption('Referred_by', $lbfrow['field_value'], ''));
+          break;
+      }
+    }
+    $fres = sqlStatement("SELECT f.form_id, fe.sensitivity, fe.referral_source, pc.pc_catname FROM forms f " .
+      "INNER JOIN form_encounter fe on f.pid=fe.pid and f.encounter=fe.encounter " . 
+      "INNER JOIN openemr_postcalendar_categories pc on fe.pc_catid=pc.pc_catid " . 
+      "WHERE " .
+      "f.pid = '$pid' AND " .
+      "f.encounter = '$encounter' AND " .
+      "f.formdir = 'newpatient' AND " .
+      "f.deleted = 0 " .
+      "ORDER BY f.id");
+    // For each PE form in this encounter...
+    while ($frow = sqlFetchArray($fres)) {
+      $form_id = $frow['form_id'];
+      Addifpresent('Sensitivity'   , $frow['sensitivity']);
+      Addifpresent('MarketingReferral', $frow['referral_source']);
+      Addifpresent('Category'      , $frow['pc_catname']);
+    }
+  } // end $msi_specific
 
   // Dump IPPF services.
   // This queries the MA codes from which we'll get the related IPPF codes.
@@ -252,108 +318,111 @@ function exportEncounter($pid, $encounter, $date) {
 }
 
 function endClient($pid, &$encarray) {
-  global $beg_year, $beg_month, $end_year, $end_month;
-  // Output issues.
-  $ires = sqlStatement("SELECT " .
-    "l.id, l.type, l.begdate, l.enddate, l.title, l.diagnosis, " .
-    "c.prev_method, c.new_method, c.reason_chg, c.reason_term, " .
-    "c.hor_history, c.hor_lmp, c.hor_flow, c.hor_bleeding, c.hor_contra, " .
-    "c.iud_history, c.iud_lmp, c.iud_pain, c.iud_upos, c.iud_contra, " .
-    "c.sur_screen, c.sur_anes, c.sur_type, c.sur_post_ins, c.sur_contra, " .
-    "c.nat_reason, c.nat_method, c.emg_reason, c.emg_method, " .
-    "g.client_status, g.in_ab_proc, g.ab_types, g.ab_location, g.pr_status, " .
-    "g.gest_age_by, g.sti, g.prep_procs, g.reason, g.exp_p_i, g.ab_contraind, " .
-    "g.screening, g.pre_op, g.anesthesia, g.side_eff, g.rec_compl, g.post_op, " .
-    "g.qc_ind, g.contrameth, g.fol_compl " .
-    "FROM lists AS l " .
-    "LEFT JOIN lists_ippf_con  AS c ON l.type = 'contraceptive' AND c.id = l.id " .
-    "LEFT JOIN lists_ippf_gcac AS g ON l.type = 'ippf_gcac' AND g.id = l.id " .
-    "WHERE l.pid = '$pid' AND " .
-    sprintf("l.begdate >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
-    sprintf("l.begdate <  '%04u-%02u-01 00:00:00' AND ", $end_year, $end_month) .
-    "l.type != 'ippf_gcac' " .
-    "ORDER BY l.begdate");
+  global $beg_year, $beg_month, $end_year, $end_month, $msi_specific;
 
-  while ($irow = sqlFetchArray($ires)) {
-    OpenTag('IMS_eMRUpload_Issue');
-    Add('IssueType'     , substr($irow['type'], 0, 15)); // per email 2009-03-20
-    Add('emrIssueId'    , $irow['id']);
-    Add('IssueStartDate', xmlTime($irow['begdate'], 0));
-    Add('IssueEndDate'  , xmlTime($irow['enddate']));
-    Add('IssueTitle'    , $irow['title']);
-    Add('IssueDiagnosis', $irow['diagnosis']);
-    $form_id = ($irow['type'] == 'ippf_gcac') ? 'GCA' : 'CON';
-    foreach ($irow AS $key => $value) {
-      if (empty($value)) continue;
-      if ($key == 'id' || $key == 'type' || $key == 'begdate' ||
-        $key == 'enddate' || $key == 'title' || $key == 'diagnosis')
-        continue;
-      $avalues = explode('|', $value);
-      foreach ($avalues as $tmp) {
-        OpenTag('IMS_eMRUpload_IssueData');
-        // TBD: Add IssueCodeGroup to identify the list, if any???
-        Add('IssueCodeGroup', '?');
-        Add('IssueCode', $key);
-        Add('IssueCodeValue', mappedFieldOption($form_id, $key, $tmp));
-        CloseTag('IMS_eMRUpload_IssueData');
-      }
-    }
-    // List the encounters linked to this issue.  We include pid
-    // to speed up the search, as it begins the primary key.
-    $ieres = sqlStatement("SELECT encounter FROM issue_encounter " .
-      "WHERE pid = '$pid' AND list_id = '" . $irow['id'] . "' " .
-      "ORDER BY encounter");
-    while ($ierow = sqlFetchArray($ieres)) {
-      OpenTag('IMS_eMRUpload_VisitIssue');
-      Add('emrIssueId', $irow['id']);
-      Add('emrVisitId', $ierow['encounter']);
-      CloseTag('IMS_eMRUpload_VisitIssue');
-    }
-    CloseTag('IMS_eMRUpload_Issue');
-  }
+  if (!$msi_specific) {
+    // Output issues.
+    $ires = sqlStatement("SELECT " .
+      "l.id, l.type, l.begdate, l.enddate, l.title, l.diagnosis, " .
+      "c.prev_method, c.new_method, c.reason_chg, c.reason_term, " .
+      "c.hor_history, c.hor_lmp, c.hor_flow, c.hor_bleeding, c.hor_contra, " .
+      "c.iud_history, c.iud_lmp, c.iud_pain, c.iud_upos, c.iud_contra, " .
+      "c.sur_screen, c.sur_anes, c.sur_type, c.sur_post_ins, c.sur_contra, " .
+      "c.nat_reason, c.nat_method, c.emg_reason, c.emg_method, " .
+      "g.client_status, g.in_ab_proc, g.ab_types, g.ab_location, g.pr_status, " .
+      "g.gest_age_by, g.sti, g.prep_procs, g.reason, g.exp_p_i, g.ab_contraind, " .
+      "g.screening, g.pre_op, g.anesthesia, g.side_eff, g.rec_compl, g.post_op, " .
+      "g.qc_ind, g.contrameth, g.fol_compl " .
+      "FROM lists AS l " .
+      "LEFT JOIN lists_ippf_con  AS c ON l.type = 'contraceptive' AND c.id = l.id " .
+      "LEFT JOIN lists_ippf_gcac AS g ON l.type = 'ippf_gcac' AND g.id = l.id " .
+      "WHERE l.pid = '$pid' AND " .
+      sprintf("l.begdate >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
+      sprintf("l.begdate <  '%04u-%02u-01 00:00:00' AND ", $end_year, $end_month) .
+      "l.type != 'ippf_gcac' " .
+      "ORDER BY l.begdate");
 
-  // Loop on $encarray and generate an "issue" for each GCAC visit form,
-  // similarly to the above.
-  foreach ($encarray as $erow) {
-    $fres = sqlStatement("SELECT form_id FROM forms WHERE " .
-      "pid = '$pid' AND " .
-      "encounter = '" . $erow['encounter'] . "' AND " .
-      "formdir = 'LBFgcac' AND " .
-      "deleted = 0 " .
-      "ORDER BY id");
-    // For each GCAC form in this encounter...
-    while ($frow = sqlFetchArray($fres)) {
-      $form_id = $frow['form_id'];
+    while ($irow = sqlFetchArray($ires)) {
       OpenTag('IMS_eMRUpload_Issue');
-      Add('IssueType'     , 'ippf_gcac');
-      Add('emrIssueId'    , 10000000 + $form_id);
-      Add('IssueStartDate', xmlTime($erow['date'], 0));
-      Add('IssueEndDate'  , xmlTime(''));
-      Add('IssueTitle'    , 'GCAC Visit Form');
-      Add('IssueDiagnosis', '');
-      $gres = sqlStatement("SELECT field_id, field_value FROM lbf_data WHERE " .
-        "form_id = '$form_id' ORDER BY field_id");
-      // For each data item in the form...
-      while ($grow = sqlFetchArray($gres)) {
-        $key = $grow['field_id'];
-        $value = $grow['field_value'];
+      Add('IssueType'     , substr($irow['type'], 0, 15)); // per email 2009-03-20
+      Add('emrIssueId'    , $irow['id']);
+      Add('IssueStartDate', xmlTime($irow['begdate'], 0));
+      Add('IssueEndDate'  , xmlTime($irow['enddate']));
+      Add('IssueTitle'    , $irow['title']);
+      Add('IssueDiagnosis', $irow['diagnosis']);
+      $form_id = ($irow['type'] == 'ippf_gcac') ? 'GCA' : 'CON';
+      foreach ($irow AS $key => $value) {
         if (empty($value)) continue;
+        if ($key == 'id' || $key == 'type' || $key == 'begdate' ||
+          $key == 'enddate' || $key == 'title' || $key == 'diagnosis')
+          continue;
         $avalues = explode('|', $value);
         foreach ($avalues as $tmp) {
           OpenTag('IMS_eMRUpload_IssueData');
+          // TBD: Add IssueCodeGroup to identify the list, if any???
           Add('IssueCodeGroup', '?');
           Add('IssueCode', $key);
-          Add('IssueCodeValue', mappedFieldOption('LBFgcac', $key, $tmp));
+          Add('IssueCodeValue', mappedFieldOption($form_id, $key, $tmp));
           CloseTag('IMS_eMRUpload_IssueData');
         }
       }
-      OpenTag('IMS_eMRUpload_VisitIssue');
-      Add('emrIssueId', 10000000 + $form_id);
-      Add('emrVisitId', $erow['encounter']);
-      CloseTag('IMS_eMRUpload_VisitIssue');
+      // List the encounters linked to this issue.  We include pid
+      // to speed up the search, as it begins the primary key.
+      $ieres = sqlStatement("SELECT encounter FROM issue_encounter " .
+        "WHERE pid = '$pid' AND list_id = '" . $irow['id'] . "' " .
+        "ORDER BY encounter");
+      while ($ierow = sqlFetchArray($ieres)) {
+        OpenTag('IMS_eMRUpload_VisitIssue');
+        Add('emrIssueId', $irow['id']);
+        Add('emrVisitId', $ierow['encounter']);
+        CloseTag('IMS_eMRUpload_VisitIssue');
+      }
       CloseTag('IMS_eMRUpload_Issue');
     }
-  }
+
+    // Loop on $encarray and generate an "issue" for each GCAC visit form,
+    // similarly to the above.
+    foreach ($encarray as $erow) {
+      $fres = sqlStatement("SELECT form_id FROM forms WHERE " .
+        "pid = '$pid' AND " .
+        "encounter = '" . $erow['encounter'] . "' AND " .
+        "formdir = 'LBFgcac' AND " .
+        "deleted = 0 " .
+        "ORDER BY id");
+      // For each GCAC form in this encounter...
+      while ($frow = sqlFetchArray($fres)) {
+        $form_id = $frow['form_id'];
+        OpenTag('IMS_eMRUpload_Issue');
+        Add('IssueType'     , 'ippf_gcac');
+        Add('emrIssueId'    , 10000000 + $form_id);
+        Add('IssueStartDate', xmlTime($erow['date'], 0));
+        Add('IssueEndDate'  , xmlTime(''));
+        Add('IssueTitle'    , 'GCAC Visit Form');
+        Add('IssueDiagnosis', '');
+        $gres = sqlStatement("SELECT field_id, field_value FROM lbf_data WHERE " .
+          "form_id = '$form_id' ORDER BY field_id");
+        // For each data item in the form...
+        while ($grow = sqlFetchArray($gres)) {
+          $key = $grow['field_id'];
+          $value = $grow['field_value'];
+          if (empty($value)) continue;
+          $avalues = explode('|', $value);
+          foreach ($avalues as $tmp) {
+            OpenTag('IMS_eMRUpload_IssueData');
+            Add('IssueCodeGroup', '?');
+            Add('IssueCode', $key);
+            Add('IssueCodeValue', mappedFieldOption('LBFgcac', $key, $tmp));
+            CloseTag('IMS_eMRUpload_IssueData');
+          }
+        }
+        OpenTag('IMS_eMRUpload_VisitIssue');
+        Add('emrIssueId', 10000000 + $form_id);
+        Add('emrVisitId', $erow['encounter']);
+        CloseTag('IMS_eMRUpload_VisitIssue');
+        CloseTag('IMS_eMRUpload_Issue');
+      }
+    }
+  } // end not $msi_specific
 
   CloseTag('IMS_eMRUpload_Client');
 }
@@ -371,6 +440,7 @@ if (!empty($form_submit)) {
   $sdpid     = $_POST['form_sdp'];
   $beg_year  = $_POST['form_year'];
   $beg_month = $_POST['form_month'];
+  $passphrase = $_POST['form_pass'];
   $end_year  = $beg_year;
   $end_month = $beg_month + 1;
   if ($end_month > 12) {
@@ -494,47 +564,56 @@ if (!empty($form_submit)) {
     Add('LastUpdated'     , xmlTime($row['last_update']));
     Add('NewAcceptorDate' , xmlTime($row['contrastart']));
 
-    // Get the current contraceptive method with greatest effectiveness.
-    $methodid = '';
-    $methodvalue = -999;
-    if (!empty($crow['new_method'])) {
-      $methods = explode('|', $crow['new_method']);
-      $methodid = mappedOption('contrameth', $methods[0]);
+    if (!$msi_specific) {
+      // Get the current contraceptive method with greatest effectiveness.
+      $methodid = '';
+      $methodvalue = -999;
+      if (!empty($crow['new_method'])) {
+        $methods = explode('|', $crow['new_method']);
+        $methodid = mappedOption('contrameth', $methods[0]);
+      }
+      Add('CurrentMethod', $methodid);
     }
-    Add('CurrentMethod', $methodid);
 
     Add('Dob'        , xmlTime($row['DOB']));
     Add('DobType'    , "rel"); // rel=real, est=estimated
-    Add('Pregnancies', 0 + getTextListValue($hrow['genobshist'],'npreg')); // number of pregnancies
-    Add('Children'   , 0 + getTextListValue($hrow['genobshist'],'nlc'));   // number of living children
-    Add('Abortions'  , 0 + getTextListValue($hrow['genabohist'],'nia'));   // number of induced abortions
-    Add('Education'  , $education);
-    Add('Demo5'      , Sex($row['sex']));
 
-    // Things included if they are present (July 2010)
-    AddIfPresent('City', $row['city']);
-    AddIfPresent('State', mappedOption('state', $row['state'], ''));
-    AddIfPresent('Occupation', mappedOption('occupations', $row['occupation'], ''));
-    AddIfPresent('MaritalStatus', mappedOption('marital', $row['status'], ''));
-    AddIfPresent('Ethnoracial', mappedOption('ethrace', $row['ethnoracial'], ''));
-    AddIfPresent('Interpreter', $row['interpretter']);
-    AddIfPresent('MonthlyIncome', $row['monthly_income']);
-    AddIfPresent('ReferralSource', mappedOption('refsource', $row['referral_source'], ''));
-    AddIfPresent('PriceLevel', mappedOption('pricelevel', $row['pricelevel'], ''));
-    AddIfPresent('UserList1', mappedOption('userlist1', $row['userlist1'], ''));
-    AddIfPresent('UserList3', mappedOption('userlist3', $row['userlist3'], ''));
-    AddIfPresent('UserList4', mappedOption('userlist4', $row['userlist4'], ''));
-    AddIfPresent('UserList5', mappedOption('userlist5', $row['userlist5'], ''));
-    AddIfPresent('UserText11', $row['usertext11']);
-    AddIfPresent('UserText12', $row['usertext12']);
-    AddIfPresent('UserText13', $row['usertext13']);
-    AddIfPresent('UserText14', $row['usertext14']);
-    AddIfPresent('UserText15', $row['usertext15']);
-    AddIfPresent('UserText16', $row['usertext16']);
-    AddIfPresent('UserText17', $row['usertext17']);
-    AddIfPresent('UserText18', $row['usertext18']);
-    AddIfPresent('UserText19', $row['usertext19']);
-    AddIfPresent('UserText20', $row['usertext20']);
+    if ($msi_specific) {
+      Add('Education', describedOption('Education', $education, ''));
+      Add('Sex'      , Sex($row['sex']));
+      AddIfPresent('WarSubCity', $row['state']);
+    }
+    else {
+      Add('Pregnancies', 0 + getTextListValue($hrow['genobshist'],'npreg')); // number of pregnancies
+      Add('Children'   , 0 + getTextListValue($hrow['genobshist'],'nlc'));   // number of living children
+      Add('Abortions'  , 0 + getTextListValue($hrow['genabohist'],'nia'));   // number of induced abortions
+      Add('Education'  , $education);
+      Add('Demo5'      , Sex($row['sex']));
+      // Things included if they are present (July 2010)
+      AddIfPresent('City', $row['city']);
+      AddIfPresent('State', mappedOption('state', $row['state'], ''));
+      AddIfPresent('Occupation', mappedOption('occupations', $row['occupation'], ''));
+      AddIfPresent('MaritalStatus', mappedOption('marital', $row['status'], ''));
+      AddIfPresent('Ethnoracial', mappedOption('ethrace', $row['ethnoracial'], ''));
+      AddIfPresent('Interpreter', $row['interpretter']);
+      AddIfPresent('MonthlyIncome', $row['monthly_income']);
+      AddIfPresent('ReferralSource', mappedOption('refsource', $row['referral_source'], ''));
+      AddIfPresent('PriceLevel', mappedOption('pricelevel', $row['pricelevel'], ''));
+      AddIfPresent('UserList1', mappedOption('userlist1', $row['userlist1'], ''));
+      AddIfPresent('UserList3', mappedOption('userlist3', $row['userlist3'], ''));
+      AddIfPresent('UserList4', mappedOption('userlist4', $row['userlist4'], ''));
+      AddIfPresent('UserList5', mappedOption('userlist5', $row['userlist5'], ''));
+      AddIfPresent('UserText11', $row['usertext11']);
+      AddIfPresent('UserText12', $row['usertext12']);
+      AddIfPresent('UserText13', $row['usertext13']);
+      AddIfPresent('UserText14', $row['usertext14']);
+      AddIfPresent('UserText15', $row['usertext15']);
+      AddIfPresent('UserText16', $row['usertext16']);
+      AddIfPresent('UserText17', $row['usertext17']);
+      AddIfPresent('UserText18', $row['usertext18']);
+      AddIfPresent('UserText19', $row['usertext19']);
+      AddIfPresent('UserText20', $row['usertext20']);
+    }
 
     // Dump the visits for this patient.
     if ($MULTIPLE == 2) {
@@ -544,11 +623,17 @@ if (!empty($form_submit)) {
         "fe.pid = '$last_pid' AND f.id = fe.facility_id AND " .
         "f.domain_identifier = '$sdpid' ";
     }
-    else {
+    else if ($MULTIPLE == 1) {
       $query = "SELECT " .
         "fe.encounter, fe.date " .
         "FROM form_encounter AS fe WHERE " .
         "fe.pid = '$last_pid' AND fe.facility_id = '$last_facility' ";
+    }
+    else {
+      $query = "SELECT " .
+        "fe.encounter, fe.date " .
+        "FROM form_encounter AS fe WHERE " .
+        "fe.pid = '$last_pid' ";
     }
 
     if (true) {
@@ -575,16 +660,38 @@ if (!empty($form_submit)) {
   if ($last_facility >= 0) endFacility();
   // endFacility();
 
-  header("Pragma: public");
-  header("Expires: 0");
-  header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
-  header("Content-Type: application/force-download");
-  header("Content-Length: " . strlen($out));
-  header("Content-Disposition: attachment; filename=export.xml");
-  header("Content-Description: File Transfer");
-  echo $out;
+  // This is the "filename" for the Content-Disposition header.
+  $filename = 'export.xml';
 
-  exit(0);
+  // Do encryption if requested.
+  if (!empty($passphrase)) {
+    $filename .= '.aes';
+    // This requires PHP 5.3.0 or later.  The 5th (iv) parameter is not supported until
+    // PHP 5.3.3, so we specify ECB which does not use it.
+    $pass = "12345678123456781234567812345678"; // 32 bytes = 256 bits
+    $method = 'aes-256-ecb'; // aes-256-cbc requires iv
+    $out = openssl_encrypt($out, $method, $pass, true);
+    //
+    // To decrypt at the command line, specify the 32-byte key in hex format:
+    // openssl aes-256-ecb -d -in export.xml.aes -K 3132333435363738313233343536373831323334353637383132333435363738
+    //
+  }
+
+  if ($last_pid >= 0) {
+    header("Pragma: public");
+    header("Expires: 0");
+    header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+    header("Content-Type: application/force-download");
+    header("Content-Length: " . strlen($out));
+    header("Content-Disposition: attachment; filename=$filename");
+    header("Content-Description: File Transfer");
+    echo $out;
+    exit(0);
+  }
+  else {
+    // Whoops, there's no matching data.
+    $alertmsg = xl("There is no data matching this period and SDP.");
+  }
 }
 
 $months = array(1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
@@ -624,6 +731,8 @@ foreach ($months as $key => $value) {
 ?>
    </select>
    <input type='text' name='form_year' size='4' value='<?php echo $selyear; ?>' />
+
+<?php if ($MULTIPLE == 2) { ?>
    &nbsp;
    <?php echo xl('SDP ID'); ?>:
    <select name='form_sdp'>
@@ -636,6 +745,15 @@ while ($frow = sqlFetchArray($fres)) {
 }
 ?>
    </select>
+<?php } ?>
+
+<?php if ($msi_specific /* && function_exists('openssl_encrypt') */) { ?>
+   &nbsp;
+   <?php echo xl('Encyption Key'); ?>:
+   <input type='password' name='form_pass' size='16' value=''
+    title='<?php echo xl('Key if AES encryption is desired'); ?>' />
+<?php } ?>
+
    &nbsp;
    <input type='submit' name='form_submit' value='Generate XML' />
   </td>
@@ -645,6 +763,14 @@ while ($frow = sqlFetchArray($fres)) {
 </form>
 
 </center>
+
+<script language="JavaScript">
+<?php
+  if ($alertmsg) {
+    echo "alert('" . htmlentities($alertmsg) . "');\n";
+  }
+?>
+</script>
 
 </body>
 </html>
