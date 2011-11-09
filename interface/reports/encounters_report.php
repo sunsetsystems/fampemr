@@ -69,7 +69,15 @@ if ($form_facility) {
   $query .= "AND fe.facility_id = '$form_facility' ";
 }
 if ($form_new_patients) {
-  $query .= "AND fe.date = (SELECT MIN(fe2.date) FROM form_encounter AS fe2 WHERE fe2.pid = fe.pid) ";
+  // This attempts to count only first-time visits.
+  // If there is a registration date but no visit on that date, then
+  // presumably the EMR was installed after that and we cannot count any
+  // recorded visit as being the first one.  The cases where visits
+  // precede the registration date are errors but we'll list them to
+  // make the error more obvious.
+  $query .= "AND ((p.regdate IS NOT NULL AND p.regdate != '0000-00-00' AND fe.date <= p.regdate) " .
+    "OR ((p.regdate IS NULL OR p.regdate = '0000-00-00') AND fe.date = (SELECT MIN(fe2.date) " .
+    "FROM form_encounter AS fe2 WHERE fe2.pid = fe.pid))) ";
 }
 if ($form_related_code) {
   // If one or more service codes were specified, then require at least one.
@@ -183,13 +191,19 @@ $res = sqlStatement($query);
  function set_related(codetype, code, selector, codedesc) {
   var f = document.forms[0];
   var s = f.form_related_code.value;
+  var t = '';
   if (code) {
-   if (s.length > 0) s += ';';
+   if (s.length > 0) {
+    s += ';';
+    t = f.form_related_code.title + '; ';
+   }
    s += codetype + ':' + code;
+   t += codedesc;
   } else {
    s = '';
   }
   f.form_related_code.value = s;
+  f.form_related_code.title = t;
  }
 
  // This invokes the find-code popup.
