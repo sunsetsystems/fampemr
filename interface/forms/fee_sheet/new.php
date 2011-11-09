@@ -65,11 +65,15 @@ function contraceptionClass($code_type, $code) {
       list($reltype, $relcode) = explode(':', $relstring);
       if ($reltype !== 'IPPF') continue;
       if      (preg_match('/^11....110/'    , $relcode)) $contra |= 1;
-      else if (preg_match('/^11....999/'    , $relcode)) $contra |= 1;
+      else if (preg_match('/^11...[1-5]999/', $relcode)) $contra |= 1;
       else if (preg_match('/^112152010/'    , $relcode)) $contra |= 1;
       else if (preg_match('/^11317[1-2]111/', $relcode)) $contra |= 1;
+      else if (preg_match('/^145212.10/'    , $relcode)) $contra |= 1;
+      else if (preg_match('/^145212999/'    , $relcode)) $contra |= 1;
       else if (preg_match('/^12118[1-2].13/', $relcode)) $contra |= 2;
-      else if (preg_match('/^12118[1-2]999/', $relcode)) $contra |= 2;
+      else if (preg_match('/^121181999/'    , $relcode)) $contra |= 2;
+      else if (preg_match('/^122182.13/'    , $relcode)) $contra |= 2;
+      else if (preg_match('/^122182999/'    , $relcode)) $contra |= 2;
     }
   }
   return $contra;
