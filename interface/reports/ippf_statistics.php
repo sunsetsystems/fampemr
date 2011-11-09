@@ -296,7 +296,7 @@ function getAbortionMethod($code) {
 
 // Determine if a recent gcac service was performed.
 //
-function hadRecentAbService($pid, $encdate) {
+function hadRecentAbService($pid, $encdate, $includeIncomplete=false) {
   $query = "SELECT COUNT(*) AS count " .
     "FROM form_encounter AS fe, billing AS b, codes AS c WHERE " .
     "fe.pid = '$pid' AND " .
@@ -308,7 +308,12 @@ function hadRecentAbService($pid, $encdate) {
     "b.code_type = 'MA' AND " .
     "c.code_type = '12' AND " .
     "c.code = b.code AND c.modifier = b.modifier AND " .
-    "( c.related_code LIKE '%IPPF:252223%' OR c.related_code LIKE '%IPPF:252224%' )";
+    "( c.related_code LIKE '%IPPF:252223%' OR c.related_code LIKE '%IPPF:252224%'";
+  if ($includeIncomplete) {
+    // In this case we want to include treatment for incomplete.
+    $query .= " OR c.related_code LIKE '%IPPF:252225%'";
+  }
+  $query .= " )";
   $tmp = sqlQuery($query);
   return !empty($tmp['count']);
 }
@@ -545,7 +550,8 @@ function process_ippf_code($row, $code, $quantity=1) {
   }
 
   // Contraceptive method for new contraceptive adoption following abortion.
-  // Get it from the IPPF code if there is a suitable recent GCAC form.
+  // Get it from the IPPF code if there is a suitable recent abortion service
+  // or GCAC form.
   //
   else if ($form_by === '7') {
     $key = getContraceptiveMethod($code);
@@ -553,7 +559,9 @@ function process_ippf_code($row, $code, $quantity=1) {
     $patient_id = $row['pid'];
     $encdate = $row['encdate'];
     // Skip this if no recent gcac service nor gcac form with acceptance.
-    if (!hadRecentAbService($patient_id, $encdate)) {
+    // Include incomplete abortion treatment services per AM's discussion
+    // with Dr. Celal on 2011-04-19.
+    if (!hadRecentAbService($patient_id, $encdate, true)) {
       $query = "SELECT COUNT(*) AS count " .
         "FROM forms AS f, form_encounter AS fe, lbf_data AS d " .
         "WHERE f.pid = '$patient_id' AND " .
@@ -743,7 +751,7 @@ function process_referral($row) {
       list($codetype, $code) = explode(':', $codestring);
 
       if ($codetype == 'REF') {
-        // This is the expected case; a direct IPPF code is obsolete.
+        // In the case of a REF code, look up the associated IPPF code.
         $rrow = sqlQuery("SELECT related_code FROM codes WHERE " .
           "code_type = '16' AND code = '$code' AND active = 1 " .
           "ORDER BY id LIMIT 1");
@@ -752,6 +760,7 @@ function process_referral($row) {
         }
       }
 
+      // Alternatively a direct IPPF code is also supported.
       if ($codetype !== 'IPPF') continue;
 
       if ($form_by === '1') {
@@ -1019,7 +1028,7 @@ while ($lrow = sqlFetchArray($lres)) {
   </td>
   <td colspan='3' valign='top' class='detail' nowrap>
 <?php
-foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $value) {
+foreach (array(1 => xl('Screen'), 2 => xl('Printer'), 3 => xl('Export File')) as $key => $value) {
   echo "   <input type='radio' name='form_output' value='$key'";
   if ($key == $form_output) echo ' checked';
   echo " />$value &nbsp;";
