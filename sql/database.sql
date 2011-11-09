@@ -408,6 +408,8 @@ CREATE TABLE `facility` (
   `attn` varchar(65) default NULL,
   `domain_identifier` varchar(60) default NULL,
   `facility_npi` varchar(15) default NULL,
+  `latitude` varchar(255) NOT NULL DEFAULT '',
+  `longitude` varchar(255) NOT NULL DEFAULT '',
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=4 ;
 

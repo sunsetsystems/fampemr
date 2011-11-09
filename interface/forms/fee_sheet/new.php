@@ -19,6 +19,7 @@ require_once("$srcdir/classes/Prescription.class.php");
 
 // Some table cells will not be displayed unless insurance billing is used.
 $usbillstyle = $GLOBALS['ippf_specific'] ? " style='display:none'" : "";
+$justifystyle = justify_is_used() ? "" : " style='display:none'";
 
 function alphaCodeType($id) {
   global $code_types;
@@ -81,7 +82,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
   $billed = FALSE, $code_text = NULL, $justify = NULL, $provider_id = 0)
 {
   global $code_types, $ndc_applies, $ndc_uom_choices, $justinit, $pid;
-  global $contraception, $usbillstyle, $hasCharges;
+  global $contraception, $usbillstyle, $justifystyle, $hasCharges;
 
   if ($codetype == 'COPAY') {
     if (!$code_text) $code_text = 'Cash';
@@ -148,7 +149,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
       } else {
         echo "  <td class='billcell'>&nbsp;</td>\n";
       }
-      echo "  <td class='billcell' align='center'$usbillstyle>$justify</td>\n";
+      echo "  <td class='billcell' align='center'$justifystyle>$justify</td>\n";
     }
 
     // Show provider for this line.
@@ -191,18 +192,18 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
         }
         echo "</td>\n";
         if ($code_types[$codetype]['just'] || $justify) {
-          echo "  <td class='billcell' align='center'$usbillstyle>";
+          echo "  <td class='billcell' align='center'$justifystyle>";
           echo "<select name='bill[$lino][justify]' onchange='setJustify(this)'>";
           echo "<option value='$justify'>$justify</option></select>";
           echo "</td>\n";
           $justinit .= "setJustify(f['bill[$lino][justify]']);\n";
         } else {
-          echo "  <td class='billcell'$usbillstyle>&nbsp;</td>\n";
+          echo "  <td class='billcell'$justifystyle>&nbsp;</td>\n";
         }
       } else {
         echo "  <td class='billcell'>&nbsp;</td>\n";
         echo "  <td class='billcell'>&nbsp;</td>\n";
-        echo "  <td class='billcell'$usbillstyle>&nbsp;</td>\n"; // justify
+        echo "  <td class='billcell'$justifystyle>&nbsp;</td>\n"; // justify
       }
     }
 
@@ -265,7 +266,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
 function echoProdLine($lino, $drug_id, $rx = FALSE, $del = FALSE, $units = NULL,
   $fee = NULL, $sale_id = 0, $billed = FALSE)
 {
-  global $code_types, $ndc_applies, $pid, $usbillstyle, $hasCharges;
+  global $code_types, $ndc_applies, $pid, $usbillstyle, $justifystyle, $hasCharges;
 
   $drow = sqlQuery("SELECT name FROM drugs WHERE drug_id = '$drug_id'");
   $code_text = $drow['name'];
@@ -292,7 +293,7 @@ function echoProdLine($lino, $drug_id, $rx = FALSE, $del = FALSE, $units = NULL,
     if (fees_are_used()) {
       echo "  <td class='billcell' align='right'>" . oeFormatMoney($price) . "</td>\n";
       echo "  <td class='billcell' align='center'>$units</td>\n";
-      echo "  <td class='billcell' align='center'$usbillstyle>&nbsp;</td>\n"; // justify
+      echo "  <td class='billcell' align='center'$justifystyle>&nbsp;</td>\n"; // justify
     }
     echo "  <td class='billcell' align='center'>&nbsp;</td>\n";             // provider
     echo "  <td class='billcell' align='center'$usbillstyle>&nbsp;</td>\n"; // auth
@@ -316,7 +317,7 @@ function echoProdLine($lino, $drug_id, $rx = FALSE, $del = FALSE, $units = NULL,
       echo "<input type='text' name='prod[$lino][units]' " .
         "value='$units' size='2' style='text-align:right'>";
       echo "</td>\n";
-      echo "  <td class='billcell'$usbillstyle>&nbsp;</td>\n"; // justify
+      echo "  <td class='billcell'$justifystyle>&nbsp;</td>\n"; // justify
     }
     echo "  <td class='billcell' align='center'>&nbsp;</td>\n"; // provider
     echo "  <td class='billcell' align='center'$usbillstyle>&nbsp;</td>\n"; // auth
@@ -357,6 +358,12 @@ function genProviderSelect($selname, $toptext, $default=0, $disabled=false) {
     echo ">" . $row['lname'] . ", " . $row['fname'] . "\n";
   }
   echo "   </select>\n";
+}
+
+function justify_is_used() {
+ global $code_types;
+ foreach ($code_types as $value) { if ($value['just']) return true; }
+ return false;
 }
 
 // This is just for Family Planning, to indicate if the visit includes
@@ -943,7 +950,7 @@ echo " </tr>\n";
 <?php if (fees_are_used()) { ?>
   <td class='billcell' align='right'><b><?php xl('Price','e');?></b>&nbsp;</td>
   <td class='billcell' align='center'><b><?php xl('Units','e');?></b></td>
-  <td class='billcell' align='center'<?php echo $usbillstyle; ?>><b><?php xl('Justify','e');?></b></td>
+  <td class='billcell' align='center'<?php echo $justifystyle; ?>><b><?php xl('Justify','e');?></b></td>
 <?php } ?>
   <td class='billcell' align='center'><b><?php xl('Provider','e');?></b></td>
   <td class='billcell' align='center'<?php echo $usbillstyle; ?>><b><?php xl('Auth','e');?></b></td>

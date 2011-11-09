@@ -404,3 +404,11 @@ UPDATE transactions SET refer_external = '2' WHERE title = 'Referral' AND refer_
 UPDATE transactions SET refer_external = '3' WHERE title = 'Referral' AND refer_external = '0';
 #EndIf
 
+#IfMissingColumn facility latitude
+ALTER TABLE facility ADD latitude varchar(255) NOT NULL DEFAULT '';
+#EndIf
+
+#IfMissingColumn facility longitude
+ALTER TABLE facility ADD longitude varchar(255) NOT NULL DEFAULT '';
+#EndIf
+

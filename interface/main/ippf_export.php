@@ -13,8 +13,12 @@ require_once("../globals.php");
 require_once("$srcdir/acl.inc");
 require_once("$srcdir/patient.inc");
 
-// Make this true when Daniel wants multiple facility support.
-$MULTIPLE = false;
+// Set this to:
+// 0 = Select all visits and use one (Billing) facility
+// 1 = Output a separate facility for each OpenEMR facility
+// 2 = Output the facilities having a given SDP ID, merged into one facility
+//
+$MULTIPLE = 2;
 
 if (!acl_check('admin', 'super')) die("Not authorized!");
 
@@ -142,7 +146,9 @@ function exportEncounter($pid, $encounter, $date) {
   Add('emrVisitId', $encounter);
 
   // Dump IPPF services.
-  $query = "SELECT b.code_type, b.code, b.units, b.fee, c.related_code " .
+  // This queries the MA codes from which we'll get the related IPPF codes.
+  $query = "SELECT b.code_type, b.code, b.code_text, b.units, b.fee, " .
+    "b.justify, c.related_code " .
     "FROM billing AS b, codes AS c WHERE " .
     "b.pid = '$pid' AND b.encounter = '$encounter' AND " .
     "b.activity = 1 AND " .
@@ -158,10 +164,21 @@ function exportEncounter($pid, $encounter, $date) {
         // Starting a new service (IPPF code).
         OpenTag('IMS_eMRUpload_Service');
         Add('IppfServiceProductId', $code);
+        Add('LocalServiceProductId'         , $brow['code']);
+        Add('LocalServiceProductDescription', $brow['code_text']);
         Add('Type'                , '0'); // 0=service, 1=product, 2=diagnosis, 3=referral
         Add('IppfQuantity'        , $brow['units']);
         Add('CurrID'              , "TBD"); // TBD: Currency e.g. USD
         Add('Amount'              , $brow['fee']);
+        // Dump related diagnoses, if any.
+        $atmp = explode(':', $row['justify']);
+        foreach ($atmp as $tmp) {
+          if (!empty($tmp)) {
+            OpenTag('IMS_eMRService_Diag');
+            Add('DiagCode', $tmp);
+            CloseTag('IMS_eMRService_Diag');
+          }
+        }
         CloseTag('IMS_eMRUpload_Service');
       } // end foreach
     } // end if related code
@@ -351,82 +368,43 @@ function endFacility() {
 }
 
 if (!empty($form_submit)) {
-
+  $sdpid     = $_POST['form_sdp'];
   $beg_year  = $_POST['form_year'];
   $beg_month = $_POST['form_month'];
-  $end_year = $beg_year;
+  $end_year  = $beg_year;
   $end_month = $beg_month + 1;
   if ($end_month > 12) {
     $end_month = 1;
     ++$end_year;
   }
 
-  /*******************************************************************
-  $query = "SELECT " .
-    "fe.facility_id, fe.pid, fe.encounter, fe.date, " .
-    "f.name, f.street, f.city, f.state, f.postal_code, f.country_code, " .
-    "f.federal_ein, " .
-    "p.regdate, p.date AS last_update, p.contrastart, p.DOB, " .
-    "p.userlist2 AS education " .
-    "FROM form_encounter AS fe " .
-    "LEFT OUTER JOIN facility AS f ON f.id = fe.facility_id " .
-    "LEFT OUTER JOIN patient_data AS p ON p.pid = fe.pid WHERE " .
-    sprintf("fe.date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
-    sprintf("fe.date < '%04u-%02u-01 00:00:00' ", $end_year, $end_month) .
-    "ORDER BY fe.facility_id, fe.pid, fe.encounter";
-
-  $query = "SELECT DISTINCT " .
-    "fe.facility_id, fe.pid, " .
-    "f.name, f.street, f.city, f.state, f.postal_code, f.country_code, " .
-    "f.federal_ein, " .
-    "p.regdate, p.date AS last_update, p.contrastart, p.DOB, " .
-    "p.userlist2 AS education " .
-    "FROM form_encounter AS fe " .
-    "LEFT OUTER JOIN facility AS f ON f.id = fe.facility_id " .
-    "LEFT OUTER JOIN patient_data AS p ON p.pid = fe.pid WHERE " .
-    sprintf("fe.date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
-    sprintf("fe.date < '%04u-%02u-01 00:00:00' ", $end_year, $end_month) .
-    "ORDER BY fe.facility_id, fe.pid";
-  *******************************************************************/
-  // $last_pid = -1;
-  // $last_facility = -1;
-
-  /*******************************************************************
-  // Dump info for the main facility.
-  $facrow = sqlQuery("SELECT * FROM facility ORDER BY " .
-    "billing_location DESC, id ASC LIMIT 1");
-  OpenTag('IMS_eMRUpload_Point');
-  Add('ServiceDeliveryPointName' , $facrow['name']);
-  // Add('EmrServiceDeliveryPointId', $facrow['id']);
-  Add('EmrServiceDeliveryPointId', $facrow['facility_npi']);
-  Add('Channel'                  , '01');
-  Add('Latitude'                 , '222222'); // TBD: Add this to facility attributes
-  Add('Longitude'                , '433333'); // TBD: Add this to facility attributes
-  Add('Address'                  , $facrow['street']);
-  Add('Address2'                 , '');
-  Add('City'                     , $facrow['city']);
-  Add('PostCode'                 , $facrow['postal_code']);
-  $query = "SELECT DISTINCT " .
-    "fe.pid, " .
-    "p.regdate, p.date AS last_update, p.contrastart, p.DOB, p.sex, " .
-    "p.city, p.state, p.occupation, p.status, p.ethnoracial, " .
-    "p.interpretter, p.monthly_income, p.referral_source, p.pricelevel, " .
-    "p.userlist1, p.userlist3, p.userlist4, p.userlist5, " .
-    "p.usertext11, p.usertext12, p.usertext13, p.usertext14, p.usertext15, " .
-    "p.usertext16, p.usertext17, p.usertext18, p.usertext19, p.usertext20, " .
-    "p.userlist2 AS education " .
-    "FROM form_encounter AS fe " .
-    "LEFT OUTER JOIN patient_data AS p ON p.pid = fe.pid WHERE " .
-    sprintf("fe.date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
-    sprintf("fe.date < '%04u-%02u-01 00:00:00' ", $end_year, $end_month) .
-    "ORDER BY fe.pid";
-  *******************************************************************/
-
-  if ($MULTIPLE) {
+  if ($MULTIPLE == 2) {
+    $facrow = sqlQuery("SELECT id AS facility_id, name, street, city AS fac_city, " .
+      "state AS fac_state, postal_code, country_code, federal_ein, " .
+      "domain_identifier, pos_code, latitude, longitude FROM facility " .
+      "WHERE domain_identifier = '$sdpid' " .
+      "ORDER BY billing_location DESC, id ASC LIMIT 1");
+    $query = "SELECT DISTINCT " .
+      "fe.pid, " .
+      "p.regdate, p.date AS last_update, p.contrastart, p.DOB, p.sex, " .
+      "p.city, p.state, p.occupation, p.status, p.ethnoracial, " .
+      "p.interpretter, p.monthly_income, p.referral_source, p.pricelevel, " .
+      "p.userlist1, p.userlist3, p.userlist4, p.userlist5, " .
+      "p.usertext11, p.usertext12, p.usertext13, p.usertext14, p.usertext15, " .
+      "p.usertext16, p.usertext17, p.usertext18, p.usertext19, p.usertext20, " .
+      "p.userlist2 AS education " .
+      "FROM form_encounter AS fe " .
+      "JOIN facility AS f ON f.id = fe.facility_id AND f.domain_identifier = '$sdpid' " .
+      "LEFT OUTER JOIN patient_data AS p ON p.pid = fe.pid WHERE " .
+      sprintf("fe.date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
+      sprintf("fe.date <  '%04u-%02u-01 00:00:00'     ", $end_year, $end_month) .
+      "ORDER BY fe.pid";
+  }
+  else if ($MULTIPLE) {
     $query = "SELECT DISTINCT " .
       "fe.facility_id, fe.pid, " .
       "f.name, f.street, f.city AS fac_city, f.state AS fac_state, f.postal_code, " .
-      "f.country_code, f.federal_ein, f.domain_identifier, f.pos_code, " .
+      "f.country_code, f.federal_ein, f.domain_identifier, f.pos_code, f.latitude, f.longitude, " .
       "p.regdate, p.date AS last_update, p.contrastart, p.DOB, p.sex, " .
       "p.city, p.state, p.occupation, p.status, p.ethnoracial, " .
       "p.interpretter, p.monthly_income, p.referral_source, p.pricelevel, " .
@@ -444,7 +422,7 @@ if (!empty($form_submit)) {
   else {
     $facrow = sqlQuery("SELECT id AS facility_id, name, street, city AS fac_city, " .
       "state AS fac_state, postal_code, country_code, federal_ein, " .
-      "domain_identifier, pos_code FROM facility " .
+      "domain_identifier, pos_code, latitude, longitude FROM facility " .
       "ORDER BY billing_location DESC, id ASC LIMIT 1");
     $query = "SELECT DISTINCT " .
       "fe.pid, " .
@@ -468,9 +446,11 @@ if (!empty($form_submit)) {
   $res = sqlStatement($query);
 
   while ($row = sqlFetchArray($res)) {
-    if ($MULTIPLE) $facrow =& $row;
+    if ($MULTIPLE == 1) $facrow =& $row;
 
-    if ($facrow['facility_id'] != $last_facility) {
+    if (($MULTIPLE == 2 && $last_facility < 0) ||
+        ($MULTIPLE != 2 && $facrow['facility_id'] != $last_facility))
+    {
       if ($last_facility >= 0) {
         endFacility();
       }
@@ -480,10 +460,10 @@ if (!empty($form_submit)) {
       Add('ServiceDeliveryPointName' , $facrow['name']);
       // Add('EmrServiceDeliveryPointId', $facrow['facility_id']);
       Add('EmrServiceDeliveryPointId', $facrow['domain_identifier']);
-      // Add('Channel'                  , '01');
-      Add('Channel'                  , $facrow['pos_code']);
-      Add('Latitude'                 , '222222'); // TBD: Add this to facility attributes
-      Add('Longitude'                , '433333'); // TBD: Add this to facility attributes
+      Add('Channel'                  , '01');
+      // Add('Channel'                  , $facrow['pos_code']);
+      Add('Latitude'                 , $facrow['latitude']);
+      Add('Longitude'                , $facrow['longitude']);
       Add('Address'                  , $facrow['street']);
       Add('Address2'                 , '');
       Add('City'                     , $facrow['fac_city']);
@@ -557,19 +537,28 @@ if (!empty($form_submit)) {
     AddIfPresent('UserText20', $row['usertext20']);
 
     // Dump the visits for this patient.
-    $query = "SELECT " .
-      "encounter, date " .
-      "FROM form_encounter WHERE " .
-      "pid = '$last_pid' AND facility_id = '$last_facility' ";
-      // "pid = '$last_pid' ";
+    if ($MULTIPLE == 2) {
+      $query = "SELECT " .
+        "fe.encounter, fe.date " .
+        "FROM form_encounter AS fe, facility AS f WHERE " .
+        "fe.pid = '$last_pid' AND f.id = fe.facility_id AND " .
+        "f.domain_identifier = '$sdpid' ";
+    }
+    else {
+      $query = "SELECT " .
+        "fe.encounter, fe.date " .
+        "FROM form_encounter AS fe WHERE " .
+        "fe.pid = '$last_pid' AND fe.facility_id = '$last_facility' ";
+    }
+
     if (true) {
       // The new logic here is to restrict to the given date range.
       // Set the above to false if all visits are wanted.
       $query .= "AND " .
-      sprintf("date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
-      sprintf("date <  '%04u-%02u-01 00:00:00'     ", $end_year, $end_month);
+      sprintf("fe.date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
+      sprintf("fe.date <  '%04u-%02u-01 00:00:00'     ", $end_year, $end_month);
     }
-    $query .= "ORDER BY encounter";
+    $query .= "ORDER BY fe.encounter";
 
     // Add('Debug', $query); // debugging
 
@@ -635,6 +624,18 @@ foreach ($months as $key => $value) {
 ?>
    </select>
    <input type='text' name='form_year' size='4' value='<?php echo $selyear; ?>' />
+   &nbsp;
+   <?php echo xl('SDP ID'); ?>:
+   <select name='form_sdp'>
+<?php
+$fres = sqlStatement("SELECT DISTINCT domain_identifier FROM facility ORDER BY domain_identifier");
+while ($frow = sqlFetchArray($fres)) {
+  $sdpid = trim($frow['domain_identifier']);
+  echo "    <option value='$sdpid'";
+  echo ">$sdpid</option>\n";
+}
+?>
+   </select>
    &nbsp;
    <input type='submit' name='form_submit' value='Generate XML' />
   </td>

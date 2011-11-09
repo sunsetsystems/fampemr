@@ -2,6 +2,7 @@
 require_once("../globals.php");
 require_once("../../library/acl.inc");
 require_once("$srcdir/sql.inc");
+require_once("$srcdir/classes/POSRef.class.php");
 require_once("$srcdir/formdata.inc.php");
 
 $alertmsg = '';
@@ -17,7 +18,15 @@ if (isset($_POST["mode"]) && $_POST["mode"] == "facility") {
   "postal_code = '"  . trim(formData('postal_code' )) . "', " .
   "country_code = '" . trim(formData('country_code')) . "', " .
   "federal_ein = '"  . trim(formData('federal_ein' )) . "', " .
-  "facility_npi = '" . trim(formData('facility_npi')) . "'");
+  "facility_npi = '" . trim(formData('facility_npi')) . "', " .
+  "latitude = '"     . trim(formData('latitude'    )) . "', " .
+  "longitude = '"    . trim(formData('longitude'   )) . "', " .
+  "billing_location = '"   . trim(formData('billing_location'   )) . "', " .
+  "accepts_assignment = '" . trim(formData('accepts_assignment' )) . "', " .
+  "service_location = '"   . trim(formData('service_location'   )) . "', " .
+  "pos_code = '"           . trim(formData('pos_code'           )) . "', " .
+  "attn = '"               . trim(formData('attn'               )) . "', " .
+  "domain_identifier = '"  . trim(formData('domain_identifier'  )) . "'");
 }
 ?>
 <html>
@@ -66,17 +75,55 @@ if (isset($_POST["mode"]) && $_POST["mode"] == "facility") {
 <td><span class="text"><?php xl('Federal EIN','e'); ?>: </span></td><td><input type=entry size=20 name=federal_ein value=""></td>
 </tr>
 <tr>
-<td>&nbsp;</td><td>&nbsp;</td>
-
-<td><span class="text"><?php ($GLOBALS['simplified_demographics'] ? xl('Facility Code','e') : xl('Facility NPI','e')); ?>:
-</span></td><td><input type=entry size=20 name=facility_npi value=""></td>
-
+	<td><span class="text"><?php xl('Latitude','e'); ?>:
+  </span></td><td><input type="entry" size="20" name="latitude" value=""></td>
+  <td><span class="text"><?php ($GLOBALS['simplified_demographics'] ? xl('Facility Code','e') : xl('Facility NPI','e')); ?>:
+  </span></td><td><input type=entry size=20 name=facility_npi value=""></td>
 </tr>
 <tr>
-<td>&nbsp;</td><td>&nbsp;</td>
-<td>&nbsp;</td><td><input type="submit" value=<?php xl('Add Facility','e'); ?>></td>
+	<td><span class="text"><?php xl('Longitude','e'); ?>:
+  </span></td><td><input type="entry" size="20" name="longitude" value=""></td>
+	<td>&nbsp;</td><td>&nbsp;</td>
+</tr>
+<tr>
+  <td><span class='text'><?php xl('Billing Location','e'); ?>: </span></td>
+  <td><input type='checkbox' name='billing_location' value='1'></td>
+  <td rowspan='2'><span class='text'><?php xl('Accepts Assignment','e'); ?><br>(<?php xl('only if billing location','e'); ?>): </span></td>
+  <td><input type='checkbox' name='accepts_assignment' value='1'></td>
+</tr>
+<tr>
+  <td><span class='text'><?php xl('Service Location','e'); ?>: </span></td>
+  <td><input type='checkbox' name='service_location' value='1'></td>
+  <td>&nbsp;</td>
+</tr>
+<tr>
+  <td><span class=text><?php xl('POS Code','e'); ?>: </span></td>
+  <td colspan="3">
+    <select name="pos_code">
+    <?php
+    $pc = new POSRef();
+      foreach ($pc->get_pos_ref() as $pos) {
+      echo "<option value=\"" . $pos["code"] . "\" ";
+      echo ">" . $pos['code']  . ": ". $pos['title'];
+      echo "</option>\n";
+    }
+    ?>
+    </select>
+  </td>
+</tr>
+<tr>
+  <td><span class="text"><?php xl('Billing Attn','e'); ?>:</span></td>
+  <td colspan="3"><input type="text" name="attn" size="45" value=""></td>
+</tr>
+<tr>
+  <td><span class="text"><?php xl('CLIA Number','e'); ?>:</span></td>
+  <td colspan="3"><input type="text" name="domain_identifier" size="45" value=""></td>
+</tr>
+<tr>
+  <td colspan='4'><input type="submit" value=<?php xl('Add Facility','e'); ?>></td>
 </tr>
 </table>
+
 </form>
 <br>
 </tr>
