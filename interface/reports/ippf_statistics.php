@@ -144,7 +144,7 @@ function getListTitle($list, $option) {
   $row = sqlQuery("SELECT title FROM list_options WHERE " .
     "list_id = '$list' AND option_id = '$option'");
   if (empty($row['title'])) return $option;
-  return $row['title'];
+  return xl_list_label($row['title']);
 }
 
 // Usually this generates one cell, but allows for two or more.
@@ -345,7 +345,7 @@ function getGcacClientStatus($row) {
     "lo.option_id = d.field_value " .
     "ORDER BY d.form_id DESC LIMIT 1";
   $irow = sqlQuery($query);
-  if (!empty($irow['title'])) return $irow['title'];
+  if (!empty($irow['title'])) return xl_list_label($irow['title']);
 
   // Check for a referred-out abortion.
   $query = "SELECT COUNT(*) AS count " .
@@ -678,7 +678,7 @@ function LBFgcac_title($form_id, $field_id, $list_id) {
     "lo.option_id = d.field_value " .
     "LIMIT 1";
   $row = sqlQuery($query);
-  return empty($row['title']) ? '' : $row['title'];
+  return empty($row['title']) ? '' : xl_list_label($row['title']);
 }
 
 // This is called for each encounter that is selected.
@@ -723,7 +723,7 @@ function process_visit($row) {
           "list_id = 'complication' AND option_id = '$complid'");
         $abtype = LBFgcac_title($drow['form_id'], 'in_ab_proc', 'in_ab_proc');
         if (empty($abtype)) $abtype = xl('Indeterminate');
-        $key = "$abtype / " . $crow['title'];
+        $key = "$abtype / " . xl_list_label($crow['title']);
         loadColumnData($key, $row);
       }
     }
@@ -787,9 +787,9 @@ function uses_description($form_by) {
 }
 
 $arr_show   = array(
-  '.total' => array('title' => 'Total'),
-  '.age2'  => array('title' => 'Age Category (2)'),
-  '.age9'  => array('title' => 'Age Category (9)'),
+  '.total' => array('title' => xl('Total')),
+  '.age2'  => array('title' => xl('Age Category') . ' (2)'),
+  '.age9'  => array('title' => xl('Age Category') . ' (9)'),
 ); // info about selectable columns
 
 $arr_titles = array(); // will contain column headers
@@ -803,6 +803,7 @@ $lres = sqlStatement("SELECT field_id, title, data_type, list_id, description " 
 while ($lrow = sqlFetchArray($lres)) {
   $fid = $lrow['field_id'];
   if ($fid == 'fname' || $fid == 'mname' || $fid == 'lname') continue;
+  if (!empty($lrow['title'])) $lrow['title'] = xl_layout_label($lrow['title']);
   $arr_show[$fid] = $lrow;
   $arr_titles[$fid] = array();
 }
@@ -991,7 +992,7 @@ while ($lrow = sqlFetchArray($lres)) {
  $query = "SELECT id, name FROM facility ORDER BY name";
  $fres = sqlStatement($query);
  echo "      <select name='form_facility'>\n";
- echo "       <option value=''>-- All Facilities --\n";
+ echo "       <option value=''>-- " . xl('All Facilities') . " --\n";
  while ($frow = sqlFetchArray($fres)) {
   $facid = $frow['id'];
   echo "       <option value='$facid'";
