@@ -75,12 +75,14 @@ UPDATE layout_options SET data_type = 26, title = 'Monthly Income' WHERE form_id
 UPDATE layout_options SET data_type = 26 WHERE form_id = 'DEM' AND field_id = 'ethnoracial';
 UPDATE layout_options SET data_type = 26 WHERE form_id = 'DEM' AND field_id = 'language';
 UPDATE layout_options SET data_type = 26 WHERE form_id = 'DEM' AND field_id = 'status';
-UPDATE layout_options SET uor = 0 WHERE form_id = 'DEM' AND field_id = 'providerID';
+# UPDATE layout_options SET uor = 0 WHERE form_id = 'DEM' AND field_id = 'providerID';
+
 UPDATE layout_options SET seq = 3 WHERE form_id = 'REF' AND field_id = 'refer_external' AND seq = 5;
 UPDATE layout_options SET seq = 4 WHERE form_id = 'REF' AND field_id = 'refer_to'       AND seq = 3;
 UPDATE layout_options SET seq = 5 WHERE form_id = 'REF' AND field_id = 'body'           AND seq = 4;
 
-UPDATE layout_options AS a, list_options AS i SET a.group_name = '1Basic Data', a.title = 'Transgender', a.seq = 13, a.data_type = 26, a.uor = 1, a.description = 'Transgender', i.title = 'Transgender' WHERE a.form_id = 'DEM' AND a.field_id = 'userlist6' AND a.uor = 0 AND i.list_id = 'lists' AND i.option_id = 'userlist6';
+# UPDATE layout_options AS a, list_options AS i SET a.group_name = '1Basic Data', a.title = 'Transgender', a.seq = 13, a.data_type = 26, a.uor = 1, a.description = 'Transgender', i.title = 'Transgender' WHERE a.form_id = 'DEM' AND a.field_id = 'userlist6' AND a.uor = 0 AND i.list_id = 'lists' AND i.option_id = 'userlist6';
+UPDATE layout_options AS a, list_options AS i SET a.title = 'Transgender', a.data_type = 26, a.description = 'Transgender', i.title = 'Transgender' WHERE a.form_id = 'DEM' AND a.field_id = 'userlist6' AND a.uor = 0 AND i.list_id = 'lists' AND i.option_id = 'userlist6';
 
 UPDATE list_options SET title = 'Retention of Product' WHERE title = 'Incomplete Abortion or Retention of Prod';
 
