@@ -48,12 +48,12 @@ function genDiagJS($code_type, $code) {
   }
 }
 
-// For Family Planning only.  Returns 0 = none, 1 = nonsurgical, 2 = surgical.
+// For Family Planning only.
 //
 function contraceptionClass($code_type, $code) {
-  global $code_types;
+  global $code_types, $contraception_code, $contraception_cyp;
   if (!$GLOBALS['ippf_specific']) return 0;
-  $contra = 0;
+  // $contra = 0;
   // Get the related service codes.
   $codesrow = sqlQuery("SELECT related_code FROM codes WHERE " .
     "code_type = '" . $code_types[$code_type]['id'] .
@@ -64,6 +64,7 @@ function contraceptionClass($code_type, $code) {
       if ($relstring === '') continue;
       list($reltype, $relcode) = explode(':', $relstring);
       if ($reltype !== 'IPPF') continue;
+      /***************************************************************
       if      (preg_match('/^11....110/'    , $relcode)) $contra |= 1;
       else if (preg_match('/^11...[1-5]999/', $relcode)) $contra |= 1;
       else if (preg_match('/^112152010/'    , $relcode)) $contra |= 1;
@@ -74,9 +75,28 @@ function contraceptionClass($code_type, $code) {
       else if (preg_match('/^121181999/'    , $relcode)) $contra |= 2;
       else if (preg_match('/^122182.13/'    , $relcode)) $contra |= 2;
       else if (preg_match('/^122182999/'    , $relcode)) $contra |= 2;
+      ***************************************************************/
+      if (
+        preg_match('/^11....110/'    , $relcode) ||
+        preg_match('/^11...[1-5]999/', $relcode) ||
+        preg_match('/^112152010/'    , $relcode) ||
+        preg_match('/^11317[1-2]111/', $relcode) ||
+        preg_match('/^12118[1-2].13/', $relcode) ||
+        preg_match('/^121181999/'    , $relcode) ||
+        preg_match('/^122182.13/'    , $relcode) ||
+        preg_match('/^122182999/'    , $relcode)
+      ) {
+        $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
+          "code_type = '11' AND code = '$relcode' LIMIT 1");
+        $cyp = 0 + $tmprow['cyp_factor'];
+        if ($cyp > $contraception_cyp) {
+          $contraception_cyp = $cyp;
+          $contraception_code = $relcode;
+        }
+      }
     }
   }
-  return $contra;
+  // return $contra;
 }
 
 // This writes a billing line item to the output page.
@@ -86,7 +106,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
   $billed = FALSE, $code_text = NULL, $justify = NULL, $provider_id = 0)
 {
   global $code_types, $ndc_applies, $ndc_uom_choices, $justinit, $pid;
-  global $contraception, $usbillstyle, $justifystyle, $hasCharges;
+  global $usbillstyle, $justifystyle, $hasCharges;
 
   if ($codetype == 'COPAY') {
     if (!$code_text) $code_text = 'Cash';
@@ -260,7 +280,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
   }
 
   // For Family Planning.  Track contraceptive services.
-  if (!$del) $contraception |= contraceptionClass($codetype, $code);
+  if (!$del) contraceptionClass($codetype, $code);
 
   if ($fee != 0) $hasCharges = true;
 }
@@ -371,8 +391,9 @@ function justify_is_used() {
 }
 
 // This is just for Family Planning, to indicate if the visit includes
-// contraceptive services.
-$contraception = 0;
+// contraceptive services and to compute the service with highest CYP.
+$contraception_code = '';
+$contraception_cyp  = -1;
 
 // Possible units of measure for NDC drug quantities.
 //
@@ -602,10 +623,13 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   }
 
   // More Family Planning stuff.
-  if (!empty($_POST['contrastart'])) {
+  if (!empty($_POST['contrastart']) && !empty($_POST['contrasel'])) {
     $contrastart = $_POST['contrastart'];
-    sqlStatement("UPDATE patient_data SET contrastart = '" .
-      $contrastart . "' WHERE pid = '$pid'");
+    $ippfconmeth = $_POST['ippfconmeth'];
+    sqlStatement("UPDATE patient_data SET " .
+      "contrastart = '$contrastart', " .
+      "ippfconmeth = '$ippfconmeth' " .
+      "WHERE pid = '$pid'");
   }
 
   // Note: Taxes are computed at checkout time (in pos_checkout.php which
@@ -631,7 +655,15 @@ $billresult = getBillingByEncounter($pid, $encounter, "*");
 <style>
 .billcell { font-family: sans-serif; font-size: 10pt }
 </style>
+<style type="text/css">@import url(../../../library/dynarch_calendar.css);</style>
+<script type="text/javascript" src="../../../library/textformat.js"></script>
+<script type="text/javascript" src="../../../library/dialog.js"></script>
+<script type="text/javascript" src="../../../library/dynarch_calendar.js"></script>
+<script type="text/javascript" src="../../../library/dynarch_calendar_en.js"></script>
+<script type="text/javascript" src="../../../library/dynarch_calendar_setup.js"></script>
 <script language="JavaScript">
+
+var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
 
 var diags = new Array();
 
@@ -768,6 +800,24 @@ function setSaveAndClose() {
   }
  }
  f.bn_save_close.disabled = hascharges;
+}
+
+// Make contrastart and ippfconmeth visible or not, depending on user selection.
+// This applies only to family planning installations.
+function contrasel_changed(selobj) {
+ document.getElementById('contrasel_span').style.visibility =
+  selobj.value == '' ? 'hidden' : 'visible';
+}
+
+// Open the add-event dialog.
+function newEvt() {
+ var f = document.forms[0];
+ var url = '../../main/calendar/add_edit_event.php?patientid=<?php echo $pid ?>';
+ if (f.ProviderID && f.ProviderID.value) {
+  url += '&userid=' + parseInt(f.ProviderID.value);
+ }
+ dlgopen(url, '_blank', 600, 300);
+ return false;
 }
 
 </script>
@@ -1153,6 +1203,8 @@ if (!$GLOBALS['ippf_specific']) {
   genProviderSelect('SupervisorID', '-- N/A --', $encounter_supid, $isBilled);
 }
 
+echo "<input type='button' value='" . xl('New Appointment') . "' onclick='newEvt()' />\n";
+
 echo "</b></span>\n";
 ?>
 
@@ -1163,27 +1215,47 @@ echo "</b></span>\n";
 // If applicable, ask for the contraceptive services start date.
 $trow = sqlQuery("SELECT count(*) AS count FROM layout_options WHERE " .
   "form_id = 'DEM' AND field_id = 'contrastart' AND uor > 0");
-if ($trow['count'] && $contraception && !$isBilled) {
+// echo "<!-- contraception_code = $contraception_code -->\n"; // debugging
+if ($trow['count'] && $contraception_code && !$isBilled) {
   $date1 = substr($visit_row['date'], 0, 10);
   // If admission or surgical, then force contrastart.
-  if ($contraception > 1 ||
-    strpos(strtolower($visit_row['pc_catname']), 'admission') !== false)
-  {
-    echo "   <input type='hidden' name='contrastart' value='$date1' />\n";
+  if (preg_match('/^12/', $contraception_code)) {
+    // We identify the method with the IPPF code for the corresponding surgical procedure.
+    $servicemeth = substr($contraception_code, 0, 7) . '13';
+    //
+    echo "   <input type='hidden' name='contrasel'   value='1'            />\n";
+    echo "   <input type='hidden' name='contrastart' value='$date1'       />\n";
+    echo "   <input type='hidden' name='ippfconmeth' value='$servicemeth' />\n";
   }
   else {
-    // echo "<!-- contraception = $contraception -->\n"; // debugging
+    // We identify the method with its IPPF code for Initial Consultation.
+    $servicemeth = substr($contraception_code, 0, 6) . '110';
+    // Xavier confirms that the codes for Cervical Cap (112152010 and 112152011) are
+    // an unintended change in pattern, but at this point we have to live with it.
+    // -- Rod 2011-09-26
+    if ($servicemeth == '112152110') $servicemeth = '112152010';
+    // If there is no contraceptive start date yet then ask the user for input.
+    // "None of the above" would apply if the method was refused.
     $trow = sqlQuery("SELECT contrastart " .
       "FROM patient_data WHERE " .
       "pid = '$pid' LIMIT 1");
     if (empty($trow['contrastart']) || substr($trow['contrastart'], 0, 4) == '0000') {
-      $date0 = date('Y-m-d', strtotime($date1) - (60 * 60 * 24));
-      echo "   <select name='contrastart'>\n";
-      echo "    <option value='$date1'>" . xl('This visit begins new contraceptive use') . "</option>\n";
-      echo "    <option value='$date0'>" . xl('Contraceptive services previously started') . "</option>\n";
-      echo "    <option value=''>" . xl('None of the above') . "</option>\n";
+      echo "   <select name='contrasel' onchange='contrasel_changed(this);'>\n";
+      echo "    <option value='1'>" . xl('Contraceptive use started') . "</option>\n";
+      // echo "    <option value='1'>" . xl('This visit begins new contraceptive use') . "</option>\n";
+      // echo "    <option value='2'>" . xl('Contraceptive services previously started') . "</option>\n";
+      echo "    <option value=''>" . xl('Contraception not started') . "</option>\n";
       echo "   </select>\n";
-      echo "&nbsp; &nbsp; &nbsp;\n";
+      //
+      echo "<span id='contrasel_span' style='visibility:visible'> " . xl('on') . " ";
+      echo "<input type='text' name='contrastart' id='contrastart' size='10' value='$date1' " .
+        "onkeyup='datekeyup(this,mypcc)' onblur='dateblur(this,mypcc)' /> " .
+        "<img src='../../pic/show_calendar.gif' align='absbottom' width='24' height='22' " .
+        "id='img_contrastart' border='0' alt='[?]' style='cursor:pointer' " .
+        "title='" . xl('Click here to choose a date') . "' />\n";
+      echo ' ' . xl('using') . ' ';
+      echo generate_select_list('ippfconmeth', 'ippfconmeth', $servicemeth, '');
+      echo "</span><p>&nbsp;\n";
     }
   }
 }
@@ -1255,6 +1327,9 @@ if (true) {
 ?>
 
 <script language='JavaScript'>
+if (document.getElementById('img_contrastart')) {
+ Calendar.setup({inputField:"contrastart", ifFormat:"%Y-%m-%d", button:"img_contrastart"});
+}
 setSaveAndClose();
 <?php echo $justinit; ?>
 </script>
