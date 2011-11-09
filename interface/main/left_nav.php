@@ -1167,10 +1167,17 @@ if (!empty($reg)) {
 </table>
 
 <hr />
+
+<?php if (empty($GLOBALS['ippf_specific'])) { ?>
 <a href="../../Documentation/User_Guide/" target="_blank" class="navitem" id="help_link"
 onclick="top.restoreSession()">
 <?php xl('User Manual','e'); ?></a>
-	
+<?php } else { ?>
+<a href="../../Documentation/Process_Guides/" target="_blank" class="navitem" id="help_link"
+onclick="top.restoreSession()">
+<?php xl('Process Guides','e'); ?></a>
+<?php } ?>
+
 <?php if (!empty($GLOBALS['online_support_link'])) { ?>	
 <br>
 <a href='<?php echo $GLOBALS["online_support_link"]; ?>' target="_blank" class="navitem" id="support_link"
