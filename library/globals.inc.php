@@ -612,6 +612,13 @@ $GLOBALS_METADATA = array(
     ),
     *****************************************************************/
 
+    'gbl_encryption_key' => array(
+      xl('Hex Encryption Key for Backup/Export'),
+      'text',                           // data type
+      '',                               // default
+      xl('32-byte key for AES-256-ECB encryption expressed as 64 hexadecimal characters.')
+    ),
+
   ),
 
   // Notifications Tab

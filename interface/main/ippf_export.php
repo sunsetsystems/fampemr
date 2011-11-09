@@ -440,7 +440,6 @@ if (!empty($form_submit)) {
   $sdpid     = $_POST['form_sdp'];
   $beg_year  = $_POST['form_year'];
   $beg_month = $_POST['form_month'];
-  $passphrase = $_POST['form_pass'];
   $end_year  = $beg_year;
   $end_month = $beg_month + 1;
   if ($end_month > 12) {
@@ -664,15 +663,22 @@ if (!empty($form_submit)) {
   $filename = 'export.xml';
 
   // Do encryption if requested.
-  if (!empty($passphrase)) {
+  if (!empty($_POST['form_encrypt'])) {
     $filename .= '.aes';
     // This requires PHP 5.3.0 or later.  The 5th (iv) parameter is not supported until
     // PHP 5.3.3, so we specify ECB which does not use it.
-    $pass = "12345678123456781234567812345678"; // 32 bytes = 256 bits
-    $method = 'aes-256-ecb'; // aes-256-cbc requires iv
-    $out = openssl_encrypt($out, $method, $pass, true);
+    $key = '';
+    // Key must be 32 bytes.  Truncation or '0'-padding otherwise occurs.
+    if (!empty($GLOBALS['gbl_encryption_key'])) {
+      // pack('H*') converts hex to binary.
+      $key = substr(pack('H*', $GLOBALS['gbl_encryption_key']), 0, 32);
+    }
+    while (strlen($key) < 32) $key .= '0';
     //
-    // To decrypt at the command line, specify the 32-byte key in hex format:
+    $method = 'aes-256-ecb'; // aes-256-cbc requires iv
+    $out = openssl_encrypt($out, $method, $key, true);
+    //
+    // To decrypt at the command line specify the 32-byte key in hex, for example:
     // openssl aes-256-ecb -d -in export.xml.aes -K 3132333435363738313233343536373831323334353637383132333435363738
     //
   }
@@ -740,6 +746,9 @@ foreach ($months as $key => $value) {
 $fres = sqlStatement("SELECT DISTINCT domain_identifier FROM facility ORDER BY domain_identifier");
 while ($frow = sqlFetchArray($fres)) {
   $sdpid = trim($frow['domain_identifier']);
+  if (strlen($sdpid) < 1 || strspn($sdpid, '0123456789-') < strlen($sdpid)) {
+    $alertmsg = xl('ERROR') . ': ' . xl('One or more SDP IDs are empty or contain invalid characters');
+  }
   echo "    <option value='$sdpid'";
   echo ">$sdpid</option>\n";
 }
@@ -747,11 +756,11 @@ while ($frow = sqlFetchArray($fres)) {
    </select>
 <?php } ?>
 
-<?php if ($msi_specific /* && function_exists('openssl_encrypt') */) { ?>
+<?php if ($msi_specific || !empty($GLOBALS['gbl_encryption_key'])) { ?>
    &nbsp;
-   <?php echo xl('Encyption Key'); ?>:
-   <input type='password' name='form_pass' size='16' value=''
-    title='<?php echo xl('Key if AES encryption is desired'); ?>' />
+   <input type='checkbox' name='form_encrypt'
+    title='<?php echo xl('If AES encryption is desired'); ?>' />
+   <?php echo xl('Encypt'); ?>
 <?php } ?>
 
    &nbsp;

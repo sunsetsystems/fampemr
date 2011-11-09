@@ -56,11 +56,13 @@ else {
 }
 
 $BTN_TEXT_CREATE = xl('Create Backup');
+$BTN_TEXT_CREATE_ENC = xl('Create Encrypted Backup');
 $BTN_TEXT_EXPORT = xl('Export Configuration');
 $BTN_TEXT_IMPORT = xl('Import Configuration');
 
 $form_step   = isset($_POST['form_step']) ? trim($_POST['form_step']) : '0';
 $form_status = isset($_POST['form_status' ]) ? trim($_POST['form_status' ]) : '';
+$form_encrypt = !empty($_POST['form_encrypt']) || !empty($_POST['form_create_enc']);
 
 if (!empty($_POST['form_export'])) $form_step = 101;
 if (!empty($_POST['form_import'])) $form_step = 201;
@@ -76,17 +78,26 @@ $TAR_FILE_PATH = $TMP_BASE . DIRECTORY_SEPARATOR . $backup_file_prefix . $backup
 $EXPORT_FILE = $GLOBALS['temporary_files_dir'] . "/openemr_config.sql";
 $MYSQL_PATH = $GLOBALS['mysql_bin_dir'];
 $PERL_PATH = $GLOBALS['perl_bin_dir'];
+$DL_FILE_PATH = $TAR_FILE_PATH;
+
+// If encrypted backup is requested we will create and send an encrypted file.
+if ($form_encrypt) {
+  if (empty($GLOBALS['gbl_encryption_key'])) {
+    die(xl('There is no encryption key defined!'));
+  }
+  $DL_FILE_PATH .= '.aes';
+}
 
 if ($form_step == 8) {
   header("Pragma: public");
   header("Expires: 0");
   header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
   header("Content-Type: application/force-download");
-  header("Content-Length: " . filesize($TAR_FILE_PATH));
-  header("Content-Disposition: attachment; filename=" . basename($TAR_FILE_PATH));
+  header("Content-Length: " . filesize($DL_FILE_PATH));
+  header("Content-Disposition: attachment; filename=" . basename($DL_FILE_PATH));
   header("Content-Description: File Transfer");
-  readfile($TAR_FILE_PATH);
-  unlink($TAR_FILE_PATH);
+  readfile($DL_FILE_PATH);
+  unlink($DL_FILE_PATH);
   obliterate_dir($BACKUP_DIR);
   exit(0);
 }
@@ -116,7 +127,7 @@ if ($form_step == 104) {
 &nbsp;<br />
 <form method='post' action='backup.php' enctype='multipart/form-data'>
 
-<table style='width:30em'>
+<table style='width:80%'>
  <tr>
   <td>
 
@@ -132,6 +143,12 @@ if ($form_step == 0) {
   echo "  <td><input type='submit' name='form_create' value='$BTN_TEXT_CREATE' /></td>\n";
   echo "  <td>" . xl('Create and download a full backup') . "</td>\n";
   echo " </tr>\n";
+  if (!empty($GLOBALS['gbl_encryption_key'])) {
+    echo " <tr>\n";
+    echo "  <td><input type='submit' name='form_create_enc' value='$BTN_TEXT_CREATE_ENC' /></td>\n";
+    echo "  <td>" . xl('Create and download a full encrypted backup') . "</td>\n";
+    echo " </tr>\n";
+  }
   echo " <tr>\n";
   echo "  <td><input type='submit' name='form_export' value='$BTN_TEXT_EXPORT' /></td>\n";
   echo "  <td>" . xl('Download configuration data') . "</td>\n";
@@ -275,6 +292,15 @@ if ($form_step == 7) {   // create the final compressed tar containing all files
   $file_list = array('.');
   if (!create_tar_archive($TAR_FILE_PATH, '', $file_list))
     die(xl("Error: Unable to create downloadable archive"));
+  // If encryption is requested:
+  if ($form_encrypt) {
+    $command = sprintf("openssl aes-256-ecb -in %s -out %s -iv '' -K %s",
+      $TAR_FILE_PATH, $DL_FILE_PATH, $GLOBALS['gbl_encryption_key']);
+    $temp1 = $temp2 = '';
+    $temp0 = exec($command, $temp1, $temp2);
+    if ($temp2) die("Encryption failed: \"$command\" returned $temp2. Is OpenSSL installed?");
+    unlink($TAR_FILE_PATH);
+  }
   chdir($cur_dir);
   $auto_continue = true;
 }
@@ -388,6 +414,7 @@ if ($form_step == 203) {
 
 <input type='hidden' name='form_step' value='<?php echo $form_step; ?>' />
 <input type='hidden' name='form_status' value='<?php echo $form_status; ?>' />
+<input type='hidden' name='form_encrypt' value='<?php echo $form_encrypt ? '1' : ''; ?>' />
 
 </form>
 
