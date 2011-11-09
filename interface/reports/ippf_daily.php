@@ -151,7 +151,7 @@ else { // not export
   </td>
   <td colspan='3' valign='top' class='detail' nowrap>
 <?php
-foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $value) {
+foreach (array(1 => xl('Screen'), 2 => xl('Printer'), 3 => xl('Export File')) as $key => $value) {
   echo "   <input type='radio' name='form_output' value='$key'";
   if ($key == $form_output) echo ' checked';
   echo " />$value &nbsp;";
