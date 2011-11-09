@@ -608,3 +608,64 @@ INSERT INTO lang_constants ( constant_name ) VALUES ( 'POS Code' );
 #EndIf
 INSERT INTO lang_definitions ( cons_id, lang_id, definition ) SELECT lc.cons_id, 1, 'COD Code' FROM lang_constants AS lc LEFT JOIN lang_definitions AS ld ON ld.cons_id = lc.cons_id AND ld.lang_id = 1 WHERE lc.constant_name = 'POS Code' AND ld.cons_id IS NULL;
 
+# Following lines mirror line-for-line the spreadsheet "CYP Factors 2010.1.xlsx".
+UPDATE codes SET cyp_factor = 0.0666667 WHERE code_type = 11 AND code LIKE '11110_%';
+UPDATE codes SET cyp_factor = 0.0769230 WHERE code_type = 11 AND code LIKE '111111%';
+UPDATE codes SET cyp_factor = 0.1666667 WHERE code_type = 11 AND code LIKE '111112%';
+UPDATE codes SET cyp_factor = 0.2500000 WHERE code_type = 11 AND code LIKE '111113%';
+UPDATE codes SET cyp_factor = 3.5000000 WHERE code_type = 11 AND code LIKE '111122%';
+UPDATE codes SET cyp_factor = 3.5000000 WHERE code_type = 11 AND code LIKE '111123%';
+UPDATE codes SET cyp_factor = 2.5000000 WHERE code_type = 11 AND code LIKE '111124%';
+UPDATE codes SET cyp_factor = 0.0666667 WHERE code_type = 11 AND code LIKE '111132%';
+UPDATE codes SET cyp_factor = 0.0666667 WHERE code_type = 11 AND code LIKE '111133%';
+UPDATE codes SET cyp_factor = 0.0083333 WHERE code_type = 11 AND code LIKE '112141%';
+UPDATE codes SET cyp_factor = 0.0083333 WHERE code_type = 11 AND code LIKE '112142%';
+UPDATE codes SET cyp_factor = 1.0000000 WHERE code_type = 11 AND code LIKE '112151%';
+UPDATE codes SET cyp_factor = 1.0000000 WHERE code_type = 11 AND code LIKE '112152%';
+UPDATE codes SET cyp_factor = 0.1333333 WHERE code_type = 11 AND code LIKE '112161%';
+UPDATE codes SET cyp_factor = 0.1333333 WHERE code_type = 11 AND code LIKE '112162%';
+UPDATE codes SET cyp_factor = 0.1333333 WHERE code_type = 11 AND code LIKE '112163%';
+UPDATE codes SET cyp_factor = 0.1333333 WHERE code_type = 11 AND code LIKE '112164%';
+UPDATE codes SET cyp_factor = 0.1333333 WHERE code_type = 11 AND code LIKE '112165%';
+UPDATE codes SET cyp_factor = 3.5000000 WHERE code_type = 11 AND code LIKE '113171%';
+UPDATE codes SET cyp_factor = 3.5000000 WHERE code_type = 11 AND code LIKE '113172%';
+UPDATE codes SET cyp_factor = 10.000000 WHERE code_type = 11 AND code LIKE '121181%';
+UPDATE codes SET cyp_factor = 10.000000 WHERE code_type = 11 AND code LIKE '122182%';
+UPDATE codes SET cyp_factor = 0.0500000 WHERE code_type = 11 AND code LIKE '145212%';
+# Next line clears cyp for codes corresponding to removal of contraception.
+UPDATE codes SET cyp_factor = 0         WHERE code_type = 11 AND code LIKE '1_____112';
+
+#IfNotRow2D list_options list_id lists option_id ippfconmeth
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','ippfconmeth','IPPF Contraceptive Methods', 1,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','111101110','COC & POC'                                   ,01,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','111111110','Combined Injectable Contraceptives (1 month)',02,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','111112110','Progestogen Only Injectables (2 months)'     ,03,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','111113110','Progestogen Only Injectables (3 months)'     ,04,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','111122110','Subdermal implants 6 rods'                   ,05,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','111123110','Subdermal implants 2 rods'                   ,06,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','111124110','Subdermal implants 1 rod'                    ,07,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','111132110','Transdermal Patch (1 month)'                 ,08,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','111133110','Vaginal Ring (1 month)'                      ,09,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','112141110','Male Condom'                                 ,10,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','112142110','Female Condom'                               ,11,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','112151110','Diaphragm'                                   ,12,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','112152010','Cervical Cap'                                ,13,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','112161110','Spermicides - Foam Tabs/Tube/Suppositories'  ,14,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','112162110','Spermicides - Foam Tabs/Strip'               ,15,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','112163110','Spermicides - Foam Cans'                     ,16,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','112164110','Spermicides - Cream & Jelly'                 ,17,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','112165110','Spermicides - Pessaries / C-film'            ,18,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','113171110','Hormone releasing IUD (5 years)'             ,19,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','113172110','Copper releasing IUD (10 years) '            ,20,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','121181213','Female VSC - Minilaparatomy'                 ,21,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','121181313','Female VSC - Laparoscopy'                    ,22,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','121181413','Female VSC - Laparotomy'                     ,23,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','122182213','Male VSC - Incisional vasectomy'             ,24,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','122182313','Male VSC - No-scalpel Vasectomy'             ,25,0);
+#EndIf
+
+#IfMissingColumn patient_data ippfconmeth
+ALTER TABLE patient_data ADD ippfconmeth varchar(255) NOT NULL DEFAULT '';
+INSERT INTO `layout_options` VALUES ('DEM','ippfconmeth','5Stats','Contraceptives Start Method',9,4,0,10,10,'ippfconmeth',1,1,'','','Method provided on contraceptives start date');
+#EndIf
+
