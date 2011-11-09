@@ -344,8 +344,12 @@ function _set_patient_inc_count($limit, $count, $where) {
   }
 }
 
-function getPatientLnames($lname = "%", $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS", $orderby = "lname ASC, fname ASC", $limit="all", $start="0")
+function getPatientLnames($lname = "%",
+  $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS",
+  $orderby = "lname ASC, fname ASC", $limit="all", $start="0", $exact=false)
 {
+    $wild = $exact ? '' : '%';
+
     // Allow the last name to be followed by a comma and some part of a first name.
     // New behavior for searches:
     // Allows comma alone followed by some part of a first name
@@ -355,18 +359,18 @@ function getPatientLnames($lname = "%", $given = "pid, id, lname, fname, mname, 
     // last name or first name or both.  The arbitrary limit of 100 results is set
     // in the sql query below. --Mark Leeds
     $lname = trim($lname);
-    $fname = '';
+    $fname = '%';
      if (preg_match('/^(.*),(.*)/', $lname, $matches)) {
          $lname = trim($matches[1]);
-         $fname = trim($matches[2]);
+         $fname = trim($matches[2]) . $wild;
     }
     $search_for_pieces1 = '';
     $search_for_pieces2 = '';
-    if ($lname{0} != strtoupper($lname{0})) {$search_for_pieces1 = '%';}
-    if ($fname{0} != strtoupper($fname{0})) {$search_for_pieces2 = '%';}
+    if ($lname{0} != strtoupper($lname{0})) {$search_for_pieces1 = $wild;}
+    if ($fname{0} != strtoupper($fname{0})) {$search_for_pieces2 = $wild;}
 
-    $where = "lname LIKE '" . $search_for_pieces1 . "$lname%' " .
-        "AND fname LIKE '" . $search_for_pieces2 . "$fname%' ";
+    $where = "lname LIKE '" . $search_for_pieces1 . "$lname$wild' " .
+        "AND fname LIKE '" . $search_for_pieces2 . "$fname' ";
         if (!empty($GLOBALS['pt_restrict_field'])) {
                 if ( $_SESSION{"authUser"} != 'admin' || $GLOBALS['pt_restrict_admin'] ) {
                         $where .= "AND ( patient_data.".$GLOBALS['pt_restrict_field']." = ( SELECT facility_id FROM users WHERE username = '".$_SESSION{"authUser"}."') OR patient_data.".$GLOBALS['pt_restrict_field']." = '' ) ";
@@ -385,10 +389,12 @@ function getPatientLnames($lname = "%", $given = "pid, id, lname, fname, mname, 
     return $returnval;
 }
 
-function getPatientId($pid = "%", $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS", $orderby = "lname ASC, fname ASC", $limit="all", $start="0")
+function getPatientId($pid = "",
+  $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS",
+  $orderby = "lname ASC, fname ASC", $limit="all", $start="0", $exact=false)
 {
-    
-    $where = "pubpid LIKE '$pid%' ";
+    $wild = $exact ? '' : '%';
+    $where = "pubpid LIKE '$pid$wild' ";
         if (!empty($GLOBALS['pt_restrict_field']) && $GLOBALS['pt_restrict_by_id'] ) {
                 if ( $_SESSION{"authUser"} != 'admin' || $GLOBALS['pt_restrict_admin'] ) {
                         $where .= "AND ( patient_data.".$GLOBALS['pt_restrict_field']." = ( SELECT facility_id FROM users WHERE username = '".$_SESSION{"authUser"}."') OR patient_data.".$GLOBALS['pt_restrict_field']." = '' ) ";
@@ -405,8 +411,11 @@ function getPatientId($pid = "%", $given = "pid, id, lname, fname, mname, provid
     return $returnval;
 }
 
-function getByPatientDemographics($searchTerm = "%", $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS", $orderby = "lname ASC, fname ASC", $limit="all", $start="0")
+function getByPatientDemographics($searchTerm = "",
+  $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS",
+  $orderby = "lname ASC, fname ASC", $limit="all", $start="0", $exact=false)
 {
+  $wild = $exact ? '' : '%';
   $layoutCols = sqlStatement( "SELECT field_id FROM layout_options WHERE form_id='DEM' AND group_name not like ('%Employer%' ) AND uor !=0" );
 
   $where = "";
@@ -414,7 +423,7 @@ function getByPatientDemographics($searchTerm = "%", $given = "pid, id, lname, f
     if ( $iter > 0 ) {
       $where .= " or ";
     }
-    $where .= " ".$row["field_id"]." like '%".$searchTerm."%' ";
+    $where .= " " . $row["field_id"] . " LIKE '$wild$searchTerm$wild' ";
   }
 
   $sql = "SELECT $given FROM patient_data WHERE $where ORDER BY $orderby";
@@ -428,8 +437,10 @@ function getByPatientDemographics($searchTerm = "%", $given = "pid, id, lname, f
 
 function getByPatientDemographicsFilter($searchFields, $searchTerm = "%",
   $given = "pid, id, lname, fname, mname, providerID, DATE_FORMAT(DOB,'%m/%d/%Y') as DOB_TS",
-  $orderby = "lname ASC, fname ASC", $limit="all", $start="0", $search_service_code='')
+  $orderby = "lname ASC, fname ASC", $limit="all", $start="0", $search_service_code='',
+  $exact=false)
 {
+  $wild = $exact ? '' : '%';
 	$layoutCols = split( '~', $searchFields );
   $where = "";
   $i = 0;
@@ -439,10 +450,11 @@ function getByPatientDemographicsFilter($searchFields, $searchTerm = "%",
 		   $where .= " OR ";
 		}
     if ($val == 'pid') {
+      // pid always uses exact matching because it is an internal numeric key.
   		$where .= " $val = '$searchTerm' ";
     }
     else {
-  		$where .= " $val LIKE '$searchTerm%' ";
+  		$where .= " $val LIKE '$searchTerm$wild' ";
     }
 		$i++;
 	}
@@ -453,6 +465,7 @@ function getByPatientDemographicsFilter($searchFields, $searchTerm = "%",
   // If a non-empty service code was given, then restrict to patients who
   // have been provided that service.  Since the code is used in a LIKE
   // clause, % and _ wildcards are supported.
+  // The $exact parameter does not apply here.
   if ($search_service_code) {
     $where = "( $where ) AND " .
       "( SELECT COUNT(*) FROM billing AS b WHERE " .
@@ -516,7 +529,9 @@ function getPatientName($pid) {
 }
 
 /* find patient data by DOB */
-function getPatientDOB($DOB = "%", $given = "pid, id, lname, fname, mname", $orderby = "lname ASC, fname ASC", $limit="all", $start="0")
+function getPatientDOB($DOB = "%",
+  $given = "pid, id, lname, fname, mname", $orderby = "lname ASC, fname ASC",
+  $limit="all", $start="0", $exact=false)
 {
     $DOB = fixDate($DOB, $DOB);
     $where = "DOB like '$DOB%' ";
@@ -539,9 +554,12 @@ function getPatientDOB($DOB = "%", $given = "pid, id, lname, fname, mname", $ord
 }
 
 /* find patient data by SSN */
-function getPatientSSN($ss = "%", $given = "pid, id, lname, fname, mname, providerID", $orderby = "lname ASC, fname ASC", $limit="all", $start="0")
+function getPatientSSN($ss = "",
+  $given = "pid, id, lname, fname, mname, providerID",
+  $orderby = "lname ASC, fname ASC", $limit="all", $start="0", $exact=false)
 {
-    $where = "ss LIKE '$ss%'";
+    $wild = $exact ? '' : '%';
+    $where = "ss LIKE '$ss$wild'";
     $sql="SELECT $given FROM patient_data WHERE $where ORDER BY $orderby";
     if ($limit != "all") $sql .= " LIMIT $start, $limit";
 
@@ -554,10 +572,18 @@ function getPatientSSN($ss = "%", $given = "pid, id, lname, fname, mname, provid
 }
 
 //(CHEMED) Search by phone number
-function getPatientPhone($phone = "%", $given = "pid, id, lname, fname, mname, providerID", $orderby = "lname ASC, fname ASC", $limit="all", $start="0")
+function getPatientPhone($phone = "%",
+  $given = "pid, id, lname, fname, mname, providerID",
+  $orderby = "lname ASC, fname ASC", $limit="all", $start="0", $exact=false)
 {
+    $wild = $exact ? '' : '%';
     $phone = ereg_replace( "[[:punct:]]","", $phone );
+    /*****************************************************************
     $where = "REPLACE(REPLACE(phone_home, '-', ''), ' ', '') REGEXP '$phone'";
+    *****************************************************************/
+    // Use of REGEXP is surprisingly unlike our other search syntax, so replaced
+    // it with LIKE and the optional wildcard. -- Rod 2011-05-18
+    $where = "REPLACE(REPLACE(phone_home, '-', ''), ' ', '') LIKE '$phone$wild'";
     $sql="SELECT $given FROM patient_data WHERE $where ORDER BY $orderby";
     if ($limit != "all") $sql .= " LIMIT $start, $limit";
 

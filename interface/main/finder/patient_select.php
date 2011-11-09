@@ -165,25 +165,26 @@ else {
   $patient = formData("patient","R");
   $findBy  = $_REQUEST['findBy'];
   $searchFields = $_REQUEST['searchFields'];
+  $exact = !empty($_REQUEST['find_exact']);
 
   echo "<input type='hidden' name='patient' value='$patient' />\n";
   echo "<input type='hidden' name='findBy'  value='$findBy' />\n";
 
   if ($findBy == "Last")
-      $result = getPatientLnames("$patient", $given, $orderby, $sqllimit, $fstart);
+      $result = getPatientLnames("$patient", $given, $orderby, $sqllimit, $fstart, $exact);
   else if ($findBy == "ID")
-      $result = getPatientId("$patient", $given, "id ASC, ".$orderby, $sqllimit, $fstart);
+      $result = getPatientId("$patient", $given, "id ASC, ".$orderby, $sqllimit, $fstart, $exact);
   else if ($findBy == "DOB")
-      $result = getPatientDOB("$patient", $given, "DOB ASC, ".$orderby, $sqllimit, $fstart);
+      $result = getPatientDOB("$patient", $given, "DOB ASC, ".$orderby, $sqllimit, $fstart, $exact);
   else if ($findBy == "SSN")
-      $result = getPatientSSN("$patient", $given, "ss ASC, ".$orderby, $sqllimit, $fstart);
+      $result = getPatientSSN("$patient", $given, "ss ASC, ".$orderby, $sqllimit, $fstart, $exact);
   elseif ($findBy == "Phone")                  //(CHEMED) Search by phone number
-      $result = getPatientPhone("$patient", $given, $orderby, $sqllimit, $fstart);
+      $result = getPatientPhone("$patient", $given, $orderby, $sqllimit, $fstart, $exact);
   else if ($findBy == "Any")
-      $result = getByPatientDemographics("$patient", $given, $orderby, $sqllimit, $fstart);
+      $result = getByPatientDemographics("$patient", $given, $orderby, $sqllimit, $fstart, $exact);
   else if ($findBy == "Filter") {
     $result = getByPatientDemographicsFilter($searchFields, "$patient",
-    $given, $orderby, $sqllimit, $fstart, $search_service_code);
+    $given, $orderby, $sqllimit, $fstart, $search_service_code, $exact);
   }
 }
 ?>

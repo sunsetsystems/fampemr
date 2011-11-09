@@ -1130,9 +1130,10 @@ if (!empty($reg)) {
 
 <table cellpadding='0' cellspacing='0' border='0'>
  <tr>
-  <td class='smalltext'><?php xl('Find','e') ?>:&nbsp;</td>
-  <td class='smalltext' colspan='2'>
+  <td class='smalltext' valign='middle'><?php xl('Find','e') ?>:&nbsp;</td>
+  <td class='smalltext' colspan='2' valign='middle'>
    <input type="entry" size="7" name="patient" class='inputtext' style='width:65px;' />
+   <input type='checkbox' name='find_exact' /><?php xl('Exact','e') ?>
   </td>
  </tr>
  <tr>
