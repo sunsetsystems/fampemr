@@ -311,7 +311,8 @@ CREATE TABLE `drug_sales` (
   `xfer_inventory_id` int(11) NOT NULL DEFAULT 0 COMMENT 'source if this is a transfer',
   `distributor_id` bigint(20) NOT NULL DEFAULT 0,
   `notes` varchar(255) NOT NULL DEFAULT '',
-  PRIMARY KEY  (`sale_id`)
+  PRIMARY KEY  (`sale_id`),
+  KEY `pid_encounter` (`pid`, `encounter`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -495,7 +496,8 @@ CREATE TABLE `form_encounter` (
   `invoice_refno` varchar(31) NOT NULL DEFAULT '',
   `referral_source` varchar(31) NOT NULL DEFAULT '',
   PRIMARY KEY  (`id`),
-  KEY `pid` (`pid`)
+  KEY `pid` (`pid`),
+  KEY `date` (`date`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -885,7 +887,8 @@ CREATE TABLE `forms` (
   `authorized` tinyint(4) default NULL,
   `deleted` tinyint(4) DEFAULT '0' NOT NULL COMMENT 'flag indicates form has been deleted',
   `formdir` longtext,
-  PRIMARY KEY  (`id`)
+  PRIMARY KEY  (`id`),
+  KEY `pid_encounter` (`pid`, `encounter`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -1382,7 +1385,8 @@ CREATE TABLE `immunizations` (
   `update_date` timestamp NOT NULL,
   `created_by` bigint(20) default NULL,
   `updated_by` bigint(20) default NULL,
-  PRIMARY KEY  (`id`)
+  PRIMARY KEY  (`id`),
+  KEY `patient_id` (`patient_id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -2119,7 +2123,9 @@ CREATE TABLE `lists` (
   `injury_part` varchar(31) NOT NULL DEFAULT '',
   `injury_type` varchar(31) NOT NULL DEFAULT '',
   `injury_grade` varchar(31) NOT NULL DEFAULT '',
-  PRIMARY KEY  (`id`)
+  PRIMARY KEY  (`id`),
+  KEY `pid` (`pid`),
+  KEY `type` (`type`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -2681,7 +2687,8 @@ CREATE TABLE `pnotes` (
   `title` varchar(255) default NULL,
   `assigned_to` varchar(255) default NULL,
   `deleted` tinyint(4) default 0 COMMENT 'flag indicates note is deleted',
-  PRIMARY KEY  (`id`)
+  PRIMARY KEY  (`id`),
+  KEY `pid` (`pid`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -2821,7 +2828,8 @@ CREATE TABLE `transactions` (
   `reply_recommend`         text         NOT NULL DEFAULT '',
   `reply_rx_refer`          text         NOT NULL DEFAULT '',
   `reply_related_code`      varchar(255) NOT NULL DEFAULT '',
-  PRIMARY KEY  (`id`)
+  PRIMARY KEY  (`id`),
+  KEY `pid` (`pid`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
 -- --------------------------------------------------------
@@ -3081,7 +3089,8 @@ CREATE TABLE `procedure_order` (
   `patient_instructions`   text         NOT NULL DEFAULT '',
   `activity`               tinyint(1)   NOT NULL DEFAULT 1  COMMENT '0 if deleted',
   PRIMARY KEY (`procedure_order_id`),
-  KEY datepid (date_ordered, patient_id)
+  KEY datepid (date_ordered, patient_id),
+  KEY `patient_id` (`patient_id`)
 ) ENGINE=MyISAM;
 
 CREATE TABLE `procedure_report` (

@@ -110,9 +110,6 @@ $url = "";
 $upgrade = 0;
 $state = $_POST["state"];
 
-// Make this true for IPPF.
-$ippf_specific = true;
-
 // If this script was invoked with no site ID, then ask for one.
 if (empty($_REQUEST['site'])) {
   echo "<html>\n";
@@ -531,10 +528,10 @@ if ($upgrade != 1) {
         array_push($dumpfilesTitles,"Language Translation (latin1)");
     }
 
-    // Deal with IPPF-specific SQL.
-    if ($ippf_specific) {
-      array_push($dumpfiles, $manualPath . "sql/ippf_layout.sql");
-      array_push($dumpfilesTitles, "IPPF Layout");
+    // Load custom layout SQL if present.
+    if (file_exists("sql/custom_layout.sql")) {
+      array_push($dumpfiles, $manualPath . "sql/custom_layout.sql");
+      array_push($dumpfilesTitles, "Custom Layout");
     }
 
     // Load ICD-9 codes if present.

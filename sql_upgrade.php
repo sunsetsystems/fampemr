@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2008-2009 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2008-2011 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -46,6 +46,11 @@ function tableHasRow2D($tblname, $colname, $value, $colname2, $value2) {
   $row = sqlQuery("SELECT COUNT(*) AS count FROM $tblname WHERE " .
     "$colname LIKE '$value' AND $colname2 LIKE '$value2'");
   return $row['count'] ? true : false;
+}
+
+function tableHasIndex($tblname, $colname) {
+  $row = sqlQuery("SHOW INDEX FROM `$tblname` WHERE `Key_name` = '$colname'");
+  return !empty($row);
 }
 
 function upgradeFromSqlFile($filename) {
@@ -122,6 +127,16 @@ function upgradeFromSqlFile($filename) {
       }
       if ($skipping) echo "<font color='green'>Skipping section $line</font><br />\n";
     }
+    else if (preg_match('/^#IfNotIndex\s+(\S+)\s+(\S+)/', $line, $matches)) {
+      if (tableExists($matches[1])) {
+        $skipping = tableHasIndex($matches[1], $matches[2]);
+      }
+      else {
+        // If no such table then the index is deemed not "missing".
+        $skipping = true;
+      }
+      if ($skipping) echo "<font color='green'>Skipping section $line</font><br />\n";
+    }
 
     else if (preg_match('/^#EndIf/', $line)) {
       $skipping = false;
@@ -177,9 +192,9 @@ if (!empty($_POST['form_submit'])) {
     upgradeFromSqlFile($filename);
   }
 
-  if (!empty($GLOBALS['ippf_specific'])) {
-    // Upgrade custom stuff for IPPF.
-    upgradeFromSqlFile('ippf_upgrade.sql');
+  if (file_exists("sql/custom_upgrade.sql")) {
+    // Upgrade custom stuff.
+    upgradeFromSqlFile('custom_upgrade.sql');
   }
 
   flush();

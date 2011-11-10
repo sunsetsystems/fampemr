@@ -412,3 +412,44 @@ ALTER TABLE facility ADD latitude varchar(255) NOT NULL DEFAULT '';
 ALTER TABLE facility ADD longitude varchar(255) NOT NULL DEFAULT '';
 #EndIf
 
+#IfNotIndex forms pid_encounter
+CREATE INDEX `pid_encounter` ON `forms` (`pid`, `encounter`);
+#EndIf
+
+#IfNotIndex drug_sales pid_encounter
+CREATE INDEX `pid_encounter` ON `drug_sales` (`pid`, `encounter`);
+#EndIf
+
+#IfNotIndex form_encounter date
+CREATE INDEX `date` ON `form_encounter` (`date`);
+#EndIf
+
+#IfNotIndex billing pid_encounter
+DROP INDEX `pid` ON `billing`;
+CREATE INDEX `pid_encounter` ON `billing` (`pid`, `encounter`);
+#EndIf
+
+#IfNotIndex transactions pid
+CREATE INDEX `pid` ON `transactions` (`pid`);
+#EndIf
+
+#IfNotIndex pnotes pid
+CREATE INDEX `pid` ON `pnotes` (`pid`);
+#EndIf
+
+#IfNotIndex procedure_order patient_id
+CREATE INDEX `patient_id` ON `procedure_order` (`patient_id`);
+#EndIf
+
+#IfNotIndex immunizations patient_id
+CREATE INDEX `patient_id` ON `immunizations` (`patient_id`);
+#EndIf
+
+#IfNotIndex lists type
+CREATE INDEX `type` ON `lists` (`type`);
+#EndIf
+
+#IfNotIndex lists pid
+CREATE INDEX `pid` ON `lists` (`pid`);
+#EndIf
+

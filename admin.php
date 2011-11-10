@@ -71,14 +71,17 @@ function add_clicked() {
 
 function go_clicked() {
  var f = document.forms[0];
+ var a = f.form_site;
+ // If only one radio button then the following line is necessary.
+ if (typeof a.length === 'undefined') a = new Array(a);
  var i = 0;
- for (i = 0; i < f.form_site.length; ++i) {
-  if (f.form_site[i].checked) {
+ for (i = 0; i < a.length; ++i) {
+  if (a[i].checked) {
    if (f.form_action.value == 'login') {
-    document.location.href = "interface/login/login_frame.php?site=" + f.form_site[i].value;
+    document.location.href = "interface/login/login_frame.php?site=" + a[i].value;
    }
    else if (f.form_action.value == 'upgrade') {
-    document.location.href = "sql_upgrade.php?site=" + f.form_site[i].value;
+    document.location.href = "sql_upgrade.php?site=" + a[i].value;
    }
    else if (f.form_action.value == 'delete') {
     f.submit();
@@ -216,7 +219,7 @@ foreach ($siteslist as $sfname) {
     echo "  <td>$openemr_name</td>\n";
     echo "  <td>$openemr_version";
     if ($v_database != $database_version) {
-      echo "Needs upgrade!";
+      echo " Needs upgrade!";
     }
     echo "</td>\n";
 
