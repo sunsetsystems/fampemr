@@ -134,7 +134,8 @@ function toencounter(enc, datestr) {
 
 function newencounter() {
 <?php if ($GLOBALS['concurrent_layout']) { ?>
- return parent.left_nav.loadFrame2('nen1','RBot','forms/newpatient/new.php?autoloaded=1&calenc=');
+ var othername = (window.name == 'RTop') ? 'RBot' : 'RTop';
+ return parent.left_nav.loadFrame2('nen1',othername,'forms/newpatient/new.php?autoloaded=1&calenc=');
 <?php } else { ?>
  // TBD
  return false;
@@ -531,9 +532,9 @@ if (isset($pid) && !$GLOBALS['disable_calendar']) {
 <script language='JavaScript'>
  parent.left_nav.setPatient(<?php echo "'" . addslashes($result['fname']) . " " . addslashes($result['lname']) . "',$pid,'" . addslashes($result['pubpid']) . "','', ' " . xl('DOB') . ": " . oeFormatShortDate($result['DOB_YMD']) . " " . xl('Age') . ": " . getPatientAge($result['DOB_YMD']) . "'"; ?>);
  parent.left_nav.setRadio(window.name, 'dem');
-<?php if (!$_GET['is_new']) { // if new pt, do not load other frame ?>
- var othername = (window.name == 'RTop') ? 'RBot' : 'RTop';
  parent.left_nav.forceDual();
+<?php if (!$_GET['is_new']) { // not new patient ?>
+ var othername = (window.name == 'RTop') ? 'RBot' : 'RTop';
 <?php if (empty($GLOBALS['gbl_patient_initial_bottom'])) { ?>
  parent.left_nav.setRadio(othername, 'sum');
  parent.left_nav.loadFrame('sum1', othername, 'patient_file/summary/summary_bottom.php');
@@ -541,7 +542,9 @@ if (isset($pid) && !$GLOBALS['disable_calendar']) {
  parent.left_nav.setRadio(othername, 'ens');
  parent.left_nav.loadFrame('ens1', othername, 'patient_file/history/encounters.php');
 <?php } ?>
-<?php } ?>
+<?php } else { // new patient ?>
+ newencounter();
+<?php } // end new patient ?>
 </script>
 <?php } ?>
 
