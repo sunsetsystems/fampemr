@@ -13,8 +13,8 @@ require_once("../globals.php");
 require_once("$srcdir/acl.inc");
 require_once("$srcdir/patient.inc");
 
-// Make this true for MSI, otherwise it's IPPF.
-$msi_specific = false;
+// True for MSI, otherwise it's IPPF.
+$msi_specific = !empty($GLOBALS['gbl_rapid_workflow']);
 
 // Set this to:
 // 0 = Select all visits and use one (Billing) facility
