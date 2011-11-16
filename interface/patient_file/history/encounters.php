@@ -105,6 +105,10 @@ function showDocument(&$drow) {
 <?php html_header_show();?>
 <link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
 
+<style type="text/css">
+.openvisit {background-color:#ffffcc;}
+</style>
+
 <script type="text/javascript" src="<?php echo $GLOBALS['webroot'] ?>/library/js/jquery.js"></script>
 
 <script language="JavaScript">
@@ -183,6 +187,7 @@ function editNote(feid) {
 <table>
  <tr class='text'>
   <th><?php xl('Date','e'); ?></th>
+  <th><?php xl('Open','e'); ?></th>
 
 <?php if ($billing_view) { ?>
   <th class='billing_note'><?php xl('Billing Note','e'); ?></th>
@@ -274,6 +279,9 @@ if ($result = getEncounters($pid)) {
             $drow = sqlFetchArray($dres);
         }
 
+        // We will call a visit "open" if it is not billed.
+        $billed = isEncounterBilled($pid, $iter['encounter']);
+
         // Fetch all forms for this encounter, if the user is authorized to see
         // this encounter's notes and this is the clinical view.
         $encarr = array();
@@ -286,10 +294,19 @@ if ($result = getEncounters($pid)) {
         }
 
         $rawdata = $iter['encounter'] . "~" . oeFormatShortDate($raw_encounter_date);
-        echo "<tr class='encrow text' id='".$rawdata."' title='" . xl('View encounter','','',' ') . "$pid.{$iter['encounter']}'>\n";
+        echo "<tr class='encrow text";
+        // This color should be moved to the stylesheet when porting to current code.
+        if (!$billed) echo " openvisit";
+        echo "' id='".$rawdata."' title='" .
+          xl('View encounter','','',' ') .
+          "$pid.{$iter['encounter']}'";
+        echo ">\n";
 
         // show encounter date
         echo "<td valign='top'>" . oeFormatShortDate($raw_encounter_date) . "</td>\n";
+
+        // show if unbilled
+        echo "<td valign='top'>" . ($billed ? xl('No') : xl('Yes')) . "</td>\n";
 
         if ($billing_view) {
 
