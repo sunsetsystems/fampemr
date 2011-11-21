@@ -229,13 +229,18 @@ function newEvt() {
  var f = document.forms[0];
  var rtval = f.form_refer_external.value;
  var url = '../../main/calendar/add_edit_event.php?patientid=<?php echo $pid ?>';
+ if (f.form_refer_reply_date && f.form_refer_reply_date.value) {
+  var dt = f.form_refer_reply_date.value.replace(/\D/g, '');
+  url += '&date=' + dt;
+ }
  if (rtval == '4' || rtval == '5') { // inbound referral
-  if (f.form_refer_reply_date && f.form_refer_reply_date.value) {
-   var dt = f.form_refer_reply_date.value.replace(/\D/g, '');
-   url += '&date=' + dt;
-  }
   if (f.form_refer_to && f.form_refer_to.value) {
    url += '&userid=' + parseInt(f.form_refer_to.value);
+  }
+ }
+ else {
+  if (f.form_refer_from && f.form_refer_from.value) {
+   url += '&userid=' + parseInt(f.form_refer_from.value);
   }
  }
  dlgopen(url, '_blank', 600, 300);
