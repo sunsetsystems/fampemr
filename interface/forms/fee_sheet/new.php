@@ -790,6 +790,10 @@ function validate(f) {
    }
   }
  }
+ if (!f.ProviderID.value) {
+  alert('<?php echo xl('Default provider is required.') ?>');
+  return false;
+ }
  top.restoreSession();
  return true;
 }
@@ -1344,8 +1348,16 @@ if ($contraception_code && !$isBilled) {
       // 4 - change of method, not a new user (not applicable here)
       // 5 - not choosing contraception (contrastart is null)
       echo "   <select name='contrasel' onchange='contrasel_changed(this);'>\n";
-      echo "    <option value='3'>" . xl('Starting contraception for lifetime') . "</option>\n";
-      echo "    <option value='2'>" . xl('Starting for MA but not lifetime') . "</option>\n";
+      // Check the Contraception Event Types list to see if the Lifetime option applies.
+      $tmp = sqlQuery("SELECT COUNT(*) AS count FROM list_options WHERE " .
+        "list_id = 'contratype' AND option_id = '1'");
+      if (empty($tmp['count'])) {
+        echo "    <option value='2'>" . xl('Starting contraception') . "</option>\n";
+      }
+      else {
+        echo "    <option value='3'>" . xl('Starting contraception for lifetime') . "</option>\n";
+        echo "    <option value='2'>" . xl('Starting for MA but not lifetime') . "</option>\n";
+      }
       echo "    <option value='5'>" . xl('Refusing contraception') . "</option>\n";
       echo "   </select>\n";
       //
