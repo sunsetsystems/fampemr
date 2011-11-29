@@ -646,14 +646,6 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','5','Not choosing contraception'       ,5,0);
 #EndIf
 
-#IfNotRow2D list_options list_id lbfnames option_id LBFcontra
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('lbfnames','LBFcontra','Contraception',1);
-DELETE FROM layout_options WHERE form_id = 'LBFcontra';
-INSERT INTO layout_options VALUES ('LBFcontra','contratype' ,'1','Action'    , 1,1,2, 0, 0,'contratype' ,1,3,'','' ,'Contraception action');
-INSERT INTO layout_options VALUES ('LBFcontra','ippfconmeth','1','Method'    , 2,1,1, 0, 0,'ippfconmeth',1,3,'','' ,'Contraception method');
-INSERT INTO layout_options VALUES ('LBFcontra','contrastart','1','Start Date', 3,4,1,10,10,''           ,1,3,'','D','Contraception start date');
-#EndIf
-
 #IfNotRow2D codes code_type 11 code 252221329
 DELETE FROM codes WHERE code_type = '11';
 INSERT INTO codes ( code_text, code, code_type, modifier ) VALUES ( 'Contraceptives - Oral Contraceptives - OC - Method Specific Counselling', '111100119', 11, '' );
@@ -1237,4 +1229,63 @@ UPDATE codes SET cyp_factor = 10.000000 WHERE code_type = 11 AND code LIKE '1221
 UPDATE codes SET cyp_factor = 0.0500000 WHERE code_type = 11 AND code LIKE '145212%';
 # Next line clears cyp for codes corresponding to removal of contraception.
 UPDATE codes SET cyp_factor = 0         WHERE code_type = 11 AND code LIKE '1_____112';
+
+#IfMissingColumn patient_data contrastart
+ALTER TABLE patient_data ADD contrastart DATE DEFAULT NULL;
+#EndIf
+
+#IfMissingColumn patient_data ippfconmeth
+ALTER TABLE patient_data ADD ippfconmeth varchar(255) NOT NULL DEFAULT '';
+#EndIf
+
+#IfNotRow2D list_options list_id lbfnames option_id LBFcontra
+INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('lbfnames','LBFcontra','Contraception',1);
+DELETE FROM layout_options WHERE form_id = 'LBFcontra';
+INSERT INTO layout_options VALUES ('LBFcontra','contratype' ,'1','Action'    , 1,1,2, 0, 0,'contratype' ,1,3,'','' ,'Contraception action');
+INSERT INTO layout_options VALUES ('LBFcontra','ippfconmeth','1','Method'    , 2,1,1, 0, 0,'ippfconmeth',1,3,'','' ,'Contraception method');
+INSERT INTO layout_options VALUES ('LBFcontra','contrastart','1','Start Date', 3,4,1,10,10,''           ,1,3,'','D','Contraception start date');
+# This section creates LBFcontra visit forms to replace contraception dates/methods in demographics.
+INSERT INTO lbf_data (field_id, field_value)
+  SELECT 'contratype', pd.pid FROM patient_data AS pd, form_encounter AS fe
+  WHERE pd.contrastart IS NOT NULL
+  AND fe.pid = pd.pid
+  AND fe.date >= pd.contrastart
+  GROUP BY pd.pid;
+INSERT INTO lbf_data (form_id, field_id, field_value)
+  SELECT MAX(ld.form_id), 'contrastart', pd.contrastart
+  FROM patient_data AS pd, form_encounter AS fe, lbf_data AS ld
+  WHERE pd.contrastart IS NOT NULL
+  AND fe.pid = pd.pid
+  AND fe.date >= pd.contrastart
+  AND ld.field_id = 'contratype'
+  AND ld.field_value = pd.pid
+  GROUP BY pd.pid;
+INSERT INTO lbf_data (form_id, field_id, field_value)
+  SELECT MAX(ld.form_id), 'ippfconmeth', pd.ippfconmeth
+  FROM patient_data AS pd, form_encounter AS fe, lbf_data AS ld
+  WHERE pd.contrastart IS NOT NULL
+  AND pd.ippfconmeth != ''
+  AND fe.pid = pd.pid
+  AND fe.date >= pd.contrastart
+  AND ld.field_id = 'contratype'
+  AND ld.field_value = pd.pid
+  GROUP BY pd.pid;
+INSERT INTO forms (date, encounter, form_name, form_id, pid, user, groupname, authorized, formdir)
+  SELECT CURRENT_DATE, MIN(fe.encounter), 'Contraception Start', MAX(ld.form_id), pd.pid, 'admin', 'Default', '1', 'LBFcontra'
+  FROM patient_data AS pd, form_encounter AS fe, lbf_data AS ld
+  WHERE pd.contrastart IS NOT NULL
+  AND fe.pid = pd.pid
+  AND fe.date >= pd.contrastart
+  AND ld.field_id = 'contratype'
+  AND ld.field_value = pd.pid
+  GROUP BY pd.pid;
+UPDATE forms AS f, lbf_data AS ld SET ld.field_value = '3' WHERE
+  f.formdir = 'LBFcontra' AND f.deleted = 0 AND ld.form_id = f.form_id AND
+  ld.field_id = 'contratype' AND ld.field_value = f.pid;
+#EndIf
+
+ALTER TABLE patient_data DROP ippfconmeth;
+ALTER TABLE patient_data DROP contrastart;
+DELETE FROM `layout_options` WHERE form_id = 'DEM' AND field_id = 'ippfconmeth';
+DELETE FROM `layout_options` WHERE form_id = 'DEM' AND field_id = 'contrastart';
 

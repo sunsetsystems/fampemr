@@ -1817,9 +1817,6 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','122182213','Male VSC - Incisional vasectomy'             ,24,0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','122182313','Male VSC - No-scalpel Vasectomy'             ,25,0);
 
-ALTER TABLE patient_data ADD ippfconmeth varchar(255) NOT NULL DEFAULT '';
-INSERT INTO `layout_options` VALUES ('DEM','ippfconmeth','5Stats','Contraceptives Start Method',9,1,0,10,10,'ippfconmeth',1,1,'','','Method provided on contraceptives start date');
-
 -- The following revised/added 2011-10-12:
 
 INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('lbfnames','LBFcontra','Contraception',1);
