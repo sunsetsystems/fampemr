@@ -165,13 +165,14 @@ function exportEncounter($pid, $encounter, $date) {
 
   // Specific to MSI:
   if ($msi_specific) {
+    /*****************************************************************
     // Get LBF_Data entries
     $lbfres = sqlStatement("SELECT f.form_id, ld.field_id, ld.field_value FROM forms f " .
       "INNER JOIN lbf_data ld ON f.form_id = ld.form_id " . 
       "WHERE " .
       "f.pid = '$pid' AND " .
       "f.encounter = '$encounter' AND " .
-      "f.formdir = 'LBF1' AND " .
+      "f.formdir = 'LBFmsivd' AND " .
       "f.deleted = 0 " .
       "ORDER BY f.id, ld.field_id");
     while ($lbfrow = sqlFetchArray($lbfres)) {
@@ -193,6 +194,7 @@ function exportEncounter($pid, $encounter, $date) {
           break;
       }
     }
+    *****************************************************************/
     $fres = sqlStatement("SELECT f.form_id, fe.sensitivity, fe.referral_source, pc.pc_catname FROM forms f " .
       "INNER JOIN form_encounter fe on f.pid=fe.pid and f.encounter=fe.encounter " . 
       "INNER JOIN openemr_postcalendar_categories pc on fe.pc_catid=pc.pc_catid " . 
@@ -578,9 +580,12 @@ if (!empty($form_submit)) {
     Add('DobType'    , "rel"); // rel=real, est=estimated
 
     if ($msi_specific) {
+      // Add('Education', describedOption('Education', $education, ''));
+      // Add('Sex'      , Sex($row['sex']));
+      // AddIfPresent('WarSubCity', $row['state']);
       Add('Education', describedOption('Education', $education, ''));
-      Add('Sex'      , Sex($row['sex']));
-      AddIfPresent('WarSubCity', $row['state']);
+      Add('Demo5'    , Sex($row['sex']));
+      AddIfPresent('State', $row['state']);
     }
     else {
       Add('Pregnancies', 0 + getTextListValue($hrow['genobshist'],'npreg')); // number of pregnancies
