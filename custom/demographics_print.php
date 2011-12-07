@@ -420,13 +420,13 @@ if ($patientid) {
 
 $fres = sqlStatement("SELECT * FROM layout_options " .
   "WHERE form_id = 'DEM' AND uor > 0 " .
-  "ORDER BY group_name, seq");
+  "ORDER BY seq");
 
 if ($PDF_OUTPUT) {
   // documentation for ezpdf is here --> http://www.ros.co.nz/pdf/
   require_once ("$srcdir/classes/class.ezpdf.php");
   $pdf =& new Cezpdf("letter", "landscape");
-  $pdf->ezSetMargins(36, 36, 36, 36); // top, bottom, left, right
+  $pdf->ezSetMargins(20,20,20,20); // top, bottom, left, right
   $pdf->selectFont("$srcdir/fonts/Helvetica.afm");
 }
 else {
@@ -508,7 +508,7 @@ div.section {
 $erow = false;
 $encdate = date('Y-m-d');
 if ($encounter && $patientid == $pid) {
-  $erow = sqlQuery("SELECT fe.date, c.pc_catname, lrs.title " .
+  $erow = sqlQuery("SELECT fe.date, DATE_FORMAT(fe.date,'%d-%M-%Y') AS date_fmtd, c.pc_catname, lrs.title " .
     "FROM form_encounter AS fe " .
     "LEFT JOIN openemr_postcalendar_categories AS c ON c.pc_catid = fe.pc_catid " .
     "LEFT JOIN list_options AS lrs ON lrs.list_id = 'refsource' AND lrs.option_id = fe.referral_source " .
@@ -539,7 +539,8 @@ while ($frow = sqlFetchArray($fres)) {
     if (isset($prow[$field_id])) $currvalue = $prow[$field_id];
   }
 
-  if ($frow['title'] == 'DOB') {
+// This was originally == 'DOB' which didn't work. JT
+  if ($frow['title'] == 'Age') {
     // Translate DOB to age.
     displayMSIField($titlecols > 0, xl('Age'),
       getPatientAge(str_replace('-','',$currvalue), str_replace('-','',$encdate)));
@@ -554,18 +555,21 @@ while ($frow = sqlFetchArray($fres)) {
 }
 
 // Add visit category and referral source.
+// Added Visit data and formated.
 if ($erow) {
-  displayMSIField(true, xl('Visit Category' ), $erow['pc_catname']);
-  displayMSIField(true, xl('Referral Source'), $erow['title'     ]);
+  displayMSIField(true, xl('Visit Date'), $erow['date_fmtd']);
+  displayMSIField(true, xl('Visit Cat' ), $erow['pc_catname']);
 }
 
 if ($PDF_OUTPUT) {
   $pdf->ezTable($table, '', '', array(
     'showHeadings' => 0,       // no column headings
-    'fontSize'     => 10,      // font size in points
+    'fontSize'     => 9,      // font size in points
     'xPos'         => 'left',  // location of positioning bar
     'xOrientation' => 'right', // position to right of xPos
-    'maxWidth'     => 360,     // max width of table in points
+    'maxWidth'     => 380,     // max width of table in points
+    'width'     => 380,     // width of table in points
+    'cols' =>  array ( array('width' => 120), array('width' => 280))
   ));
   // For "inline" option see stream() function in library/classes/class.pdf.php.
   $pdf->ezStream(array('inline' => true));
