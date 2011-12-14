@@ -179,14 +179,12 @@ function set_related(codetype, code, selector, codedesc) {
 function sel_related(e) {
  current_sel_name = e.name;
  var parms = '';
-<?php if (false) { // ($GLOBALS['ippf_specific']) ?>
+<?php if ($GLOBALS['ippf_specific']) { ?>
  // This case wants to force specific referral code types.
  var f = document.forms[0];
  var rtval = f.form_refer_external.value;
- if (rtval == '4' || rtval == '5')
-  parms = '?codetype=MA';  // inbound referrals
- else
-  parms = '?codetype=REF'; // outbound referrals
+ if (rtval == '2' || rtval == '4') // outbound or inbound external
+  parms = '?codetype=REF';
 <?php } ?>
  dlgopen('../encounter/find_code_popup.php' + parms, '_blank', 500, 400);
 }
@@ -304,8 +302,8 @@ while ($frow = sqlFetchArray($fres)) {
   $currvalue  = '';
   if (isset($trow[$field_id])) $currvalue = $trow[$field_id];
 
-  // Handle special-case default values.
-  if (!$currvalue && !$transid) {
+  // Handle special-case default values... except IPPF does not want these.
+  if (!$currvalue && !$transid && !$GLOBALS['ippf_specific']) {
     if ($field_id == 'refer_date') {
       $currvalue = date('Y-m-d');
     }

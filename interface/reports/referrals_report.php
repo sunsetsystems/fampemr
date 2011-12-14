@@ -178,6 +178,7 @@
   <th> <?php xl('Refer By','e'); ?> </th>
   <th> <?php xl('Refer To','e'); ?> </th>
   <th> <?php xl('Refer Date','e'); ?> </th>
+  <th> <?php xl('Expected Date','e'); ?> </th>
   <th> <?php xl('Reply Date','e'); ?> </th>
   <th> <?php xl('Patient','e'); ?> </th>
   <th> <?php xl('ID','e'); ?> </th>
@@ -186,7 +187,8 @@
  <tbody>
 <?php
  if ($_POST['form_refresh']) {
-  $query = "SELECT t.id, t.refer_date, t.reply_date, t.body, " .
+  $query = "SELECT " .
+    "t.id, t.refer_date, t.refer_reply_date, t.reply_date, t.body, " .
     "ut.organization, uf.facility_id, p.pubpid, " .
     "CONCAT(uf.fname,' ', uf.lname) AS referer_name, " .
     "CONCAT(p.fname,' ', p.lname) AS patient_name " .
@@ -225,6 +227,9 @@
    <a href='#' onclick="return show_referral(<?php echo $row['id']; ?>)">
    <?php echo oeFormatShortDate($row['refer_date']); ?>&nbsp;
    </a>
+  </td>
+  <td>
+   <?php echo oeFormatShortDate($row['refer_reply_date']) ?>
   </td>
   <td>
    <?php echo oeFormatShortDate($row['reply_date']) ?>
