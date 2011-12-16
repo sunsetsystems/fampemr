@@ -851,7 +851,7 @@ function setSaveAndClose() {
 // This applies only to family planning installations.
 function contrasel_changed(selobj) {
  document.getElementById('contrasel_span').style.visibility =
-  selobj.value > '3' ? 'hidden' : 'visible';
+  selobj.value > '4' ? 'hidden' : 'visible';
 }
 
 // Open the add-event dialog.
@@ -1257,55 +1257,6 @@ echo "</b></span>\n";
 &nbsp;
 
 <?php
-/*********************************************************************
-// If applicable, ask for the contraceptive services start date.
-$trow = sqlQuery("SELECT count(*) AS count FROM layout_options WHERE " .
-  "form_id = 'DEM' AND field_id = 'contrastart' AND uor > 0");
-// echo "<!-- contraception_code = $contraception_code -->\n"; // debugging
-if ($trow['count'] && $contraception_code && !$isBilled) {
-  $date1 = substr($visit_row['date'], 0, 10);
-  // If admission or surgical, then force contrastart.
-  if (preg_match('/^12/', $contraception_code)) {
-    // We identify the method with the IPPF code for the corresponding surgical procedure.
-    $servicemeth = substr($contraception_code, 0, 7) . '13';
-    //
-    echo "   <input type='hidden' name='contrasel'   value='1'            />\n";
-    echo "   <input type='hidden' name='contrastart' value='$date1'       />\n";
-    echo "   <input type='hidden' name='ippfconmeth' value='$servicemeth' />\n";
-  }
-  else {
-    // We identify the method with its IPPF code for Initial Consultation.
-    $servicemeth = substr($contraception_code, 0, 6) . '110';
-    // Xavier confirms that the codes for Cervical Cap (112152010 and 112152011) are
-    // an unintended change in pattern, but at this point we have to live with it.
-    // -- Rod 2011-09-26
-    if ($servicemeth == '112152110') $servicemeth = '112152010';
-    // If there is no contraceptive start date yet then ask the user for input.
-    // "None of the above" would apply if the method was refused.
-    $trow = sqlQuery("SELECT contrastart " .
-      "FROM patient_data WHERE " .
-      "pid = '$pid' LIMIT 1");
-    if (empty($trow['contrastart']) || substr($trow['contrastart'], 0, 4) == '0000') {
-      echo "   <select name='contrasel' onchange='contrasel_changed(this);'>\n";
-      echo "    <option value='1'>" . xl('Contraceptive use started') . "</option>\n";
-      // echo "    <option value='1'>" . xl('This visit begins new contraceptive use') . "</option>\n";
-      // echo "    <option value='2'>" . xl('Contraceptive services previously started') . "</option>\n";
-      echo "    <option value=''>" . xl('Contraception not started') . "</option>\n";
-      echo "   </select>\n";
-      //
-      echo "<span id='contrasel_span' style='visibility:visible'> " . xl('on') . " ";
-      echo "<input type='text' name='contrastart' id='contrastart' size='10' value='$date1' " .
-        "onkeyup='datekeyup(this,mypcc)' onblur='dateblur(this,mypcc)' /> " .
-        "<img src='../../pic/show_calendar.gif' align='absbottom' width='24' height='22' " .
-        "id='img_contrastart' border='0' alt='[?]' style='cursor:pointer' " .
-        "title='" . xl('Click here to choose a date') . "' />\n";
-      echo ' ' . xl('using') . ' ';
-      echo generate_select_list('ippfconmeth', 'ippfconmeth', $servicemeth, '');
-      echo "</span><p>&nbsp;\n";
-    }
-  }
-}
-*********************************************************************/
 // If applicable, ask for the contraceptive services start date.
 if ($contraception_code && !$isBilled) {
   $csrow = sqlQuery("SELECT COUNT(*) AS count FROM forms AS f WHERE " .
@@ -1348,17 +1299,26 @@ if ($contraception_code && !$isBilled) {
       // 4 - change of method, not a new user (not applicable here)
       // 5 - not choosing contraception (contrastart is null)
       echo "   <select name='contrasel' onchange='contrasel_changed(this);'>\n";
-      // Check the Contraception Event Types list to see if the Lifetime option applies.
-      $tmp = sqlQuery("SELECT COUNT(*) AS count FROM list_options WHERE " .
-        "list_id = 'contratype' AND option_id = '1'");
-      if (empty($tmp['count'])) {
-        echo "    <option value='2'>" . xl('Starting contraception') . "</option>\n";
-      }
-      else {
-        echo "    <option value='3'>" . xl('Starting contraception for lifetime') . "</option>\n";
-        echo "    <option value='2'>" . xl('Starting for MA but not lifetime') . "</option>\n";
-      }
-      echo "    <option value='5'>" . xl('Refusing contraception') . "</option>\n";
+      //
+      // // Check the Contraception Event Types list to see if the Lifetime option applies.
+      // $tmp = sqlQuery("SELECT COUNT(*) AS count FROM list_options WHERE " .
+      //   "list_id = 'contratype' AND option_id = '1'");
+      // if (empty($tmp['count'])) {
+      //   echo "    <option value='2'>" . xl('Starting contraception') . "</option>\n";
+      // }
+      // else {
+      //   echo "    <option value='3'>" . xl('Starting contraception for lifetime') . "</option>\n";
+      //   echo "    <option value='2'>" . xl('Starting for MA but not lifetime') . "</option>\n";
+      // }
+      // echo "    <option value='5'>" . xl('Refusing contraception') . "</option>\n";
+      //
+      // Meeting with LV and AM on 2011-12-15 we decided that until the full contraception
+      // form is implemented (in a couple of weeks), only these choices are applicable:
+      echo "    <option value='2'>" . xl('Starting contraception at association') . "</option>\n";
+      echo "    <option value='4'>" . xl('Method change') . "</option>\n";
+      // Another side note: We are not responsible here for collecting old contraception
+      // start data. Reporting will only be valid going forward.
+      //
       echo "   </select>\n";
       //
       echo "<span id='contrasel_span' style='visibility:visible'> " . xl('on') . " ";
@@ -1373,7 +1333,6 @@ if ($contraception_code && !$isBilled) {
     }
   }
 }
-/********************************************************************/
 
 // If there is a choice of warehouses, allow override of user default.
 if ($prod_lino > 0) { // if any products are in this form

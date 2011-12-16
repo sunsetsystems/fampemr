@@ -1980,9 +1980,9 @@ INSERT INTO layout_options VALUES ('LBFcontra','ippfconmeth','1','Method'    , 2
 INSERT INTO layout_options VALUES ('LBFcontra','contrastart','1','Start Date', 3,4,1,10,10,''           ,1,3,'','D','Contraception start date');
 
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','contratype','Contraception Event Types', 1,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','1','Starting for lifetime but not MA' ,1,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','2','Starting for MA but not lifetime' ,2,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','3','Starting for both lifetime and MA',3,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','4','Change of method, not starting'   ,4,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','5','Not choosing contraception'       ,5,0);
+-- INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','1','Starting for lifetime but not MA' ,1,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','2','Starting contractption at association' ,2,0);
+-- INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','3','Starting for both lifetime and MA',3,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','4','Method change',4,0);
+-- INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','5','Not choosing contraception'       ,5,0);
 
