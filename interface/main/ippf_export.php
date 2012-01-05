@@ -14,7 +14,8 @@ require_once("$srcdir/acl.inc");
 require_once("$srcdir/patient.inc");
 
 // True for MSI, otherwise it's IPPF.
-$msi_specific = !empty($GLOBALS['gbl_rapid_workflow']);
+$msi_specific = !empty($GLOBALS['gbl_rapid_workflow']) &&
+  $GLOBALS['gbl_rapid_workflow'] == 'LBFmsivd';
 
 // Set this to:
 // 0 = Select all visits and use one (Billing) facility

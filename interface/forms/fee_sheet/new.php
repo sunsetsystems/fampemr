@@ -621,7 +621,7 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   // Save-and-Close is currently specific to Family Planning but might be more
   // generally useful.  It provides the ability to mark an encounter as billed
   // directly from the Fee Sheet, if there are no charges.
-  if ($_POST['bn_save_close']) {
+  if ($_POST['bn_save_close'] && !$_POST['form_has_charges']) {
     $tmp1 = sqlQuery("SELECT SUM(ABS(fee)) AS sum FROM drug_sales WHERE " .
       "pid = '$pid' AND encounter = '$encounter'");
     $tmp2 = sqlQuery("SELECT SUM(ABS(fee)) AS sum FROM billing WHERE " .
@@ -674,8 +674,9 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   // "In exam room".
   updateAppointmentStatus($pid, $visit_date, '<');
 
-  if ($rapid_data_entry) {
-    // In rapid data entry mode we go directly to the Checkout page.
+  if ($rapid_data_entry || ($_POST['bn_save_close'] && $_POST['form_has_charges'])) {
+    // In rapid data entry mode or if "Save and Checkout" was clicked,
+    // we go directly to the Checkout page.
     formJump("{$GLOBALS['rootdir']}/patient_file/pos_checkout.php?framed=1&rde=1");
   }
   else {
@@ -844,7 +845,15 @@ function setSaveAndClose() {
    if (!isNaN(fee) && fee != 0) hascharges = true;
   }
  }
- f.bn_save_close.disabled = hascharges;
+ // f.bn_save_close.disabled = hascharges;
+ if (hascharges) {
+  f.form_has_charges.value = '1';
+  f.bn_save_close.value = '<?php echo xl('Save and Checkout'); ?>';
+ }
+ else {
+  f.form_has_charges.value = '0';
+  f.bn_save_close.value = '<?php echo xl('Save and Close'); ?>';
+ }
 }
 
 // Make contrastart and ippfconmeth visible or not, depending on user selection.
@@ -1377,12 +1386,17 @@ if (true) {
 />
 &nbsp;
 <?php if ($GLOBALS['ippf_specific']) { ?>
-<input type='submit' name='bn_save_close' value='<?php xl('Save and Close','e');?>'<?php if ($hasCharges) echo " disabled"; ?> />
+<?php if ($hasCharges) { ?>
+<input type='submit' name='bn_save_close' value='<?php xl('Save and Checkout','e');?>' />
+<?php } else { ?>
+<input type='submit' name='bn_save_close' value='<?php xl('Save and Close','e');?>' />
+<?php } // end no charges ?>
 &nbsp;
 <?php } ?>
 <input type='submit' name='bn_refresh' value='<?php xl('Refresh','e');?>'>
 &nbsp;
 <?php } ?>
+<input type='hidden' name='form_has_charges' value='<?php echo $hasCharges ? 1 : 0; ?>' />
 
 <input type='button' value='<?php xl('Cancel','e');?>'
  onclick="top.restoreSession();location='<?php echo "$rootdir/patient_file/encounter/$returnurl" ?>'" />

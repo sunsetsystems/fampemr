@@ -24,17 +24,21 @@ include_once("../../globals.php");
 
 <script language="JavaScript">
 
-function openNewFormURL(url) {
+function openNewFormURL(url, fullsize) {
  top.restoreSession();
 <?php if ($GLOBALS['concurrent_layout']) { ?>
-  parent.location.href = url;
+ if (fullsize) { // if other frame is to be closed
+  var istop = parent.window.name == 'RTop';
+  parent.parent.left_nav.forceSpec(istop, !istop);
+ }
+ parent.location.href = url;
 <?php } else { ?>
-  top.frames['Main'].location.href = url;
+ top.frames['Main'].location.href = url;
 <?php } ?>
 }
 
 function openNewForm(sel) {
- openNewFormURL(sel.options[sel.selectedIndex].value);
+ openNewFormURL(sel.options[sel.selectedIndex].value, false);
 }
 
 </script>
@@ -62,7 +66,7 @@ function myGetRegistered($state="1", $limit="unlimited", $offset="0") {
   return $all;
 }
 
-$disabled = empty($GLOBALS['gbl_rapid_workflow']) ? '' : 'disabled';
+$disabled = (empty($GLOBALS['gbl_rapid_workflow']) || $GLOBALS['gbl_rapid_workflow'] == 'fee_sheet') ? '' : 'disabled';
 
 $reg = myGetRegistered();
 $old_category = '';
@@ -117,8 +121,9 @@ if (!empty($GLOBALS['gbl_rapid_workflow'])) {
   else {
     $url .= "view_form.php?formname=$rdeform&id=" . $frow['id'];
   }
-  echo "<p><input type='button' value='" . xl('Rapid Data Entry') . "' " .
-    "onclick='openNewFormURL(\"$url\")' class='rdeclass' /></p>\n";
+  $label = ($rdeform == 'fee_sheet') ? xl('Fee Sheet') : xl('Rapid Data Entry');
+  echo "<p><input type='button' value='$label' " .
+    "onclick='openNewFormURL(\"$url\", true)' class='rdeclass' /></p>\n";
 }
 
 echo "</FORM>\n";

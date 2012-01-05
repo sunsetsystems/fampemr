@@ -358,6 +358,7 @@ $GLOBALS_METADATA = array(
       array(
         '0'        => xl('None'),
         'LBFmsivd' => xl('MSI (requires LBFmsivd form)'),
+        'fee_sheet' => xl('Fee Sheet and Checkout'),
       ),
       '0',                              // default
       xl('Activates custom work flow logic')
