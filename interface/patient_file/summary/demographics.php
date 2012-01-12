@@ -459,9 +459,32 @@ if ($document_id) {
     "onclick='top.restoreSession()'>Click for ID card</a><br />";
 }
 
-// Display contraception start date and method, if it exists.
+// Display contraception start date and method when appropriate.
+// This requires the LBFccicon (Contraception Initial Consult) form to exist,
+// showing either surgical contraception or having a positive "first time"
+// indicator.
 //
 if ($GLOBALS['ippf_specific']) {
+  $query = "SELECT " .
+    "fe.date AS contrastart, lo.title AS contrameth " .
+    "FROM forms AS f " .
+    "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
+    "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
+    "LEFT JOIN list_options AS lo ON lo.list_id = 'ippfconmeth' AND lo.option_id = d1.field_value " .
+    "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
+    "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' AND " .
+    "d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1') " .
+    "ORDER BY contrastart DESC LIMIT 1";
+  $tmp = sqlQuery($query);
+  if (!empty($tmp['contrastart'])) {
+    echo "<span class='text'>" . xl('Contraception Start') . ': ';
+    echo oeFormatShortDate(substr($tmp['contrastart'], 0, 10));
+    if (!empty($tmp['contrameth'])) {
+      echo ' ' . xl_list_label($tmp['contrameth']);
+    }
+    echo "</span><br />&nbsp;<br />\n";
+  }
+  /*******************************************************************
   $query = "SELECT " .
     "d2.field_value AS contrastart, lo.title AS contrameth " .
     "FROM forms AS f " .
@@ -482,6 +505,7 @@ if ($GLOBALS['ippf_specific']) {
     }
     echo "</span><br />&nbsp;<br />\n";
   }
+  *******************************************************************/
 }
 
 // Determine if an encounter exists for today.

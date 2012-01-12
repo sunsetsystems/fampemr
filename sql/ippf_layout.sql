@@ -1971,18 +1971,33 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','122182213','Male VSC - Incisional vasectomy'             ,24,0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','122182313','Male VSC - No-scalpel Vasectomy'             ,25,0);
 
--- The following revised/added 2011-10-12:
+-- The following revised/added 2011-10-12 and then revoked before release:
 
-INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('lbfnames','LBFcontra','Contraception',1);
-DELETE FROM layout_options WHERE form_id = 'LBFcontra';
-INSERT INTO layout_options VALUES ('LBFcontra','contratype' ,'1','Action'    , 1,1,2, 0, 0,'contratype' ,1,3,'','' ,'Contraception action');
-INSERT INTO layout_options VALUES ('LBFcontra','ippfconmeth','1','Method'    , 2,1,1, 0, 0,'ippfconmeth',1,3,'','' ,'Contraception method');
-INSERT INTO layout_options VALUES ('LBFcontra','contrastart','1','Start Date', 3,4,1,10,10,''           ,1,3,'','D','Contraception start date');
+-- INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('lbfnames','LBFcontra','Contraception',1);
+-- DELETE FROM layout_options WHERE form_id = 'LBFcontra';
+-- INSERT INTO layout_options VALUES ('LBFcontra','contratype' ,'1','Action'    , 1,1,2, 0, 0,'contratype' ,1,3,'','' ,'Contraception action');
+-- INSERT INTO layout_options VALUES ('LBFcontra','ippfconmeth','1','Method'    , 2,1,1, 0, 0,'ippfconmeth',1,3,'','' ,'Contraception method');
+-- INSERT INTO layout_options VALUES ('LBFcontra','contrastart','1','Start Date', 3,4,1,10,10,''           ,1,3,'','D','Contraception start date');
+-- INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','contratype','Contraception Event Types', 1,0);
+-- INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','2','Starting contractption at association' ,2,0);
+-- INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','4','Method change',4,0);
 
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','contratype','Contraception Event Types', 1,0);
--- INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','1','Starting for lifetime but not MA' ,1,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','2','Starting contractption at association' ,2,0);
--- INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','3','Starting for both lifetime and MA',3,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','4','Method change',4,0);
--- INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('contratype','5','Not choosing contraception'       ,5,0);
+-- The following revised/added 2012-01-05:
+
+INSERT INTO list_options (list_id,option_id,title,seq,option_value) VALUES ('lbfnames','LBFccicon','Contraception Initial Consult',1,5);
+DELETE FROM layout_options WHERE form_id = 'LBFccicon';
+INSERT INTO layout_options VALUES ('LBFccicon', 'newmauser', '1', 'First at this clinic?',
+  1,  1, 2, 0, 0, 'boolean'    , 1, 3, '', '', 'Is this the first contraceptive accepted at this clinic?');
+INSERT INTO layout_options VALUES ('LBFccicon', 'curmethod', '1', 'Current Method',
+  2,  1, 2, 0, 0, 'ippfconmeth', 1, 3, '', '', 'Method in use at start of visit');
+INSERT INTO layout_options VALUES ('LBFccicon', 'pastmodern','1', 'Method used previously?',
+  3,  1, 1, 0, 0, 'boolean'    , 1, 3, '', '', 'Was a modern contraceptive method used at some time in the past?');
+INSERT INTO layout_options VALUES ('LBFccicon', 'reqmethod', '1', 'Requested Method',
+  4,  1, 1, 0, 0, 'ippfconmeth', 1, 3, '', '', 'Method requested by the client');
+INSERT INTO layout_options VALUES ('LBFccicon', 'newmethod', '1', 'Method Adopted',
+  5,  1, 1, 0, 0, 'ippfconmeth', 1, 3, '', '', 'Method adopted in this visit');
+INSERT INTO layout_options VALUES ('LBFccicon', 'provider' , '1', 'Service Provider',
+  6, 10, 1, 0, 0, ''           , 1, 3, '', '', 'Provider of this initial consultation');
+INSERT INTO layout_options VALUES ('LBFccicon', 'mcreason' , '1', 'Reason for Method Change',
+  7,  1, 1, 0, 0, 'mcreason'   , 1, 3, '', '', 'Reason for method change');
 

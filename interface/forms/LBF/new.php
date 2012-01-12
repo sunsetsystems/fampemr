@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2009-2011 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2009-2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -298,19 +298,27 @@ function sel_related() {
       echo " <table border='0' cellpadding='0'>\n";
       $display_style = 'none';
 
-      // NEW: Initialize historical data array and write date headers.
+      // Initialize historical data array and write date headers.
       $historical_ids = array();
       if ($formhistory > 0) {
         echo " <tr>";
-        echo "<td colspan='$CPR' align='right' class='bold'>" . xl('Current') . "</th>\n";
-        $hres = sqlStatement("SELECT date, form_id FROM forms WHERE " .
-          "pid = '$pid' AND formdir = '$formname' AND " .
-          "form_id != '$formid' AND deleted = 0 " .
-          "ORDER BY date DESC LIMIT $formhistory");
+        echo "<td colspan='$CPR' align='right' class='bold'>";
+        echo htmlspecialchars(xl('Current'));
+        echo "</td>\n";
+        $hres = sqlStatement("SELECT f.form_id, fe.date " .
+          "FROM forms AS f, form_encounter AS fe WHERE " .
+          "f.pid = '$pid' AND f.formdir = '$formname' AND " .
+          "f.form_id != '$formid' AND f.deleted = 0 AND " .
+          "fe.pid = f.pid AND fe.encounter = f.encounter " .
+          "ORDER BY fe.date DESC, f.encounter DESC, f.date DESC " .
+          "LIMIT $formhistory");
+        // For some readings like vitals there may be multiple forms per encounter.
+        // We sort these sensibly, however only the encounter date is shown here;
+        // at some point we may wish to show also the data entry date/time.
         while ($hrow = sqlFetchArray($hres)) {
           $historical_ids[$hrow['form_id']] = '';
-          echo "<td colspan='$CPR' align='right' class='bold'>&nbsp;" . $hrow['date'] . "</th>\n";
-          // TBD: Format date per globals.
+          echo "<td colspan='$CPR' align='right' class='bold'>&nbsp;" .
+            oeFormatShortDate(substr($hrow['date'], 0, 10)) . "</td>\n";
         }
         echo " </tr>";
       }

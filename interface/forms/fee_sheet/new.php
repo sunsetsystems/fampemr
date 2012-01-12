@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2005-2011 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2005-2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -52,6 +52,7 @@ function genDiagJS($code_type, $code) {
   }
 }
 
+/*********************************************************************
 // For Family Planning only.
 //
 function contraceptionClass($code_type, $code) {
@@ -68,18 +69,6 @@ function contraceptionClass($code_type, $code) {
       if ($relstring === '') continue;
       list($reltype, $relcode) = explode(':', $relstring);
       if ($reltype !== 'IPPF') continue;
-      /***************************************************************
-      if      (preg_match('/^11....110/'    , $relcode)) $contra |= 1;
-      else if (preg_match('/^11...[1-5]999/', $relcode)) $contra |= 1;
-      else if (preg_match('/^112152010/'    , $relcode)) $contra |= 1;
-      else if (preg_match('/^11317[1-2]111/', $relcode)) $contra |= 1;
-      else if (preg_match('/^145212.10/'    , $relcode)) $contra |= 1;
-      else if (preg_match('/^145212999/'    , $relcode)) $contra |= 1;
-      else if (preg_match('/^12118[1-2].13/', $relcode)) $contra |= 2;
-      else if (preg_match('/^121181999/'    , $relcode)) $contra |= 2;
-      else if (preg_match('/^122182.13/'    , $relcode)) $contra |= 2;
-      else if (preg_match('/^122182999/'    , $relcode)) $contra |= 2;
-      ***************************************************************/
       if (
         preg_match('/^11....110/'    , $relcode) ||
         preg_match('/^11...[1-5]999/', $relcode) ||
@@ -101,6 +90,38 @@ function contraceptionClass($code_type, $code) {
     }
   }
   // return $contra;
+}
+*********************************************************************/
+
+// For Family Planning only.
+//
+function checkForContraception($code_type, $code) {
+  global $code_types, $contraception_found;
+  if (!$GLOBALS['ippf_specific']) return 0;
+  // Get the related service codes.
+  $codesrow = sqlQuery("SELECT related_code FROM codes WHERE " .
+    "code_type = '" . $code_types[$code_type]['id'] .
+    "' AND code = '$code' LIMIT 1");
+  if (!empty($codesrow['related_code']) && $code_type == 'MA') {
+    $relcodes = explode(';', $codesrow['related_code']);
+    foreach ($relcodes as $relstring) {
+      if ($relstring === '') continue;
+      list($reltype, $relcode) = explode(':', $relstring);
+      if ($reltype !== 'IPPF') continue;
+      if (
+        preg_match('/^11....110/'    , $relcode) ||
+        preg_match('/^11...[1-5]999/', $relcode) ||
+        preg_match('/^112152010/'    , $relcode) ||
+        preg_match('/^11317[1-2]111/', $relcode) ||
+        preg_match('/^12118[1-2].13/', $relcode) ||
+        preg_match('/^121181999/'    , $relcode) ||
+        preg_match('/^122182.13/'    , $relcode) ||
+        preg_match('/^122182999/'    , $relcode)
+      ) {
+        $contraception_found = true;
+      }
+    }
+  }
 }
 
 // This writes a billing line item to the output page.
@@ -284,7 +305,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
   }
 
   // For Family Planning.  Track contraceptive services.
-  if (!$del) contraceptionClass($codetype, $code);
+  if (!$del) checkForContraception($codetype, $code);
 
   if ($fee != 0) $hasCharges = true;
 }
@@ -410,9 +431,8 @@ function insert_lbf_item($form_id, $field_id, $field_value) {
 
 
 // This is just for Family Planning, to indicate if the visit includes
-// contraceptive services and to compute the service with highest CYP.
-$contraception_code = '';
-$contraception_cyp  = -1;
+// contraceptive services.
+$contraception_found = false;
 
 // Possible units of measure for NDC drug quantities.
 //
@@ -641,17 +661,12 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
     }
   }
 
+  /*******************************************************************
   // More Family Planning stuff.
   if (!empty($_POST['contrasel']) && !empty($_POST['contrastart']) && $_POST['contrasel'] != 5) {
     $contrasel   = $_POST['contrasel'];
     $contrastart = $_POST['contrastart'];
     $ippfconmeth = $_POST['ippfconmeth'];
-    /*****************************************************************
-    sqlStatement("UPDATE patient_data SET " .
-      "contrastart = '$contrastart', " .
-      "ippfconmeth = '$ippfconmeth' " .
-      "WHERE pid = '$pid'");
-    *****************************************************************/
     // Add contraception form but only if it does not already exist
     // (if it does, must be 2 users working on the visit concurrently).
     $csrow = sqlQuery("SELECT COUNT(*) AS count FROM forms AS f WHERE " .
@@ -663,8 +678,8 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
       insert_lbf_item($newid, 'ippfconmeth', $ippfconmeth);
       addForm($encounter, 'Contraception Start', $newid, 'LBFcontra', $pid, $userauthorized);
     }
-    /****************************************************************/
   }
+  *******************************************************************/
 
   // Note: Taxes are computed at checkout time (in pos_checkout.php which
   // also posts to SL).  Currently taxes with insurance claims make no sense,
@@ -753,6 +768,8 @@ function copayselect() {
 }
 
 function validate(f) {
+ var refreshing = f.bn_refresh.clicked ? true : false;
+ f.bn_refresh.clicked = false;
  for (var lino = 1; f['bill['+lino+'][code_type]']; ++lino) {
   var pfx = 'bill['+lino+']';
   if (f[pfx+'[ndcnum]'] && f[pfx+'[ndcnum]'].value) {
@@ -791,7 +808,7 @@ function validate(f) {
    }
   }
  }
- if (!f.ProviderID.value) {
+ if (!f.ProviderID.value && !refreshing) {
   alert('<?php echo xl('Default provider is required.') ?>');
   return false;
  }
@@ -856,12 +873,14 @@ function setSaveAndClose() {
  }
 }
 
+/*********************************************************************
 // Make contrastart and ippfconmeth visible or not, depending on user selection.
 // This applies only to family planning installations.
 function contrasel_changed(selobj) {
  document.getElementById('contrasel_span').style.visibility =
   selobj.value > '4' ? 'hidden' : 'visible';
 }
+*********************************************************************/
 
 // Open the add-event dialog.
 function newEvt() {
@@ -1266,6 +1285,7 @@ echo "</b></span>\n";
 &nbsp;
 
 <?php
+/*********************************************************************
 // If applicable, ask for the contraceptive services start date.
 if ($contraception_code && !$isBilled) {
   $csrow = sqlQuery("SELECT COUNT(*) AS count FROM forms AS f WHERE " .
@@ -1342,6 +1362,7 @@ if ($contraception_code && !$isBilled) {
     }
   }
 }
+*********************************************************************/
 
 // If there is a choice of warehouses, allow override of user default.
 if ($prod_lino > 0) { // if any products are in this form
@@ -1393,7 +1414,8 @@ if (true) {
 <?php } // end no charges ?>
 &nbsp;
 <?php } ?>
-<input type='submit' name='bn_refresh' value='<?php xl('Refresh','e');?>'>
+<input type='submit' name='bn_refresh' onclick='return this.clicked = true;'
+ value='<?php xl('Refresh','e');?>'>
 &nbsp;
 <?php } ?>
 <input type='hidden' name='form_has_charges' value='<?php echo $hasCharges ? 1 : 0; ?>' />
@@ -1417,9 +1439,11 @@ if (true) {
 ?>
 
 <script language='JavaScript'>
+/*********************************************************************
 if (document.getElementById('img_contrastart')) {
  Calendar.setup({inputField:"contrastart", ifFormat:"%Y-%m-%d", button:"img_contrastart"});
 }
+*********************************************************************/
 setSaveAndClose();
 <?php echo $justinit; ?>
 </script>

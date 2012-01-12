@@ -492,7 +492,7 @@ function generate_form_field($frow, $currvalue) {
     $cols = max(1, $frow['fld_length']);
     $lres = sqlStatement("SELECT * FROM list_options " .
       "WHERE list_id = '$list_id' ORDER BY seq, title");
-    echo "<table cellpadding='0' cellspacing='0' width='100%'>";
+    echo "<table cellpadding='0' cellspacing='0' width='100%' title='$description'>";
     $tdpct = (int) (100 / $cols);
     $got_selected = FALSE;
     for ($count = 0; $lrow = sqlFetchArray($lres); ++$count) {
