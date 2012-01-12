@@ -183,8 +183,10 @@ function sel_related(e) {
  // This case wants to force specific referral code types.
  var f = document.forms[0];
  var rtval = f.form_refer_external.value;
- if (rtval == '2' || rtval == '4') // outbound or inbound external
+ if (rtval == '2') // outbound external
   parms = '?codetype=REF';
+ else
+  parms = '?codetype=MA';
 <?php } ?>
  dlgopen('../encounter/find_code_popup.php' + parms, '_blank', 500, 400);
 }
