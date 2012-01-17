@@ -166,7 +166,6 @@ function exportEncounter($pid, $encounter, $date) {
 
   // Specific to MSI:
   if ($msi_specific) {
-    /*****************************************************************
     // Get LBF_Data entries
     $lbfres = sqlStatement("SELECT f.form_id, ld.field_id, ld.field_value FROM forms f " .
       "INNER JOIN lbf_data ld ON f.form_id = ld.form_id " . 
@@ -175,8 +174,16 @@ function exportEncounter($pid, $encounter, $date) {
       "f.encounter = '$encounter' AND " .
       "f.formdir = 'LBFmsivd' AND " .
       "f.deleted = 0 " .
-      "ORDER BY f.id, ld.field_id");
+      "ORDER BY f.form_id, f.id, ld.field_id");
+    $last_form_id = '';
     while ($lbfrow = sqlFetchArray($lbfres)) {
+      if ($last_form_id) {
+        // Skip any duplicate LBFmsivd forms for this encounter.
+        if ($lbfrow['form_id'] != $last_form_id) continue;
+      }
+      else {
+        $last_form_id = $lbfrow['form_id'];
+      }
       switch ($lbfrow['field_id']) {
         case "Child":
           Add('Child', mappedOption('Parity', $lbfrow['field_value'], ''));
@@ -195,7 +202,6 @@ function exportEncounter($pid, $encounter, $date) {
           break;
       }
     }
-    *****************************************************************/
     $fres = sqlStatement("SELECT f.form_id, fe.sensitivity, fe.referral_source, pc.pc_catname FROM forms f " .
       "INNER JOIN form_encounter fe on f.pid=fe.pid and f.encounter=fe.encounter " . 
       "INNER JOIN openemr_postcalendar_categories pc on fe.pc_catid=pc.pc_catid " . 
@@ -648,16 +654,28 @@ if (!empty($form_submit)) {
       sprintf("fe.date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
       sprintf("fe.date <  '%04u-%02u-01 00:00:00'     ", $end_year, $end_month);
     }
+
+    /*****************************************************************
     $query .= "ORDER BY fe.encounter";
-
-    // Add('Debug', $query); // debugging
-
     $eres = sqlStatement($query);
     $encarray = array();
     while ($erow = sqlFetchArray($eres)) {
       exportEncounter($last_pid, $erow['encounter'], $erow['date']);
       $encarray[] = $erow;
     }
+    *****************************************************************/
+    // Logic revised to skip duplicate encounters which should not happen!
+    $query .= "ORDER BY fe.encounter, fe.id";
+    $eres = sqlStatement($query);
+    $encarray = array();
+    $last_encounter = '';
+    while ($erow = sqlFetchArray($eres)) {
+      if ($erow['encounter'] == $last_encounter) continue;
+      $last_encounter = $erow['encounter'];
+      exportEncounter($last_pid, $erow['encounter'], $erow['date']);
+      $encarray[] = $erow;
+    }
+    /****************************************************************/
 
     endClient($last_pid, $encarray);
   }
