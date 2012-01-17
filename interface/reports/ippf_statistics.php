@@ -13,6 +13,8 @@ include_once("../globals.php");
 include_once("../../library/patient.inc");
 include_once("../../library/acl.inc");
 
+$alertmsg = '';
+
 // Might want something different here.
 //
 if (! acl_check('acct', 'rep')) die("Unauthorized access.");
@@ -808,8 +810,6 @@ function uses_description($form_by) {
     $form_by === '20' || $form_by === '104');
 }
 
-
-
 function writeSubtotals($last_group, &$asubtotals, $form_by) {
   if ($last_group) {
     genStartRow("bgcolor='#dddddd'");
@@ -824,8 +824,6 @@ function writeSubtotals($last_group, &$asubtotals, $form_by) {
     genEndRow();
   }
 }
-
-
 
 $arr_show   = array(
   '.total' => array('title' => xl('Total')),
@@ -1233,8 +1231,8 @@ if ($_POST['form_submit']) {
     // Reporting New Acceptors by Contraceptive Method (or method after abortion)
     // is a special case that gets one method on each contraceptive start date.
     //
-    if ($form_content == 3 && ($form_by === '6' || $form_by === '7'))
-    {
+    if ($form_content == 3) {
+     if ($form_by === '6' || $form_by === '7') {
       /***************************************************************
       // This gets us all MA codes, with encounter and patient
       // info attached and grouped by patient and encounter.
@@ -1329,6 +1327,7 @@ if ($_POST['form_submit']) {
       }
       ***************************************************************/
 
+      /***************************************************************
       // This counts instances of "contraception starting" for the MA.  Note that a
       // client could be counted twice, once for nonsurgical and once for surgical.
       // Note also that we filter based on contrastart date, which is usually
@@ -1353,6 +1352,32 @@ if ($_POST['form_submit']) {
         "JOIN patient_data AS pd ON pd.pid = f.pid $sexcond " .
         "WHERE f.formdir = 'LBFcontra' AND f.deleted = 0 " .
         "ORDER BY fe.pid, fe.encounter, f.form_id";
+      ***************************************************************/
+
+      // This counts instances of "contraception starting" for the MA.  Note that a
+      // client could be counted twice, once for nonsurgical and once for surgical.
+      // Note also that we filter based on start date which is the same as encounter
+      // date.
+      $query = "SELECT " .
+        "d1.field_value AS ippfconmeth, " .
+        "fe.pid, fe.encounter, fe.date AS encdate, fe.date AS contrastart, " .
+        "f.user AS provider, " .
+        "pd.regdate, pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, " .
+        "pd.referral_source$pd_fields " .
+        "FROM forms AS f " .
+        "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter AND " .
+        "fe.date IS NOT NULL AND fe.date >= '$from_date' AND fe.date <= '$to_date' ";
+      if ($form_facility) {
+        $query .= "AND fe.facility_id = '$form_facility' ";
+      }
+      $query .=
+        "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
+        "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
+        "JOIN patient_data AS pd ON pd.pid = f.pid $sexcond " .
+        "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND " .
+        "d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1') " .
+        "ORDER BY fe.pid, fe.encounter, f.form_id";
+
       echo "<!-- $query -->\n"; // debugging
       $res = sqlStatement($query);
       //
@@ -1361,8 +1386,9 @@ if ($_POST['form_submit']) {
         $ippfconmeth = $row['ippfconmeth'];
         $thispid     = $row['pid'];
         $thisenc     = $row['encounter'];
-        echo "<!-- '$thispid' '$thisenc' '$contrastart' '$ippfconmeth' -->\n"; // debugging
-        //
+        // echo "<!-- '$thispid' '$thisenc' '$contrastart' '$ippfconmeth' -->\n"; // debugging
+
+        /*************************************************************
         if ($ippfconmeth) {
           process_ippf_code($row, $ippfconmeth);
         }
@@ -1419,8 +1445,15 @@ if ($_POST['form_submit']) {
             // echo "<!-- process_ippf_code(row, $contraception_code) -->\n"; // debugging
           }
         }
-      }
-      /**************************************************************/
+        *************************************************************/
+
+        process_ippf_code($row, $ippfconmeth);
+
+      } // end while
+     }
+     else { // content is new acceptors but incompatible report type
+      $alertmsg = xl("New Acceptors content type is valid only for contraceptive method reporting.");
+     }
     } // end if
 
     else
@@ -1578,18 +1611,11 @@ if ($_POST['form_submit']) {
 
     $encount = 0;
 
-
-
     // These support group subtotals.
     $last_group = '';
     $asubtotals = array();
 
-
-
     foreach ($areport as $key => $varr) {
-
-
-
       $display_key = $key;
       if ($form_output != 3 && $form_content != '2' && $form_content != '3' && $form_content != '4') {
         // TBD: Get group name, if any, for this key.
@@ -1607,8 +1633,6 @@ if ($_POST['form_submit']) {
           $asubtotals = array();
         }
       }
-
-
 
       $bgcolor = (++$encount & 1) ? "#ddddff" : "#ffdddd";
 
@@ -1709,6 +1733,13 @@ if ($_POST['form_submit']) {
  selreport();
  Calendar.setup({inputField:"form_from_date", ifFormat:"%Y-%m-%d", button:"img_from_date"});
  Calendar.setup({inputField:"form_to_date", ifFormat:"%Y-%m-%d", button:"img_to_date"});
+
+<?php
+  if ($alertmsg) {
+    echo "alert('" . htmlentities($alertmsg) . "');\n";
+  }
+?>
+
 <?php if ($form_output == 2) { ?>
  window.print();
 <?php } ?>
