@@ -473,7 +473,7 @@ if ($GLOBALS['ippf_specific']) {
     "LEFT JOIN list_options AS lo ON lo.list_id = 'ippfconmeth' AND lo.option_id = d1.field_value " .
     "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
     "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' AND " .
-    "d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1') " .
+    "(d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1')) " .
     "ORDER BY contrastart DESC LIMIT 1";
   $tmp = sqlQuery($query);
   if (!empty($tmp['contrastart'])) {
