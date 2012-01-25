@@ -204,13 +204,13 @@ function exportEncounter($pid, $encounter, $date) {
     }
     $fres = sqlStatement("SELECT f.form_id, fe.sensitivity, fe.referral_source, pc.pc_catname FROM forms f " .
       "INNER JOIN form_encounter fe on f.pid=fe.pid and f.encounter=fe.encounter " . 
-      "INNER JOIN openemr_postcalendar_categories pc on fe.pc_catid=pc.pc_catid " . 
+      "LEFT JOIN openemr_postcalendar_categories pc on fe.pc_catid=pc.pc_catid " . 
       "WHERE " .
       "f.pid = '$pid' AND " .
       "f.encounter = '$encounter' AND " .
       "f.formdir = 'newpatient' AND " .
       "f.deleted = 0 " .
-      "ORDER BY f.id");
+      "ORDER BY f.id LIMIT 1");
     // For each PE form in this encounter...
     while ($frow = sqlFetchArray($fres)) {
       $form_id = $frow['form_id'];
