@@ -93,6 +93,7 @@ function contraceptionClass($code_type, $code) {
 }
 *********************************************************************/
 
+/*********************************************************************
 // For Family Planning only.
 //
 function checkForContraception($code_type, $code) {
@@ -119,6 +120,51 @@ function checkForContraception($code_type, $code) {
         preg_match('/^122182999/'    , $relcode)
       ) {
         $contraception_found = true;
+      }
+    }
+  }
+}
+*********************************************************************/
+
+// This is called for each service in the visit to determine the IPPF code
+// of the service with highest CYP.
+//
+function checkForContraception($code_type, $code) {
+  global $code_types;
+  global $contraception_code, $contraception_cyp;
+
+  // This logic is only used for family planning clinics, and then only when
+  // the option is chosen to auto-generate Contraception forms.
+  if (!$GLOBALS['ippf_specific'] || $GLOBALS['gbl_new_acceptor_policy'] != '1') return;
+
+  $sql = "SELECT related_code FROM codes WHERE " .
+    "code_type = '" . $code_types[$code_type]['id'] .
+    "' AND code = '$code' LIMIT 1";
+  $codesrow = sqlQuery($sql);
+
+  if (!empty($codesrow['related_code']) && $code_type == 'MA') {
+    $relcodes = explode(';', $codesrow['related_code']);
+    foreach ($relcodes as $relstring) {
+      if ($relstring === '') continue;
+      list($reltype, $relcode) = explode(':', $relstring);
+      if ($reltype !== 'IPPF') continue;
+      if (
+        preg_match('/^11....110/'    , $relcode) ||
+        preg_match('/^11...[1-5]999/', $relcode) ||
+        preg_match('/^112152010/'    , $relcode) ||
+        preg_match('/^11317[1-2]111/', $relcode) ||
+        preg_match('/^12118[1-2].13/', $relcode) ||
+        preg_match('/^121181999/'    , $relcode) ||
+        preg_match('/^122182.13/'    , $relcode) ||
+        preg_match('/^122182999/'    , $relcode)
+      ) {
+        $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
+          "code_type = '11' AND code = '$relcode' LIMIT 1");
+        $cyp = 0 + $tmprow['cyp_factor'];
+        if ($cyp > $contraception_cyp) {
+          $contraception_cyp  = $cyp;
+          $contraception_code = $relcode;
+        }
       }
     }
   }
@@ -428,11 +474,16 @@ function insert_lbf_item($form_id, $field_id, $field_value) {
   return $form_id;
 }
 
-
-
+/*********************************************************************
 // This is just for Family Planning, to indicate if the visit includes
 // contraceptive services.
 $contraception_found = false;
+*********************************************************************/
+
+// These variables are used to compute the service with highest CYP.
+//
+$contraception_code = '';
+$contraception_cyp  = -1;
 
 // Possible units of measure for NDC drug quantities.
 //
@@ -680,6 +731,24 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
     }
   }
   *******************************************************************/
+
+  // More Family Planning stuff.
+  if (!empty($_POST['ippfconmeth'])) {
+    $newmauser   = $_POST['newmauser'];
+    $ippfconmeth = $_POST['ippfconmeth'];
+    // Add contraception form but only if it does not already exist
+    // (if it does, must be 2 users working on the visit concurrently).
+    $csrow = sqlQuery("SELECT COUNT(*) AS count FROM forms AS f WHERE " .
+      "f.pid = '$pid' AND f.encounter = '$encounter' AND " .
+      "f.formdir = 'LBFccicon' AND f.deleted = 0");
+    if ($csrow['count'] == 0) {
+      $newid = insert_lbf_item(0, 'newmauser', $newmauser);
+      insert_lbf_item($newid, 'newmethod', $ippfconmeth);
+      // Do we care about a service-specific provider here?
+      insert_lbf_item($newid, 'provider', $main_provid);
+      addForm($encounter, 'Contraception', $newid, 'LBFccicon', $pid, $userauthorized);
+    }
+  }
 
   // Note: Taxes are computed at checkout time (in pos_checkout.php which
   // also posts to SL).  Currently taxes with insurance claims make no sense,
@@ -1363,6 +1432,58 @@ if ($contraception_code && !$isBilled) {
   }
 }
 *********************************************************************/
+
+if ($contraception_code && !$isBilled) {
+  $csrow = sqlQuery("SELECT COUNT(*) AS count FROM forms AS f WHERE " .
+    "f.pid = '$pid' AND f.encounter = '$encounter' AND " .
+    "f.formdir = 'LBFccicon' AND f.deleted = 0");
+  // Do it only if a contraception form does not already exist for this visit.
+  // Otherwise assume that whoever created it knows what they were doing.
+  if ($csrow['count'] == 0) {
+    $date1 = substr($visit_row['date'], 0, 10);
+    $servicemeth = '';
+    // If surgical
+    if (preg_match('/^12/', $contraception_code)) {
+      // Identify the method with the IPPF code for the corresponding surgical procedure.
+      $servicemeth = substr($contraception_code, 0, 7) . '13';
+    }
+    else {
+      // Determine if this client ever started contraception with the MA.
+      // Even if only a method change, we assume they have.
+      /***************************************************************
+      // But this version would be used if method changes don't count.
+      $query = "SELECT f.form_id FROM forms AS f " .
+        "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
+        "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
+        "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
+        "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' AND " .
+        "(d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1')) " .
+        "ORDER BY fe.date DESC LIMIT 1";
+      ***************************************************************/
+      $query = "SELECT f.form_id FROM forms AS f " .
+        "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
+        "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' " .
+        "ORDER BY fe.date DESC LIMIT 1";
+      $csrow = sqlQuery($query);
+      if (empty($csrow)) {
+        // Identify the method with its IPPF code for Initial Consultation.
+        $servicemeth = substr($contraception_code, 0, 6) . '110';
+      }
+    }
+    if ($servicemeth) {
+      // Xavier confirms that the codes for Cervical Cap (112152010 and 112152011) are
+      // an unintended change in pattern, but at this point we have to live with it.
+      // -- Rod 2011-09-26
+      if ($servicemeth == '112152110') $servicemeth = '112152010';
+      echo "<select name='newmauser'>\n";
+      echo " <option value='1'>" . xl('First contraception at this clinic') . "</option>\n";
+      echo " <option value='0'>" . xl('Method change') . "</option>\n";
+      echo "</select>\n";
+      echo "<input type='hidden' name='ippfconmeth' value='$servicemeth'>\n";
+      echo "<p>&nbsp;\n";
+    }
+  }
+}
 
 // If there is a choice of warehouses, allow override of user default.
 if ($prod_lino > 0) { // if any products are in this form

@@ -1984,17 +1984,17 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 
 -- The following revised/added 2012-01-05:
 
-INSERT INTO list_options (list_id,option_id,title,seq,option_value) VALUES ('lbfnames','LBFccicon','Contraception Initial Consult',1,5);
+INSERT INTO list_options (list_id,option_id,title,seq,option_value) VALUES ('lbfnames','LBFccicon','Contraception',1,5);
 DELETE FROM layout_options WHERE form_id = 'LBFccicon';
-INSERT INTO layout_options VALUES ('LBFccicon', 'newmauser', '1', 'First at this clinic?',
+INSERT INTO layout_options VALUES ('LBFccicon', 'newmauser', '1', 'First contraceptive at this clinic?',
   1,  1, 2, 0, 0, 'boolean'    , 1, 3, '', '', 'Is this the first contraceptive accepted at this clinic?');
 INSERT INTO layout_options VALUES ('LBFccicon', 'curmethod', '1', 'Current Method',
-  2,  1, 2, 0, 0, 'ippfconmeth', 1, 3, '', '', 'Method in use at start of visit');
-INSERT INTO layout_options VALUES ('LBFccicon', 'pastmodern','1', 'Method used previously?',
+  2,  1, 1, 0, 0, 'contrameth' , 1, 3, '', '', 'Method in use at start of visit');
+INSERT INTO layout_options VALUES ('LBFccicon', 'pastmodern','1', 'Previous modern contraceptive use?',
   3,  1, 1, 0, 0, 'boolean'    , 1, 3, '', '', 'Was a modern contraceptive method used at some time in the past?');
 INSERT INTO layout_options VALUES ('LBFccicon', 'reqmethod', '1', 'Requested Method',
-  4,  1, 1, 0, 0, 'ippfconmeth', 1, 3, '', '', 'Method requested by the client');
-INSERT INTO layout_options VALUES ('LBFccicon', 'newmethod', '1', 'Method Adopted',
+  4,  1, 1, 0, 0, 'contrameth' , 1, 3, '', '', 'Method requested by the client');
+INSERT INTO layout_options VALUES ('LBFccicon', 'newmethod', '1', 'Adopted Method',
   5,  1, 1, 0, 0, 'ippfconmeth', 1, 3, '', '', 'Method adopted in this visit');
 INSERT INTO layout_options VALUES ('LBFccicon', 'provider' , '1', 'Service Provider',
   6, 10, 1, 0, 0, ''           , 1, 3, '', '', 'Provider of this initial consultation');

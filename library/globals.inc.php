@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2010-2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -362,6 +362,18 @@ $GLOBALS_METADATA = array(
       ),
       '0',                              // default
       xl('Activates custom work flow logic')
+    ),
+
+    'gbl_new_acceptor_policy' => array(
+      xl('New Acceptor Policy'),
+      array(
+        '0' => xl('Not applicable'),
+        '1' => xl('Simplified, contraception form not used'),
+        '2' => xl('Contraception form for local acceptors only'),
+        '3' => xl('Contraception form for all acceptors new to modern contraception'),
+      ),
+      '1',                              // default
+      xl('Applicable only for family planning clinics')
     ),
 
     'inhouse_pharmacy' => array(
