@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2008-2011 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2008-2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -464,7 +464,7 @@ if (!empty($form_submit)) {
       "ORDER BY billing_location DESC, id ASC LIMIT 1");
     $query = "SELECT DISTINCT " .
       "fe.pid, " .
-      "p.regdate, p.date AS last_update, p.contrastart, p.DOB, p.sex, " .
+      "p.regdate, p.date AS last_update, p.DOB, p.sex, " .
       "p.city, p.state, p.occupation, p.status, p.ethnoracial, " .
       "p.interpretter, p.monthly_income, p.referral_source, p.pricelevel, " .
       "p.userlist1, p.userlist3, p.userlist4, p.userlist5, " .
@@ -473,7 +473,7 @@ if (!empty($form_submit)) {
       "p.userlist2 AS education " .
       "FROM form_encounter AS fe " .
       "JOIN facility AS f ON f.id = fe.facility_id AND f.domain_identifier = '$sdpid' " .
-      "LEFT OUTER JOIN patient_data AS p ON p.pid = fe.pid WHERE " .
+      "JOIN patient_data AS p ON p.pid = fe.pid WHERE " .
       sprintf("fe.date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
       sprintf("fe.date <  '%04u-%02u-01 00:00:00'     ", $end_year, $end_month) .
       "ORDER BY fe.pid";
@@ -483,7 +483,7 @@ if (!empty($form_submit)) {
       "fe.facility_id, fe.pid, " .
       "f.name, f.street, f.city AS fac_city, f.state AS fac_state, f.postal_code, " .
       "f.country_code, f.federal_ein, f.domain_identifier, f.pos_code, f.latitude, f.longitude, " .
-      "p.regdate, p.date AS last_update, p.contrastart, p.DOB, p.sex, " .
+      "p.regdate, p.date AS last_update, p.DOB, p.sex, " .
       "p.city, p.state, p.occupation, p.status, p.ethnoracial, " .
       "p.interpretter, p.monthly_income, p.referral_source, p.pricelevel, " .
       "p.userlist1, p.userlist3, p.userlist4, p.userlist5, " .
@@ -492,7 +492,7 @@ if (!empty($form_submit)) {
       "p.userlist2 AS education " .
       "FROM form_encounter AS fe " .
       "LEFT OUTER JOIN facility AS f ON f.id = fe.facility_id " .
-      "LEFT OUTER JOIN patient_data AS p ON p.pid = fe.pid WHERE " .
+      "JOIN patient_data AS p ON p.pid = fe.pid WHERE " .
       sprintf("fe.date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
       sprintf("fe.date <  '%04u-%02u-01 00:00:00'     ", $end_year, $end_month) .
       "ORDER BY fe.facility_id, fe.pid";
@@ -504,7 +504,7 @@ if (!empty($form_submit)) {
       "ORDER BY billing_location DESC, id ASC LIMIT 1");
     $query = "SELECT DISTINCT " .
       "fe.pid, " .
-      "p.regdate, p.date AS last_update, p.contrastart, p.DOB, p.sex, " .
+      "p.regdate, p.date AS last_update, p.DOB, p.sex, " .
       "p.city, p.state, p.occupation, p.status, p.ethnoracial, " .
       "p.interpretter, p.monthly_income, p.referral_source, p.pricelevel, " .
       "p.userlist1, p.userlist3, p.userlist4, p.userlist5, " .
@@ -512,7 +512,7 @@ if (!empty($form_submit)) {
       "p.usertext16, p.usertext17, p.usertext18, p.usertext19, p.usertext20, " .
       "p.userlist2 AS education " .
       "FROM form_encounter AS fe " .
-      "LEFT OUTER JOIN patient_data AS p ON p.pid = fe.pid WHERE " .
+      "JOIN patient_data AS p ON p.pid = fe.pid WHERE " .
       sprintf("fe.date >= '%04u-%02u-01 00:00:00' AND ", $beg_year, $beg_month) .
       sprintf("fe.date < '%04u-%02u-01 00:00:00' ", $end_year, $end_month) .
       "ORDER BY fe.pid";
@@ -552,11 +552,13 @@ if (!empty($form_submit)) {
 
     $education = mappedOption('userlist2', $row['education']);
 
+    /*****************************************************************
     // Get most recent contraceptive issue.
     $crow = sqlQuery("SELECT l.begdate, c.new_method " .
       "FROM lists AS l, lists_ippf_con AS c WHERE " .
       "l.pid = '$last_pid' AND c.id = l.id " .
       "ORDER BY l.begdate DESC LIMIT 1");
+    *****************************************************************/
 
     // Get obstetric and abortion data from most recent static history.
     $hrow = sqlQuery("SELECT date, " .
@@ -570,6 +572,8 @@ if (!empty($form_submit)) {
     Add('emrClientId'     , $row['pid']);
     Add('RegisteredOn'    , xmlTime($row['regdate']));
     Add('LastUpdated'     , xmlTime($row['last_update']));
+
+    /*****************************************************************
     Add('NewAcceptorDate' , xmlTime($row['contrastart']));
 
     if (!$msi_specific) {
@@ -582,6 +586,40 @@ if (!empty($form_submit)) {
       }
       Add('CurrentMethod', $methodid);
     }
+    *****************************************************************/
+
+    if (!$msi_specific) {
+      // Get New Acceptor date, and also the method in case someone wants it later.
+      $query = "SELECT " .
+        "fe.date AS contrastart, d1.field_value AS contrameth " .
+        "FROM forms AS f " .
+        "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
+        "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
+        "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
+        "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$last_pid' AND " .
+        "(d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1')) " .
+        "ORDER BY contrastart DESC LIMIT 1";
+      $contradate_row = sqlQuery($query);
+
+      Add('NewAcceptorDate' , xmlTime($contradate_row['contrastart']));
+
+      // Get the current contraceptive method. This is not necessarily the method
+      // on the start date.
+      $query = "SELECT " .
+        "fe.date AS contrastart, d1.field_value AS contrameth " .
+        "FROM forms AS f " .
+        "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
+        "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
+        "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$last_pid' " .
+        "ORDER BY contrastart DESC LIMIT 1";
+      $contrameth_row = sqlQuery($query);
+
+      $methodid = '';
+      if (!empty($contrameth_row['contrameth'])) {
+        $methodid = mappedOption('ippfconmeth', $contrameth_row['contrameth']);
+      }
+      Add('CurrentMethod', $methodid);
+    }
 
     Add('Dob'        , xmlTime($row['DOB']));
     Add('DobType'    , "rel"); // rel=real, est=estimated
@@ -590,7 +628,7 @@ if (!empty($form_submit)) {
       // Add('Education', describedOption('Education', $education, ''));
       // Add('Sex'      , Sex($row['sex']));
       // AddIfPresent('WarSubCity', $row['state']);
-      Add('Education', describedOption('Education', $education, ''));
+      Add('Education', $education);
       Add('Demo5'    , Sex($row['sex']));
       AddIfPresent('State', $row['state']);
     }
@@ -686,6 +724,23 @@ if (!empty($form_submit)) {
   // This is the "filename" for the Content-Disposition header.
   $filename = 'export.xml';
 
+  // Do compression if requested.
+  if (!empty($_POST['form_compress'])) {
+    $zip = new ZipArchive();
+    $zipname = tempnam($GLOBALS['temporary_files_dir'], 'OEZ');
+    if ($zipname === FALSE) {
+      die("tempnam('" . $GLOBALS['temporary_files_dir'] . "','OEZ') failed.\n");
+    }
+    if ($zip->open($zipname, ZIPARCHIVE::OVERWRITE) !== TRUE) {
+      die(xl('Cannot create file') . " '$zipname'\n");
+    }
+    $zip->addFromString($filename, $out);
+    $zip->close();
+    $out = file_get_contents($zipname);
+    unlink($zipname);
+    $filename .= '.zip';
+  }
+
   // Do encryption if requested.
   if (!empty($_POST['form_encrypt'])) {
     $filename .= '.aes';
@@ -747,7 +802,7 @@ if ($selmonth < 1) {
 &nbsp;<br />
 <form method='post' action='ippf_export.php'>
 
-<table style='width:30em'>
+<table style='width:95%'>
  <tr>
   <td align='center'>
    <?php echo xl('Month'); ?>:
@@ -780,11 +835,16 @@ while ($frow = sqlFetchArray($fres)) {
    </select>
 <?php } ?>
 
-<?php if ($msi_specific || !empty($GLOBALS['gbl_encryption_key'])) { ?>
+   &nbsp;
+   <input type='checkbox' name='form_compress'
+    title='<?php echo xl('To compress in ZIP archive format'); ?>'
+    /><?php echo xl('Compress'); ?>
+
+<?php if (function_exists('openssl_encrypt') && ($msi_specific || !empty($GLOBALS['gbl_encryption_key']))) { ?>
    &nbsp;
    <input type='checkbox' name='form_encrypt'
-    title='<?php echo xl('If AES encryption is desired'); ?>' />
-   <?php echo xl('Encypt'); ?>
+    title='<?php echo xl('If AES encryption is desired'); ?>'
+    /><?php echo xl('Encypt'); ?>
 <?php } ?>
 
    &nbsp;

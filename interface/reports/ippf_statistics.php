@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2008-2011 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2008-2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -39,7 +39,7 @@ if ($report_type == 'm') {
     102 => xl('Specific Service'),
     // 6   => xl('Contraceptive Method'),
     // 104 => xl('Specific Contraceptive Service');
-    17  => xl('Patient'),
+    17  => xl('Clients who had a visit'),
     9   => xl('Outbound Internal Referrals'),
     10  => xl('Outbound External Referrals'),
     14  => xl('Inbound Internal Referrals'),
@@ -627,12 +627,6 @@ function process_ippf_code($row, $code, $quantity=1) {
     }
   }
 
-  // Patient Name.
-  //
-  else if ($form_by === '17') {
-    $key = $row['lname'] . ', ' . $row['fname'] . ' ' . $row['mname'];
-  }
-
   else {
     return; // no match, so do nothing
   }
@@ -673,6 +667,12 @@ function process_ma_code($row) {
     $key = $arr_content[$form_content];
   }
 
+  // Patient Name.
+  //
+  else if ($form_by === '17') {
+    $key = $row['lname'] . ', ' . $row['fname'] . ' ' . $row['mname'];
+  }
+
   else {
     return;
   }
@@ -708,9 +708,7 @@ function LBFgcac_title($form_id, $field_id, $list_id) {
 // This is called for each encounter that is selected.
 //
 function process_visit($row) {
-  global $form_by;
-
-  if ($form_by !== '7' && $form_by !== '11') return;
+  global $form_by, $form_content;
 
   // New contraceptive method following abortion.  These should only be
   // present for inbound referrals.
@@ -753,7 +751,13 @@ function process_visit($row) {
     }
   }
 
-  // loadColumnData() already done as needed.
+  // Patient Name.
+  //
+  else if ($form_by === '17') {
+    $key = $row['lname'] . ', ' . $row['fname'] . ' ' . $row['mname'];
+    // If content is services then quantity = 0 because a visit is not a service.
+    loadColumnData($key, $row, $form_content == 1 ? 0 : 1);
+  }
 }
 
 // This is called for each selected referral.
