@@ -64,6 +64,19 @@ function _LBFccicon_contraception_scan($code_type, $code, $provider) {
 function LBFccicon_javascript() {
   global $formid;
 
+  // Create an associative array of contrameth mapping values.  These are regex
+  // patterns used to match ippfconmeth list items with contrameth list items.
+  echo "var contraMapping = new Object();\n";
+  $res = sqlStatement("SELECT option_id, mapping FROM list_options WHERE " .
+    "list_id = 'contrameth' ORDER BY seq, title");
+  while ($row = sqlFetchArray($res)) {
+    $i = strpos($row['mapping'], ':');
+    if ($i !== FALSE) {
+      echo "contraMapping['" . $row['option_id'] . "'] = '" .
+        substr($row['mapping'], $i + 1) . "'\n";
+    }
+  }
+
   echo "
 // Respond to selection of a current method.
 // If None, ask if a modern method was used anywhere before.
@@ -72,11 +85,17 @@ function current_method_changed() {
  var f = document.forms[0];
  f.form_pastmodern.disabled = true;
  f.form_mcreason.disabled = true;
- if (f.form_curmethod.selectedIndex <= 0) {
-  f.form_pastmodern.disabled = false;
+ if (f.form_curmethod.selectedIndex <= 0 || f.form_curmethod.value == 'no') {
+  // Enable past use question iff no modern current method and only if the
+  // global option is set to record all acceptors new to modern contraception.
+  f.form_pastmodern.disabled = " . ($GLOBALS['gbl_new_acceptor_policy'] == '3' ? 'false' : 'true') . ";
  }
  else {
-  if (f.form_curmethod.selectedIndex != f.form_newmethod.selectedIndex) {
+  // Here there is a current modern method.  Use its regex pattern to decide if
+  // the new method is different.  If so, enable the reason for change selector.
+  // The pattern should not be missing, but we also enable in that case.
+  var pattern = contraMapping[f.form_curmethod.value];
+  if (!(pattern && f.form_newmethod.value.match('^' + pattern))) {
    f.form_mcreason.disabled = false;
   }
  }
@@ -118,7 +137,11 @@ function LBFccicon_javascript_onload() {
   }
 
   // Normalize the IPPF service code to what we use in our list of methods.
+
+  $newdisabled = 'false';
   if (!empty($contraception_code)) {
+    // A contraception service exists, so will not ask for it or the provider here.
+    $newdisabled = 'true';
     if (preg_match('/^12/', $contraception_code)) { // surgical methods
       // Identify the method with the IPPF code for the corresponding surgical procedure.
       $contraception_code = substr($contraception_code, 0, 7) . '13';
@@ -139,7 +162,7 @@ var sel;
 current_method_changed();
 
 sel = f.form_newmethod;
-sel.disabled = true;
+sel.disabled = $newdisabled;
 for (var i = 0; i < sel.options.length; ++i) {
  if (sel.options[i].value == '$contraception_code') {
   sel.selectedIndex = i;
@@ -148,7 +171,7 @@ for (var i = 0; i < sel.options.length; ++i) {
 }
 
 sel = f.form_provider;
-sel.disabled = true;
+sel.disabled = $newdisabled;
 for (var i = 0; i < sel.options.length; ++i) {
  if (sel.options[i].value == '$contraception_prov') {
   sel.selectedIndex = i;
@@ -157,6 +180,7 @@ for (var i = 0; i < sel.options.length; ++i) {
 }
 
 f.form_curmethod.onchange = function () { current_method_changed(); };
+f.form_newmethod.onchange = function () { current_method_changed(); };
 f.onsubmit = function () { return mysubmit(); };
 ";
 }
