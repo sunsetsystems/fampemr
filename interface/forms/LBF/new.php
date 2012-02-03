@@ -24,11 +24,10 @@ if (! $encounter) { // comes from globals.php
 function end_cell() {
   global $item_count, $cell_count, $historical_ids;
   if ($item_count > 0) {
-    echo "</td>";
+    echo "&nbsp;</td>";
 
-    // NEW:
     foreach ($historical_ids as $key => $dummy) {
-      $historical_ids[$key] .= "</td>";
+      $historical_ids[$key] .= "&nbsp;</td>";
     }
 
     $item_count = 0;
@@ -41,17 +40,13 @@ function end_row() {
   if ($cell_count > 0) {
     for (; $cell_count < $CPR; ++$cell_count) {
       echo "<td></td>";
-      // NEW:
       foreach ($historical_ids as $key => $dummy) {
         $historical_ids[$key] .= "<td></td>";
       }
     }
-
-    // NEW:
     foreach ($historical_ids as $key => $dummy) {
       echo $historical_ids[$key];
     }
-
     echo "</tr>\n";
     $cell_count = 0;
   }
@@ -126,13 +121,11 @@ if ($_POST['bn_save']) {
 
   // Support custom behavior at save time, such as going to another form.
   if (function_exists($formname . '_save_exit')) {
-    call_user_func($formname . '_save_exit');
+    if (call_user_func($formname . '_save_exit')) exit;
   }
-  else {
-    formHeader("Redirecting....");
-    formJump();
-    formFooter();
-  }
+  formHeader("Redirecting....");
+  formJump();
+  formFooter();
   exit;
 }
 
@@ -294,8 +287,7 @@ function sel_related() {
         echo " /><b>" . xl_layout_label($group_name) . "</b></span>\n";
         echo "<div id='div_$group_seq' class='section' style='display:$display_style;'>\n";
       }
-      // echo " <table border='0' cellpadding='0' width='100%'>\n";
-      echo " <table border='0' cellpadding='0'>\n";
+      echo " <table border='0' cellspacing='0' cellpadding='1'>\n";
       $display_style = 'none';
 
       // Initialize historical data array and write date headers.
@@ -304,7 +296,7 @@ function sel_related() {
         echo " <tr>";
         echo "<td colspan='$CPR' align='right' class='bold'>";
         echo htmlspecialchars(xl('Current'));
-        echo "</td>\n";
+        echo "&nbsp;</td>\n";
         $hres = sqlStatement("SELECT f.form_id, fe.date " .
           "FROM forms AS f, form_encounter AS fe WHERE " .
           "f.pid = '$pid' AND f.formdir = '$formname' AND " .
@@ -316,9 +308,14 @@ function sel_related() {
         // We sort these sensibly, however only the encounter date is shown here;
         // at some point we may wish to show also the data entry date/time.
         while ($hrow = sqlFetchArray($hres)) {
+          echo "<td colspan='$CPR' align='right' class='bold' style='";
+          echo "border-top:1px solid black;";
+          echo "border-right:1px solid black;";
+          echo "border-bottom:1px solid black;";
+          if (empty($historical_ids)) echo "border-left:1px solid black;";
+          echo "'>" .
+            oeFormatShortDate(substr($hrow['date'], 0, 10)) . "&nbsp;</td>\n";
           $historical_ids[$hrow['form_id']] = '';
-          echo "<td colspan='$CPR' align='right' class='bold'>&nbsp;" .
-            oeFormatShortDate(substr($hrow['date'], 0, 10)) . "</td>\n";
         }
         echo " </tr>";
       }
@@ -329,7 +326,7 @@ function sel_related() {
     if (($titlecols > 0 && $cell_count >= $CPR) || $cell_count == 0) {
       end_row();
       echo " <tr>";
-      // NEW: Clear historical data string.
+      // Clear historical data string.
       foreach ($historical_ids as $key => $dummy) {
         $historical_ids[$key] = '';
       }
@@ -337,10 +334,11 @@ function sel_related() {
 
     if ($item_count == 0 && $titlecols == 0) $titlecols = 1;
 
+    $leftborder = true;
+
     // Handle starting of a new label cell.
     if ($titlecols > 0) {
       end_cell();
-      // echo "<td valign='top' colspan='$titlecols' width='1%' nowrap";
       echo "<td valign='top' colspan='$titlecols' nowrap";
       echo " class='";
       echo ($frow['uor'] == 2) ? "required" : "bold";
@@ -350,10 +348,13 @@ function sel_related() {
       if ($graphable) echo " id='$field_id'";
       echo ">";
 
-      // NEW:
       foreach ($historical_ids as $key => $dummy) {
-        // $historical_ids[$key] .= "<td valign='top' colspan='$titlecols' class='text' width='1%' nowrap>";
-        $historical_ids[$key] .= "<td valign='top' colspan='$titlecols' class='text' nowrap>";
+        $historical_ids[$key] .= "<td valign='top' colspan='$titlecols' class='text' style='";
+        $historical_ids[$key] .= "border-bottom:1px solid black;";
+        if ($leftborder) $historical_ids[$key] .= "border-left:1px solid black;";
+        if (!$datacols ) $historical_ids[$key] .= "border-right:1px solid black;";
+        $historical_ids[$key] .= "' nowrap>";
+        $leftborder = false;
       }
 
       $cell_count += $titlecols;
@@ -373,9 +374,13 @@ function sel_related() {
       if ($cell_count > 0) echo " style='padding-left:5pt'";
       echo ">";
 
-      // NEW:
       foreach ($historical_ids as $key => $dummy) {
-        $historical_ids[$key] .= "<td valign='top' align='right' colspan='$datacols' class='text'>";
+        $historical_ids[$key] .= "<td valign='top' align='right' colspan='$datacols' class='text' style='";
+        $historical_ids[$key] .= "border-bottom:1px solid black;";
+        $historical_ids[$key] .= "border-right:1px solid black;";
+        if ($leftborder) $historical_ids[$key] .= "border-left:1px solid black;";
+        $historical_ids[$key] .= "'>";
+        $leftborder = false;
       }
 
       $cell_count += $datacols;
@@ -388,7 +393,7 @@ function sel_related() {
     else
       generate_form_field($frow, $currvalue);
 
-    // NEW: Append to historical data of other dates for this item.
+    // Append to historical data of other dates for this item.
     foreach ($historical_ids as $key => $dummy) {
       $hvrow = sqlQuery("SELECT field_value FROM lbf_data WHERE " .
         "form_id = '$key' AND field_id = '$field_id'");
@@ -403,12 +408,17 @@ function sel_related() {
 
 <p style='text-align:center'>
 <input type='submit' name='bn_save' value='<?php xl('Save','e') ?>' />
+<?php
+if (function_exists($formname . '_additional_buttons')) {
+  // Allow the plug-in to insert more action buttons here.
+  call_user_func($formname . '_additional_buttons');
+}
+?>
 &nbsp;
 <input type='button' value='<?php xl('Cancel','e') ?>' onclick="top.restoreSession();location='<?php echo $GLOBALS['form_exit_url']; ?>'" />
 &nbsp;
 <?php if ($form_is_graphable) { ?>
 <input type='button' value='<?php xl('Show Graph','e') ?>' onclick="top.restoreSession();location='../../patient_file/encounter/trend_form.php?formname=<?php echo $formname; ?>'" />
-&nbsp;
 <?php } ?>
 </p>
 

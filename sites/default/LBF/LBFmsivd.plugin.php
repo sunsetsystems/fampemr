@@ -28,5 +28,6 @@ function LBFmsivd_save_exit() {
   // it to have a red Save button and to load the Checkout form at save time.
   formJump("{$GLOBALS['rootdir']}/patient_file/encounter/load_form.php?formname=fee_sheet&rde=1");
   formFooter();
+  return true;
 }
 ?>

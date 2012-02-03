@@ -184,4 +184,25 @@ f.form_newmethod.onchange = function () { current_method_changed(); };
 f.onsubmit = function () { return mysubmit(); };
 ";
 }
+
+// This function generates HTML to go after the Save button.
+//
+function LBFccicon_additional_buttons() {
+  global $formid, $pid, $encounter;
+  echo "<input type='submit' name='bn_save' " .
+    "value='" . xl('Save and Tally Sheet') . "' />\n";
+}
+
+// Custom logic to run at end of save handler.
+// In this case we redirect to the Tally Sheet.
+//
+function LBFccicon_save_exit() {
+  if ($_POST['bn_save'] == xl('Save and Tally Sheet')) {
+    formJump("{$GLOBALS['rootdir']}/patient_file/encounter/load_form.php?formname=fee_sheet");
+    formFooter();
+    return true;
+  }
+  return false;
+}
+
 ?>
