@@ -355,10 +355,11 @@ $res = sqlStatement($query);
 if ($res) {
   $lastdocname = "";
   $doc_encounters = 0;
+  $total_encounters = 0;
   while ($row = sqlFetchArray($res)) {
     $patient_id = $row['pid'];
 
-    $docname = '';
+    $docname = '-- ' . xl('Unassigned') . ' --';
     if (!empty($row['ulname']) || !empty($row['ufname'])) {
       $docname = $row['ulname'];
       if (!empty($row['ufname']) || !empty($row['umname']))
@@ -441,10 +442,16 @@ if ($res) {
       }
       ++$doc_encounters;
     }
+    ++$total_encounters;
     $lastdocname = $docname;
   }
 
   if (!$form_details) show_doc_total($lastdocname, $doc_encounters);
+
+  echo " <tr>\n";
+  echo "  <td class='detail'>-- " . xl('Total') . " --</td>\n";
+  echo "  <td class='detail' align='right'>$total_encounters</td>\n";
+  echo " </tr>\n";
 }
 ?>
 </tbody>
