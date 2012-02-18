@@ -26,18 +26,25 @@ $to_date       = fixDate($_POST['form_to_date'], date('Y-m-d'));
 $form_by_arr   = $_POST['form_by'];     // this is an array
 $form_show     = $_POST['form_show'];   // this is an array
 $form_facility = isset($_POST['form_facility']) ? $_POST['form_facility'] : '';
-$form_sexes    = isset($_POST['form_sexes']) ? $_POST['form_sexes'] : '3';
+$form_sexes    = isset($_POST['form_sexes']) ? $_POST['form_sexes'] : '4';
 $form_content  = isset($_POST['form_content']) ? $_POST['form_content'] : '1';
 $form_output   = isset($_POST['form_output']) ? 0 + $_POST['form_output'] : 1;
 
-// One of these is chosen as the left column, or Y-axis, of the report.
+// Clinics: 0=Combined, 1=Detail
+$form_clinics  = isset($_POST['form_clinics']) ? 0 + $_POST['form_clinics'] : 0;
+
+// Periods: 0=None, 1=Months, 2=Quarters, 3=Years.
+$form_periods  = isset($_POST['form_periods']) ? 0 + $_POST['form_periods'] : 0;
+
+// One or more of these are chosen as the left column, or Y-axis, of the report.
 //
 if ($report_type == 'm') {
   $report_title = xl('Member Association Statistics Report');
   $arr_by = array(
     101 => xl('MA Category'),
     102 => xl('Specific Service'),
-    // 6   => xl('Contraceptive Method'),
+    6   => xl('Contraceptive Method'),        // reactivated 2/2012 same as in ippf report
+    105 => xl('Contraceptive Products'),      // new on 2/2012
     // 104 => xl('Specific Contraceptive Service');
     17  => xl('Clients who had a visit'),
     9   => xl('Outbound Internal Referrals'),
@@ -51,7 +58,8 @@ if ($report_type == 'm') {
     1 => xl('Services'),
     2 => xl('Unique Clients'),
     4 => xl('Unique New Clients'),
-    // 5 => xl('Contraceptive Products'),
+    6 => xl('Acceptors New to Modern Contraception'), // new on 2/2012
+    5 => xl('Contraceptive Products'),                // reactivated 2/2012
   );
   $arr_report = array(
     // Items are content|row|column|column|...
@@ -106,11 +114,62 @@ else {
   );
 }
 
+// Default Rows selection is just the first one in the list.
 if (empty($form_by_arr)) {
   $tmp = array_keys($arr_by);
   $form_by_arr = array($tmp[0]);
 }
+// Default Columns selection, don't understand this, should be array('.total') instead?
 if (empty($form_show)) $form_show = array('1');
+
+// This sets up the array of date periods for which detail is wanted.
+// Key is the period start date, value is the column header.
+// There is a final entry for totals with an empty string as its key,
+// and that is the only entry if no period detail is wanted.
+//
+$arr_periods = array();
+$arr_months = array(xl('Jan'),xl('Feb'),xl('Mar'),xl('Apr'),xl('May'),
+  xl('Jun'),xl('Jul'),xl('Aug'),xl('Sep'),xl('Oct'),xl('Nov'),xl('Dec'));
+$arr_quarters = array(xl('1st'),xl('2nd'),xl('3rd'),xl('4th'));
+$i = 0;
+if ($form_periods) {
+  $date1 = $from_date;
+  while ($date1 <= $to_date) {
+    $date1yy = substr($date1, 0, 4);
+    $date1mm = substr($date1, 5, 2);
+    $date1dd = substr($date1, 8, 2);
+    if ($form_periods == '1') { // Months
+      $arr_periods[$date1] = $arr_months[$date1mm - 1];
+      if (++$date1mm > 12) {
+        ++$date1yy;
+        $date1mm = '01';
+      }
+    }
+    else if ($form_periods == '2') {        // Quarters
+      $date1qq = (int)(($date1mm - 1) / 3); // Quarter number 0-3
+      $arr_periods[$date1] = $arr_quarters[$date1qq];
+      $date1mm = ($date1qq + 1) * 3 + 1;
+      if ($date1mm > 12) {
+        ++$date1yy;
+        $date1mm = '01';
+      }
+    }
+    else { // Years
+      $arr_periods[$date1] = $date1yy;
+      ++$date1yy;
+      $date1mm = '01';
+    }
+    $date1dd = '01';
+    $date1 = sprintf('%04d-%02d-%02d', $date1yy, $date1mm, $date1dd);
+    if (++$i > 100) die("Too many periods from '$from_date' to '$to_date', stopping at '$date1'"); // debugging
+  }
+}
+$arr_periods[''] = xl('Total');
+
+// Array of clinic headers.  This will be built dynamically if needed.
+// Key is clinic (facility) ID, value is clinic name.
+//
+// $arr_clinics = array('' => xl('Total'));
 
 // Compute age in years given a DOB and "as of" date.
 //
@@ -178,10 +237,12 @@ function genHeadCell($data, $align='left', $colspan=1) {
 
 // Create an HTML table cell containing a numeric value, and track totals.
 //
-function genNumCell($num, $cnum) {
+function genNumCell($num, $cnum, $clikey) {
   global $atotals, $asubtotals, $form_output;
-  $atotals[$cnum] += $num;
-  $asubtotals[$cnum] += $num;
+  if (!$clikey) {
+    $atotals[$cnum] += $num;
+    $asubtotals[$cnum] += $num;
+  }
   if (empty($num) && $form_output != 3) $num = '&nbsp;';
   genAnyCell($num, 'right', 'detail');
 }
@@ -191,7 +252,7 @@ function genNumCell($num, $cnum) {
 //
 function getContraceptiveMethod($code) {
   global $contra_group_name;
-  $contra_group_name = '';
+  $contra_group_name = '00000 ' . xl('No Group');
   $key = '';
   /*******************************************************************
   if (preg_match('/^111101/', $code)) {
@@ -244,7 +305,7 @@ function getContraceptiveMethod($code) {
   if (!empty($row['title'])) {
     $key = $row['title'];
     if (!empty($row['mapping'])) {
-      $contra_group_name = $row['mapping'];
+      $contra_group_name = substr($code, 0, 5) . ' ' . $row['mapping'];
     }
   }
   /******************************************************************/
@@ -395,14 +456,72 @@ function getGcacClientStatus($row) {
   return xl('Indeterminate');
 }
 
+// For a given clinic (or '' for clinic totals) this sets up the empty
+// accumulators for each needed period and for the total of all periods.
+// Or if that is already done for the clinic, no action is taken.
+//
+function needClinicArray($key, $clinicid) {
+  global $areport, $arr_clinics, $arr_periods, $arr_show;
+  // if (empty($arr_clinics[$key1])) {
+  //   $row = sqlQuery("SELECT name FROM facility WHERE id = '$key1'");
+  //   $name = empty($row['name']) ? 'Unknown' : $row['name'];
+  //   $arr_clinics[$key1] = $name;
+  // }
+  if (!empty($areport[$key]['.dtl'][$clinicid])) return;
+  $areport[$key]['.dtl'][$clinicid] = array();
+  foreach ($arr_periods as $pdate => $dummy) {
+    $areport[$key]['.dtl'][$clinicid][$pdate] = array();
+    $areport[$key]['.dtl'][$clinicid][$pdate]['.wom'] = 0;       // number of services for women
+    $areport[$key]['.dtl'][$clinicid][$pdate]['.men'] = 0;       // number of services for men
+    $areport[$key]['.dtl'][$clinicid][$pdate]['.age2'] = array(0,0);               // age array
+    $areport[$key]['.dtl'][$clinicid][$pdate]['.age9'] = array(0,0,0,0,0,0,0,0,0); // age array
+    foreach ($arr_show as $askey => $dummy) {
+      if (substr($askey, 0, 1) == '.') continue;
+      $areport[$key]['.dtl'][$clinicid][$pdate][$askey] = array();
+    }
+  }
+}
+
+// For a given clinic (or '' for clinic totals) and period (or '' for period totals)
+// increment the corresponding counters in the $areport array.  Make new clinic
+// sub-arrays and $arr_titles entries as needed.
+//
+function accumClinicPeriod($key, $row, $quantity, $clikey, $perkey) {
+  global $areport, $arr_titles, $arr_show;
+
+  needClinicArray($key, $clikey);
+
+  // Increment the correct sex category.
+  if (strcasecmp($row['sex'], 'Male') == 0)
+    $areport[$key]['.dtl'][$clikey][$perkey]['.men'] += $quantity;
+  else
+    $areport[$key]['.dtl'][$clikey][$perkey]['.wom'] += $quantity;
+
+  // Increment the correct age categories.
+  $age = getAge(fixDate($row['DOB']), $row['encdate']);
+  $i = min(intval(($age - 5) / 5), 8);
+  if ($age < 10) $i = 0;
+  $areport[$key]['.dtl'][$clikey][$perkey]['.age9'][$i] += $quantity;
+  $i = $age < 25 ? 0 : 1;
+  $areport[$key]['.dtl'][$clikey][$perkey]['.age2'][$i] += $quantity;
+
+  foreach ($arr_show as $askey => $dummy) {
+    if (substr($askey, 0, 1) == '.') continue;
+    $status = empty($row[$askey]) ? 'Unspecified' : $row[$askey];
+    $areport[$key]['.dtl'][$clikey][$perkey][$askey][$status] += $quantity;
+    $arr_titles[$askey][$status] = 1;
+  }
+}
+
 // Helper function called after the reporting key is determined for a row.
 //
 function loadColumnData($key, $row, $quantity=1) {
   global $areport, $arr_titles, $form_content, $from_date, $to_date, $arr_show;
+  global $form_clinics, $form_periods, $arr_periods;
 
   // If we are counting new acceptors, then this must be a report of contraceptive
   // methods and a contraceptive start date is provided.
-  if ($form_content == '3') {
+  if ($form_content == '3' || $form_content == '6') {
     if (empty($row['contrastart'])) return;
   }
 
@@ -417,26 +536,42 @@ function loadColumnData($key, $row, $quantity=1) {
   if (empty($areport[$key])) {
     $areport[$key] = array();
     $areport[$key]['.prp'] = 0;       // previous pid
-    $areport[$key]['.wom'] = 0;       // number of services for women
-    $areport[$key]['.men'] = 0;       // number of services for men
-    $areport[$key]['.age2'] = array(0,0);               // age array
-    $areport[$key]['.age9'] = array(0,0,0,0,0,0,0,0,0); // age array
-    foreach ($arr_show as $askey => $dummy) {
-      if (substr($askey, 0, 1) == '.') continue;
-      $areport[$key][$askey] = array();
-    }
+    $areport[$key]['.dtl'] = array();
   }
 
   // If we are counting unique clients, new acceptors or new clients, then
   // require a unique patient.
-  if ($form_content == '2' || $form_content == '3' || $form_content == '4') {
+  if ($form_content == '2' || $form_content == '3' || $form_content == '4' || $form_content == '6') {
     if ($row['pid'] == $areport[$key]['.prp']) return;
   }
 
   // Flag this patient as having been encountered for this report row.
-  // $areport[$key]['prp'] = $row['pid'];
   $areport[$key]['.prp'] = $row['pid'];
 
+  // Increment the appropriate accumulators in the report array.
+  $encdate = $row['encdate'];
+  if (empty($encdate)) $encdate = $row['sale_date'];
+  accumClinicPeriod($key, $row, $quantity, '', '');
+  $perkey = '';
+  if ($form_periods) {
+    foreach ($arr_periods as $pdate => $dummy) {
+      if (!$perkey || ($pdate && $pdate <= $row['encdate'])) {
+        $perkey = $pdate;
+      }
+    }
+    if ($perkey) accumClinicPeriod($key, $row, $quantity, '', $perkey);
+  }
+  if ($form_clinics) {
+    // Clinic ID of -1 indicates no facility is associated.
+    // That should not happen but undoubtedly will.
+    $clikey = empty($row['facility_id']) ? '-1' : $row['facility_id'];
+    accumClinicPeriod($key, $row, $quantity, $clikey, '');
+    if ($form_periods) {
+      accumClinicPeriod($key, $row, $quantity, $clikey, $perkey);
+    }
+  }
+
+  /*******************************************************************
   // Increment the correct sex category.
   if (strcasecmp($row['sex'], 'Male') == 0)
     $areport[$key]['.men'] += $quantity;
@@ -457,12 +592,13 @@ function loadColumnData($key, $row, $quantity=1) {
     $areport[$key][$askey][$status] += $quantity;
     $arr_titles[$askey][$status] += $quantity;
   }
+  *******************************************************************/
 }
 
 // This is called for each IPPF service code that is selected.
 //
 function process_ippf_code($row, $code, $quantity=1) {
-  global $areport, $arr_titles, $form_by, $form_content, $contra_group_name;
+  global $form_by, $form_content, $contra_group_name;
 
   $key = 'Unspecified';
 
@@ -638,9 +774,10 @@ function process_ippf_code($row, $code, $quantity=1) {
 
 // This is called for each MA service code that is selected.
 //
-function process_ma_code($row) {
+function process_ma_code($row, $code='', $quantity=1) {
   global $form_by, $arr_content, $form_content;
 
+  if ($code === '') $code = $row['code'];
   $key = 'Unspecified';
 
   // One row for each service category.
@@ -652,7 +789,7 @@ function process_ma_code($row) {
   // Specific Services. One row for each MA code.
   //
   else if ($form_by === '102') {
-    $key = $row['code'];
+    $key = $code;
   }
 
   // One row for each referral source.
@@ -677,7 +814,7 @@ function process_ma_code($row) {
     return;
   }
 
-  loadColumnData($key, $row);
+  loadColumnData($key, $row, $quantity);
 }
 
 function LBFgcac_query($pid, $encounter, $name) {
@@ -816,11 +953,14 @@ function uses_description($form_by) {
 
 function writeSubtotals($last_group, &$asubtotals, $form_by) {
   if ($last_group) {
+    if (preg_match('/^(\d\d\d\d\d) (.*)/', $last_group, $tmp)) {
+      $last_group = $tmp[2] . ' - ' . $tmp[1];
+    }
     genStartRow("bgcolor='#dddddd'");
     if (uses_description($form_by)) {
       genHeadCell(array(xl('Subtotals for') . " $last_group", ''));
     } else {
-      genHeadCell(xl('Subtotals for') . " $last_group", 'left', 2);
+      genHeadCell(xl('Subtotals for') . " $last_group", 'right', 2);
     }
     for ($cnum = 0; $cnum < count($asubtotals); ++$cnum) {
       genHeadCell($asubtotals[$cnum], 'right');
@@ -835,10 +975,15 @@ $arr_show   = array(
   '.age9'  => array('title' => xl('Age Category') . ' (9)'),
 ); // info about selectable columns
 
+// This holds 2 levels of column headers. The first level of keys are the
+// field names, and each key's value is an array whose keys are the field
+// values, and whose values are meaningless positive numbers.
+//
 $arr_titles = array(); // will contain column headers
 
 // Query layout_options table to generate the $arr_show table.
 // Table key is the field ID.
+//
 $lres = sqlStatement("SELECT field_id, title, data_type, list_id, description " .
   "FROM layout_options WHERE " .
   "form_id = 'DEM' AND uor > 0 AND field_id NOT LIKE 'em%' " .
@@ -1015,7 +1160,7 @@ while ($lrow = sqlFetchArray($lres)) {
      <td class='detail' valign='top'>
       <select name='form_sexes' title='<?php xl('To filter by sex','e'); ?>'>
 <?php
-  foreach (array(3 => xl('Men and Women'), 1 => xl('Women Only'), 2 => xl('Men Only')) as $key => $value) {
+  foreach (array(4 => xl('All'), 1 => xl('Women Only'), 2 => xl('Men Only'), 3 => xl('Other Only')) as $key => $value) {
     echo "       <option value='$key'";
     if ($key == $form_sexes) echo " selected";
     echo ">$value</option>\n";
@@ -1063,6 +1208,42 @@ while ($lrow = sqlFetchArray($lres)) {
      </td>
     </tr>
    </table>
+  </td>
+ </tr>
+
+ <tr>
+  <td valign='top' class='dehead' nowrap>
+   <?php xl('Periods','e'); ?>:
+  </td>
+  <td valign='top' class='detail'>
+   <select name='form_periods'
+    title='<?php xl('To generate a column for each period','e'); ?>'>
+<?php
+  foreach (array(0 => xl('None'), 1 => xl('Months'), 2 => xl('Quarters'), 3 => xl('Years')) as $key => $value) {
+    echo "    <option value='$key'";
+    if ($key == $form_periods) echo " selected";
+    echo ">$value</option>\n";
+  }
+?>
+   </select>
+  </td>
+  <td valign='top' class='dehead' nowrap>
+   <?php xl('Clinics','e'); ?>:
+  </td>
+  <td valign='top' class='detail'>
+   <select name='form_clinics'
+    title='<?php xl('Details by clinic?','e'); ?>'>
+<?php
+  foreach (array(0 => xl('All Clinics - Summary'), 1 => xl('All Clinics - Detail')) as $key => $value) {
+    echo "    <option value='$key'";
+    if ($key == $form_clinics) echo " selected";
+    echo ">$value</option>\n";
+  }
+?>
+   </select>
+  </td>
+  <td valign='top' class='detail'>
+   &nbsp;
   </td>
  </tr>
 
@@ -1125,8 +1306,9 @@ if ($_POST['form_submit']) {
     }
 
     $sexcond = '';
-    if ($form_sexes == '1') $sexcond = "AND pd.sex NOT LIKE 'Male' ";
+    if ($form_sexes == '1') $sexcond = "AND pd.sex LIKE 'Female' ";
     else if ($form_sexes == '2') $sexcond = "AND pd.sex LIKE 'Male' ";
+    else if ($form_sexes == '3') $sexcond = "AND pd.sex NOT LIKE 'Male' AND pd.sex NOT LIKE 'Female' ";
 
     // In the case where content is contraceptive product sales, we
     // scan product sales at the top level because it is important to
@@ -1138,10 +1320,10 @@ if ($_POST['form_submit']) {
     if ($form_content == 5) { // sales of contraceptive products
       $query = "SELECT " .
         "ds.pid, ds.encounter, ds.sale_date, ds.quantity, " .
-        "d.cyp_factor, d.related_code, " . 
+        "d.name, d.cyp_factor, d.related_code, " . 
         "pd.regdate, pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, " .
         "pd.referral_source$pd_fields, " .
-        "fe.date AS encdate, fe.provider_id " .
+        "fe.date AS encdate, fe.provider_id, fe.facility_id " .
         "FROM drug_sales AS ds " .
         "JOIN drugs AS d ON d.drug_id = ds.drug_id " .
         "JOIN patient_data AS pd ON pd.pid = ds.pid $sexcond" .
@@ -1163,6 +1345,7 @@ if ($_POST['form_submit']) {
           $desired = true;
         }
         $tmp = getRelatedContraceptiveCode($row);
+        $my_group_name = $contra_group_name;
         if (!empty($tmp)) {
           $desired = true;
           $prodcode = $tmp;
@@ -1185,6 +1368,7 @@ if ($_POST['form_submit']) {
             $tmp = getRelatedContraceptiveCode($brow);
             if (!empty($tmp)) {
               $prodcode = $tmp;
+              process_ma_code($row, $brow['code'], $row['quantity']);
               break;
             }
           }
@@ -1193,7 +1377,15 @@ if ($_POST['form_submit']) {
         // At this point $prodcode is the desired IPPF code, or empty if none.
         process_ippf_code($row, $prodcode, $row['quantity']);
 
+        // This is for the Contraceptive Products report (105).
+        if ($form_by === '105') {
+          $key = '{' . $my_group_name . '}' . $row['name'];
+          loadColumnData($key, $row, $row['quantity']);
+        }
       }
+    }
+    else if ($form_by == '105') {
+      $alertmsg = xl("Contraceptive Products report requires Contraceptive Products content type.");
     }
 
     // Get referrals and related patient data.
@@ -1218,7 +1410,7 @@ if ($_POST['form_submit']) {
       }
 
       $query = "SELECT " .
-        "t.pid, t.refer_related_code, t.reply_related_code, " .
+        "t.pid, t.refer_related_code, t.reply_related_code, $datefld AS encdate, " .
         "pd.regdate, pd.referral_source, " .
         "pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname $pd_fields " .
         "FROM transactions AS t " .
@@ -1228,6 +1420,15 @@ if ($_POST['form_submit']) {
         "ORDER BY t.pid, t.id";
       $res = sqlStatement($query);
       while ($row = sqlFetchArray($res)) {
+        if ($form_clinics) {
+          // Get facility_id from the most recent form_encounter as of the
+          // referral date, and add that into $row.
+          $tmp = sqlQuery("SELECT facility_id FROM form_encounter WHERE " .
+            "pid = '" . $row['pid'] . "' AND " .
+            "date <= '" . $row['encdate'] . "' " .
+            "ORDER BY date DESC LIMIT 1");
+          $row['facility_id'] = empty($tmp['facility_id']) ? '0' : $tmp['facility_id'];
+        }
         process_referral($row);
       }
     }
@@ -1235,7 +1436,7 @@ if ($_POST['form_submit']) {
     // Reporting New Acceptors by Contraceptive Method (or method after abortion)
     // is a special case that gets one method on each contraceptive start date.
     //
-    if ($form_content == 3) {
+    if ($form_content == 3 || $form_content == 6) {
      if ($form_by === '6' || $form_by === '7') {
       /***************************************************************
       // This gets us all MA codes, with encounter and patient
@@ -1364,7 +1565,7 @@ if ($_POST['form_submit']) {
       // date.
       $query = "SELECT " .
         "d1.field_value AS ippfconmeth, " .
-        "fe.pid, fe.encounter, fe.date AS encdate, fe.date AS contrastart, " .
+        "fe.pid, fe.encounter, fe.date AS encdate, fe.date AS contrastart, fe.facility_id, " .
         "f.user AS provider, " .
         "pd.regdate, pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, " .
         "pd.referral_source$pd_fields " .
@@ -1374,12 +1575,24 @@ if ($_POST['form_submit']) {
       if ($form_facility) {
         $query .= "AND fe.facility_id = '$form_facility' ";
       }
+      if ($form_content == 3) {
+        // Content type 3, IPPF new acceptors
+        $query .=
+          "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
+          "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
+          "JOIN patient_data AS pd ON pd.pid = f.pid $sexcond " .
+          "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND " .
+          "d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1') ";
+      }
+      else {
+        // Content type 6, acceptors new to modern contraception
+        $query .=
+          "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' AND d1.field_value != '' " .
+          "JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'pastmodern' AND d2.field_value = '0' " .
+          "JOIN patient_data AS pd ON pd.pid = f.pid $sexcond " .
+          "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 ";
+      }
       $query .=
-        "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
-        "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
-        "JOIN patient_data AS pd ON pd.pid = f.pid $sexcond " .
-        "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND " .
-        "d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1') " .
         "ORDER BY fe.pid, fe.encounter, f.form_id";
 
       echo "<!-- $query -->\n"; // debugging
@@ -1468,9 +1681,9 @@ if ($_POST['form_submit']) {
       // This gets us all MA codes, with encounter and patient
       // info attached and grouped by patient and encounter.
       $query = "SELECT " .
-        "fe.pid, fe.encounter, fe.date AS encdate, pd.regdate, " .
+        "fe.pid, fe.encounter, fe.date AS encdate, fe.facility_id, " .
         "f.user AS provider, " .
-        "pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, " .
+        "pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, pd.regdate, " .
         "pd.referral_source$pd_fields, " .
         "b.code_type, b.code, c.related_code, lo.title AS lo_title " .
         "FROM form_encounter AS fe " .
@@ -1526,46 +1739,69 @@ if ($_POST['form_submit']) {
       genEndRow();
     }
 
-    // Generate first column headings line, with category titles.
+    // Compute number of columns per period.
     //
-    genStartRow("bgcolor='#dddddd'");
-    /*****
-    // If the key is an MA or IPPF code, then add a column for its description.
-    if (uses_description($form_by)) {
-      genHeadCell(array('', ''));
-    } else {
-      genHeadCell('', 'left', 2);
-    }
-    *****/
-    genHeadCell($arr_by[$form_by], 'left', 2);
-    $report_col_count = 2;
-    // Generate headings for values to be shown.
+    $period_col_count = 1;          // 1 for the ending totals column
     foreach ($form_show as $value) {
-      if ($value == '.total') { // Total Services
-        genHeadCell('');
-        ++$report_col_count;
+      if ($value == '.total') {     // Total Services
+        ++$period_col_count;
       }
       else if ($value == '.age2') { // Age
-        genHeadCell($arr_show[$value]['title'], 'center', 2);
-        $report_col_count += 2;
+        $period_col_count += 2;
       }
       else if ($value == '.age9') { // Age
-        genHeadCell($arr_show[$value]['title'], 'center', 9);
-        $report_col_count += 9;
+        $period_col_count += 9;
       }
-      else if ($arr_show[$value]['list_id']) {
-        genHeadCell($arr_show[$value]['title'], 'center', count($arr_titles[$value]));
-        $report_col_count += count($arr_titles[$value]);
-      }
-      else if (!empty($arr_titles[$value])) {
-        genHeadCell($arr_show[$value]['title'], 'center', count($arr_titles[$value]));
-        $report_col_count += count($arr_titles[$value]);
+      else if ($arr_show[$value]['list_id'] || !empty($arr_titles[$value])) {
+        $period_col_count += count($arr_titles[$value]);
       }
     }
-    // if ($form_output != 3) {
-      genHeadCell('');
-      ++$report_col_count;
-    // }
+    // Columns per line includes the first 2 for the key and key description.
+    $report_col_count = 2 + $period_col_count * count($arr_periods);
+
+    // Heading line for periods, if applicable.
+    //
+    if ($form_periods) {
+      genStartRow("bgcolor='#dddddd'");
+      genHeadCell('', 'left', 2);
+      foreach ($arr_periods as $pdate => $ptitle) {
+        genHeadCell($ptitle, 'center', $period_col_count);
+      }
+      genEndRow();
+    }
+
+    // Generate field name headings line, i.e. category titles.
+    //
+    genStartRow("bgcolor='#dddddd'");
+
+    // Field name heading starts with report name spanning 2 columns.
+    //
+    genHeadCell($arr_by[$form_by], 'left', 2);
+
+    // Generate remaining field name headings.
+    // There is an identical set of these for each period.
+    //
+    foreach ($arr_periods as $dummy) {
+      foreach ($form_show as $value) {
+        if ($value == '.total') { // Total Services
+          genHeadCell('');
+        }
+        else if ($value == '.age2') { // Age
+          genHeadCell($arr_show[$value]['title'], 'center', 2);
+        }
+        else if ($value == '.age9') { // Age
+          genHeadCell($arr_show[$value]['title'], 'center', 9);
+        }
+        else if ($arr_show[$value]['list_id']) {
+          genHeadCell($arr_show[$value]['title'], 'center', count($arr_titles[$value]));
+        }
+        else if (!empty($arr_titles[$value])) {
+          genHeadCell($arr_show[$value]['title'], 'center', count($arr_titles[$value]));
+        }
+      }
+      genHeadCell(''); // "Total" is on the next heading line below.
+    }
+
     genEndRow();
 
     // Generate second column headings line, with individual titles.
@@ -1578,51 +1814,53 @@ if ($_POST['form_submit']) {
       genHeadCell('', 'left', 2);
     }
     // Generate headings for values to be shown.
-    foreach ($form_show as $value) {
-      if ($value == '.total') { // Total Services
-        genHeadCell(xl('Total'));
-      }
-      else if ($value == '.age2') { // Age
-        genHeadCell(xl('0-24' ), 'right');
-        genHeadCell(xl('25+'  ), 'right');
-      }
-      else if ($value == '.age9') { // Age
-        genHeadCell(xl('0-9'  ), 'right');
-        genHeadCell(xl('10-14'), 'right');
-        genHeadCell(xl('15-19'), 'right');
-        genHeadCell(xl('20-24'), 'right');
-        genHeadCell(xl('25-29'), 'right');
-        genHeadCell(xl('30-34'), 'right');
-        genHeadCell(xl('35-39'), 'right');
-        genHeadCell(xl('40-44'), 'right');
-        genHeadCell(xl('45+'  ), 'right');
-      }
-      else if ($arr_show[$value]['list_id']) {
-        foreach ($arr_titles[$value] as $key => $dummy) {
-          genHeadCell(getListTitle($arr_show[$value]['list_id'],$key), 'right');
+    // There is an identical set of these for each period.
+    foreach ($arr_periods as $dummy) {
+      foreach ($form_show as $value) {
+        if ($value == '.total') { // Total Services
+          genHeadCell(xl('Total'));
+        }
+        else if ($value == '.age2') { // Age
+          genHeadCell(xl('0-24' ), 'right');
+          genHeadCell(xl('25+'  ), 'right');
+        }
+        else if ($value == '.age9') { // Age
+          genHeadCell(xl('0-9'  ), 'right');
+          genHeadCell(xl('10-14'), 'right');
+          genHeadCell(xl('15-19'), 'right');
+          genHeadCell(xl('20-24'), 'right');
+          genHeadCell(xl('25-29'), 'right');
+          genHeadCell(xl('30-34'), 'right');
+          genHeadCell(xl('35-39'), 'right');
+          genHeadCell(xl('40-44'), 'right');
+          genHeadCell(xl('45+'  ), 'right');
+        }
+        else if ($arr_show[$value]['list_id']) {
+          foreach ($arr_titles[$value] as $key => $dummy) {
+            genHeadCell(getListTitle($arr_show[$value]['list_id'],$key), 'right');
+          }
+        }
+        else if (!empty($arr_titles[$value])) {
+          foreach ($arr_titles[$value] as $key => $dummy) {
+            genHeadCell($key, 'right');
+          }
         }
       }
-      else if (!empty($arr_titles[$value])) {
-        foreach ($arr_titles[$value] as $key => $dummy) {
-          genHeadCell($key, 'right');
-        }
-      }
-    }
-    // if ($form_output != 3) {
       genHeadCell(xl('Total'), 'right');
-    // }
+    }
     genEndRow();
 
     $encount = 0;
 
     // These support group subtotals.
     $last_group = '';
+    $last_group_count = 0;
     $asubtotals = array();
 
     foreach ($areport as $key => $varr) {
       $display_key = $key;
       if ($form_output != 3 && $form_content != '2' && $form_content != '3' && $form_content != '4') {
-        // TBD: Get group name, if any, for this key.
+        // Get group name, if any, for this key.
         // If it is a group change and there is a non-empty $last_group,
         // generate a subtotals line and clear subtotals array.
         // Set $last_group to the current group name.
@@ -1632,13 +1870,22 @@ if ($_POST['form_submit']) {
           $display_key = $tmp[2];
         }
         if ($this_group != $last_group) {
-          writeSubtotals($last_group, $asubtotals, $form_by);  
+          if ($last_group_count > 1) {
+            // Write subtotals only if more than one row in the group.
+            writeSubtotals($last_group, $asubtotals, $form_by);  
+          }
+          if ($last_group !== '' && !$form_clinics) {
+            // Add some space before the next group.
+            genStartRow("bgcolor='#dddddd'");
+            genHeadCell('&nbsp;', 'left', $report_col_count);
+            genEndRow();
+          }
           $last_group = $this_group;
+          $last_group_count = 0;
           $asubtotals = array();
         }
       }
-
-      $bgcolor = (++$encount & 1) ? "#ddddff" : "#ffdddd";
+      ++$last_group_count;
 
       $dispkey = $display_key;
       $dispspan = 2;
@@ -1653,46 +1900,79 @@ if ($_POST['form_submit']) {
         if (!empty($crow['code_text'])) $dispkey[1] = $crow['code_text'];
       }
 
-      genStartRow("bgcolor='$bgcolor'");
-
-      genAnyCell($dispkey, 'left', 'detail', $dispspan);
-
-      // This is the column index for accumulating column totals.
-      $cnum = 0;
-      $totalsvcs = $areport[$key]['.wom'] + $areport[$key]['.men'];
-
-      // Generate data for this row.
-      foreach ($form_show as $value) {
-        // if ($value == '1') { // Total Services
-        if ($value == '.total') { // Total Services
-          genNumCell($totalsvcs, $cnum++);
-        }
-        else if ($value == '.age2') { // Age
-          for ($i = 0; $i < 2; ++$i) {
-            genNumCell($areport[$key]['.age2'][$i], $cnum++);
-          }
-        }
-        else if ($value == '.age9') { // Age
-          for ($i = 0; $i < 9; ++$i) {
-            genNumCell($areport[$key]['.age9'][$i], $cnum++);
-          }
-        }
-        else if (!empty($arr_titles[$value])) {
-          foreach ($arr_titles[$value] as $title => $dummy) {
-            genNumCell($areport[$key][$value][$title], $cnum++);
-          }
-        }
+      // If writing clinic-specific rows then write a title line for the key.
+      if ($form_clinics) {
+        genStartRow("bgcolor='#dddddd'");
+        genAnyCell($dispkey, 'left', 'detail', $dispspan);
+        genAnyCell('', 'left', 'detail', $report_col_count - 2);
+        genEndRow();
+        $encount = 0;
       }
 
-      // Write the Total column data.
-      // if ($form_output != 3) {
-        $atotals[$cnum]    += $totalsvcs;
-        $asubtotals[$cnum] += $totalsvcs;
-        genAnyCell($totalsvcs, 'right', 'dehead');
-      // }
+      ksort($varr); // TBD: Probably sort by clinic name with '' last.
 
-      genEndRow();
-    } // end foreach
+      foreach ($varr['.dtl'] as $clikey => $cliarr) {
+        $bgcolor = (++$encount & 1) ? "#ddddff" : "#ffdddd";
+        if ($form_clinics) $bgcolor = '#ddddff';
+        genStartRow("bgcolor='$bgcolor'");
+        if ($form_clinics) {
+          $cliname = xl('All Clinics');
+          if ($clikey == '-1') {
+            $cliname = xl('Unassigned');
+          }
+          else if ($clikey) {
+            $tmp = sqlQuery("SELECT name FROM facility WHERE id = '$clikey'");
+            $cliname = $tmp['name'];
+          }
+          genAnyCell($cliname, $clikey ? 'right' : 'left', 'detail', 2);
+        }
+        else {
+          genAnyCell($dispkey, 'left', 'detail', $dispspan);
+        }
+
+        // This is the column index for accumulating column totals.
+        $cnum = 0;
+
+        // Loop on periods to write the numeric data.
+        foreach ($arr_periods as $perkey => $dummy) {
+          foreach ($form_show as $value) {
+            if ($value == '.total') { // Total Services
+              genNumCell($totalsvcs, $cnum++, $clikey);
+            }
+            else if ($value == '.age2') { // Age
+              for ($i = 0; $i < 2; ++$i) {
+                genNumCell($areport[$key]['.dtl'][$clikey][$perkey]['.age2'][$i], $cnum++, $clikey);
+              }
+            }
+            else if ($value == '.age9') { // Age
+              for ($i = 0; $i < 9; ++$i) {
+                genNumCell($areport[$key]['.dtl'][$clikey][$perkey]['.age9'][$i], $cnum++, $clikey);
+              }
+            }
+            else if (!empty($arr_titles[$value])) {
+              foreach ($arr_titles[$value] as $title => $dummy) {
+                genNumCell($areport[$key]['.dtl'][$clikey][$perkey][$value][$title], $cnum++, $clikey);
+              }
+            }
+          }
+
+          // Write this period's Total column data.
+          $totalsvcs = $areport[$key]['.dtl'][$clikey][$perkey]['.wom'] +
+                       $areport[$key]['.dtl'][$clikey][$perkey]['.men'];
+          if (!$clikey) {
+            $atotals[$cnum]    += $totalsvcs;
+            $asubtotals[$cnum] += $totalsvcs;
+          }
+          ++$cnum;
+          genAnyCell($totalsvcs, 'right', 'dehead');
+
+        } // end foreach period
+
+        genEndRow();
+
+      } // end foreach clinic
+
+    } // end foreach reporting key
 
     // If we are exporting or counting unique clients, new acceptors or new clients,
     // then the totals line is skipped.
@@ -1700,7 +1980,16 @@ if ($_POST['form_submit']) {
     if ($form_output != 3 && $form_content != '2' && $form_content != '3' && $form_content != '4') {
 
       // If there is a non-empty $last_group, generate a subtotals line.
-      writeSubtotals($last_group, $asubtotals, $form_by);  
+      if ($last_group_count > 1) {
+        writeSubtotals($last_group, $asubtotals, $form_by);
+      }
+
+      if ($last_group !== '' && !$form_clinics) {
+        // Add some space before the totals line.
+        genStartRow("bgcolor='#dddddd'");
+        genHeadCell('&nbsp;', 'left', $report_col_count);
+        genEndRow();
+      }
 
       // Generate the line of totals.
       genStartRow("bgcolor='#dddddd'");

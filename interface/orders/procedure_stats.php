@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2010, 2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -406,7 +406,7 @@ foreach (array(1 => 'Screen', 2 => 'Printer', 3 => 'Export File') as $key => $va
       "po.patient_id, po.encounter_id, po.date_ordered, " .
       "po.provider_id, pd.regdate, " .
       "pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, " .
-      "pd.contrastart, pd.referral_source$pd_fields, " .
+      "pd.referral_source$pd_fields, " .
       "ps.abnormal, ps.procedure_type_id AS result_type, " .
       "pto.name AS order_name, ptr.name AS result_name, ptr.related_code " .
       "FROM procedure_order AS po " .
