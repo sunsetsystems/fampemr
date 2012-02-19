@@ -66,26 +66,29 @@ function LBFccicon_javascript() {
 
   // Create an associative array of contrameth mapping values.  These are regex
   // patterns used to match ippfconmeth list items with contrameth list items.
+  // Also use a pattern of 00000 to indicate not a modern method.
   echo "var contraMapping = new Object();\n";
-  $res = sqlStatement("SELECT option_id, mapping FROM list_options WHERE " .
+  $res = sqlStatement("SELECT option_id, option_value, mapping FROM list_options WHERE " .
     "list_id = 'contrameth' ORDER BY seq, title");
   while ($row = sqlFetchArray($res)) {
-    $i = strpos($row['mapping'], ':');
-    if ($i !== FALSE) {
-      echo "contraMapping['" . $row['option_id'] . "'] = '" .
-        substr($row['mapping'], $i + 1) . "'\n";
+    $mapping = '00000';
+    if ($row['option_value']) { // if modern method
+      $i = strpos($row['mapping'], ':');
+      if ($i === FALSE) continue;
+      $mapping = substr($row['mapping'], $i + 1);
     }
+    echo "contraMapping['" . $row['option_id'] . "'] = '$mapping';\n";
   }
 
   echo "
 // Respond to selection of a current method.
-// If None, ask if a modern method was used anywhere before.
+// If it is unassigned or not modern, ask if a modern method was used anywhere before.
 // Otherwise if new method != current then ask reason for method change.
 function current_method_changed() {
  var f = document.forms[0];
  f.form_pastmodern.disabled = true;
  f.form_mcreason.disabled = true;
- if (f.form_curmethod.selectedIndex <= 0 || f.form_curmethod.value == 'no') {
+ if (f.form_curmethod.selectedIndex <= 0 || contraMapping[f.form_curmethod.value] == '00000') {
   // Enable past use question iff no modern current method and only if the
   // global option is set to record all acceptors new to modern contraception.
   f.form_pastmodern.disabled = " . ($GLOBALS['gbl_new_acceptor_policy'] == '3' ? 'false' : 'true') . ";
