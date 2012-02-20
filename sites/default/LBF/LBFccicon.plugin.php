@@ -186,6 +186,15 @@ f.form_curmethod.onchange = function () { current_method_changed(); };
 f.form_newmethod.onchange = function () { current_method_changed(); };
 f.onsubmit = function () { return mysubmit(); };
 ";
+
+// Generate alert if method from services is different from a non-empty method in this form.
+  $csrow = sqlQuery("SELECT field_value FROM lbf_data WHERE " .
+    "form_id = '$formid' AND field_id = 'newmethod'");
+  if (!empty($csrow['field_value']) && $csrow['field_value'] != $contraception_code) {
+    echo "
+alert('" . xl('Method has changed, please save this form to record the new method.') . "');
+";
+  }
 }
 
 // This function generates HTML to go after the Save button.

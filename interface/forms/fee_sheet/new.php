@@ -135,11 +135,14 @@ function checkForContraception($code_type, $code) {
 
   // This logic is only used for family planning clinics, and then only when
   // the option is chosen to auto-generate Contraception forms.
-  if (!$GLOBALS['ippf_specific'] || $GLOBALS['gbl_new_acceptor_policy'] != '1') return;
+  if (!$GLOBALS['ippf_specific'] || !$GLOBALS['gbl_new_acceptor_policy']) return;
 
   $sql = "SELECT related_code FROM codes WHERE " .
     "code_type = '" . $code_types[$code_type]['id'] .
     "' AND code = '$code' LIMIT 1";
+
+  // echo "<!-- checkForContraception: $sql -->\n"; // debugging
+
   $codesrow = sqlQuery($sql);
 
   if (!empty($codesrow['related_code']) && $code_type == 'MA') {
@@ -204,7 +207,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
         "prices.pr_selector = '' AND " .
         "prices.pr_level = patient_data.pricelevel " .
         "LIMIT 1";
-      echo "\n<!-- $query -->\n"; // debugging
+      // echo "\n<!-- $query -->\n"; // debugging
       $prrow = sqlQuery($query);
       $fee = empty($prrow) ? 0 : $prrow['pr_price'];
     }
@@ -732,24 +735,6 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   }
   *******************************************************************/
 
-  // More Family Planning stuff.
-  if (!empty($_POST['ippfconmeth'])) {
-    $newmauser   = $_POST['newmauser'];
-    $ippfconmeth = $_POST['ippfconmeth'];
-    // Add contraception form but only if it does not already exist
-    // (if it does, must be 2 users working on the visit concurrently).
-    $csrow = sqlQuery("SELECT COUNT(*) AS count FROM forms AS f WHERE " .
-      "f.pid = '$pid' AND f.encounter = '$encounter' AND " .
-      "f.formdir = 'LBFccicon' AND f.deleted = 0");
-    if ($csrow['count'] == 0) {
-      $newid = insert_lbf_item(0, 'newmauser', $newmauser);
-      insert_lbf_item($newid, 'newmethod', $ippfconmeth);
-      // Do we care about a service-specific provider here?
-      insert_lbf_item($newid, 'provider', $main_provid);
-      addForm($encounter, 'Contraception', $newid, 'LBFccicon', $pid, $userauthorized);
-    }
-  }
-
   // Note: Taxes are computed at checkout time (in pos_checkout.php which
   // also posts to SL).  Currently taxes with insurance claims make no sense,
   // so for now we'll ignore tax computation in the insurance billing logic.
@@ -758,10 +743,42 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   // "In exam room".
   updateAppointmentStatus($pid, $visit_date, '<');
 
+  // More Family Planning stuff.
+  if (isset($_POST['ippfconmeth'])) {
+    $csrow = sqlQuery("SELECT f.form_id, ld.field_value FROM forms AS f " .
+      "LEFT JOIN lbf_data AS ld ON ld.form_id = f.form_id AND ld.field_id = 'newmethod' " .
+      "WHERE " .
+      "f.pid = '$pid' AND f.encounter = '$encounter' AND " .
+      "f.formdir = 'LBFccicon' AND f.deleted = 0 " .
+      "ORDER BY f.form_id DESC LIMIT 1");
+    if (isset($_POST['newmauser'])) {
+      $newmauser   = $_POST['newmauser'];
+      $ippfconmeth = $_POST['ippfconmeth'];
+      // Add contraception form but only if it does not already exist
+      // (if it does, must be 2 users working on the visit concurrently).
+      if (empty($csrow)) {
+        $newid = insert_lbf_item(0, 'newmauser', $newmauser);
+        insert_lbf_item($newid, 'newmethod', $ippfconmeth);
+        // Do we care about a service-specific provider here?
+        insert_lbf_item($newid, 'provider', $main_provid);
+        addForm($encounter, 'Contraception', $newid, 'LBFccicon', $pid, $userauthorized);
+      }
+    }
+    else if (!empty($csrow) && $csrow['field_value'] != $ippfconmeth) {
+      // Contraceptive method does not match what is in an existing Contraception
+      // form for this visit.  Open that form and it will present an appropriate
+      // message.
+      formJump("{$GLOBALS['rootdir']}/patient_file/encounter/view_form.php" .
+        "?formname=LBFccicon&id=" . $csrow['form_id']);
+      formFooter();
+      exit;
+    }
+  }
+
   if ($rapid_data_entry || ($_POST['bn_save_close'] && $_POST['form_has_charges'])) {
     // In rapid data entry mode or if "Save and Checkout" was clicked,
     // we go directly to the Checkout page.
-    formJump("{$GLOBALS['rootdir']}/patient_file/pos_checkout.php?framed=1&rde=1");
+    formJump("{$GLOBALS['rootdir']}/patient_file/pos_checkout.php?framed=1&rde=$rapid_data_entry");
   }
   else {
     // Otherwise return to the normal encounter summary frameset.
@@ -1434,53 +1451,68 @@ if ($contraception_code && !$isBilled) {
 *********************************************************************/
 
 if ($contraception_code && !$isBilled) {
-  $csrow = sqlQuery("SELECT COUNT(*) AS count FROM forms AS f WHERE " .
-    "f.pid = '$pid' AND f.encounter = '$encounter' AND " .
-    "f.formdir = 'LBFccicon' AND f.deleted = 0");
-  // Do it only if a contraception form does not already exist for this visit.
-  // Otherwise assume that whoever created it knows what they were doing.
-  if ($csrow['count'] == 0) {
-    $date1 = substr($visit_row['date'], 0, 10);
-    $servicemeth = '';
-    // If surgical
-    if (preg_match('/^12/', $contraception_code)) {
-      // Identify the method with the IPPF code for the corresponding surgical procedure.
-      $servicemeth = substr($contraception_code, 0, 7) . '13';
-    }
-    else {
-      // Determine if this client ever started contraception with the MA.
-      // Even if only a method change, we assume they have.
-      /***************************************************************
-      // But this version would be used if method changes don't count.
-      $query = "SELECT f.form_id FROM forms AS f " .
-        "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
-        "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
-        "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
-        "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' AND " .
-        "(d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1')) " .
-        "ORDER BY fe.date DESC LIMIT 1";
-      ***************************************************************/
-      $query = "SELECT f.form_id FROM forms AS f " .
-        "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
-        "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' " .
-        "ORDER BY fe.date DESC LIMIT 1";
-      $csrow = sqlQuery($query);
-      if (empty($csrow)) {
-        // Identify the method with its IPPF code for Initial Consultation.
-        $servicemeth = substr($contraception_code, 0, 6) . '110';
+  // If surgical
+  if (preg_match('/^12/', $contraception_code)) {
+    // Identify the method with the IPPF code for the corresponding surgical procedure.
+    $contraception_code = substr($contraception_code, 0, 7) . '13';
+  }
+  else {
+    // Xavier confirms that the codes for Cervical Cap (112152010 and 112152011) are
+    // an unintended change in pattern, but at this point we have to live with it.
+    // -- Rod 2011-09-26
+    $contraception_code = substr($contraception_code, 0, 6) . '110';
+    if ($contraception_code == '112152110') $contraception_code = '112152010';
+  }
+
+  // This will give the form save logic the associated contraceptive method.
+  echo "<input type='hidden' name='ippfconmeth' value='$contraception_code'>\n";
+
+  // If Contraception forms can be auto-created by the Fee Sheet we might need
+  // to ask if this is the client's first contraception at this clinic.
+  //
+  if ($GLOBALS['gbl_new_acceptor_policy'] == '1') {
+    $csrow = sqlQuery("SELECT COUNT(*) AS count FROM forms AS f WHERE " .
+      "f.pid = '$pid' AND f.encounter = '$encounter' AND " .
+      "f.formdir = 'LBFccicon' AND f.deleted = 0");
+    // Do it only if a contraception form does not already exist for this visit.
+    // Otherwise assume that whoever created it knows what they were doing.
+    if ($csrow['count'] == 0) {
+      $date1 = substr($visit_row['date'], 0, 10);
+      $ask_new_user = false;
+      // If surgical
+      if (preg_match('/^12/', $contraception_code)) {
+        // Identify the method with the IPPF code for the corresponding surgical procedure.
+        $ask_new_user = true;
       }
-    }
-    if ($servicemeth) {
-      // Xavier confirms that the codes for Cervical Cap (112152010 and 112152011) are
-      // an unintended change in pattern, but at this point we have to live with it.
-      // -- Rod 2011-09-26
-      if ($servicemeth == '112152110') $servicemeth = '112152010';
-      echo "<select name='newmauser'>\n";
-      echo " <option value='1'>" . xl('First contraception at this clinic') . "</option>\n";
-      echo " <option value='0'>" . xl('Method change') . "</option>\n";
-      echo "</select>\n";
-      echo "<input type='hidden' name='ippfconmeth' value='$servicemeth'>\n";
-      echo "<p>&nbsp;\n";
+      else {
+        // Determine if this client ever started contraception with the MA.
+        // Even if only a method change, we assume they have.
+        /***************************************************************
+        // But this version would be used if method changes don't count.
+        $query = "SELECT f.form_id FROM forms AS f " .
+          "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
+          "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
+          "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
+          "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' AND " .
+          "(d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1')) " .
+          "ORDER BY fe.date DESC LIMIT 1";
+        ***************************************************************/
+        $query = "SELECT f.form_id FROM forms AS f " .
+          "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
+          "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' " .
+          "ORDER BY fe.date DESC LIMIT 1";
+        $csrow = sqlQuery($query);
+        if (empty($csrow)) {
+          $ask_new_user = true;
+        }
+      }
+      if ($ask_new_user) {
+        echo "<select name='newmauser'>\n";
+        echo " <option value='1'>" . xl('First contraception at this clinic') . "</option>\n";
+        echo " <option value='0'>" . xl('Method change') . "</option>\n";
+        echo "</select>\n";
+        echo "<p>&nbsp;\n";
+      }
     }
   }
 }
