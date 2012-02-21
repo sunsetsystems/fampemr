@@ -3,6 +3,16 @@ require_once("../globals.php");
 require_once("$srcdir/log.inc");
 require_once("$srcdir/formdata.inc.php");
 require_once("$srcdir/formatting.inc.php");
+
+if ($_REQUEST['form_csvexport']) {
+  header("Pragma: public");
+  header("Expires: 0");
+  header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+  header("Content-Type: application/force-download");
+  header("Content-Disposition: attachment; filename=logview.csv");
+  header("Content-Description: File Transfer");
+} // end export
+else {
 ?>
 <html>
 <head>
@@ -45,7 +55,9 @@ require_once("$srcdir/formatting.inc.php");
 <body class="body_top">
 <font class="title"><?php  xl('Logs Viewer','e'); ?></font>
 <br>
-<?php 
+<?php
+} // end not export
+
 $err_message = 0;
 
 if ($_GET["start_date"])
@@ -60,14 +72,14 @@ if ($_GET["end_date"])
 if ($start_date && $end_date)
 {
 	if($start_date > $end_date) {
-		echo "<table><tr class='alert'><td colspan=7>"; xl('Start Date should not be greater than End Date',e);
-		echo "</td></tr></table>"; 
+    if (!$_REQUEST['form_csvexport']) {
+		  echo "<table><tr class='alert'><td colspan=7>"; xl('Start Date should not be greater than End Date',e);
+		  echo "</td></tr></table>"; 
+    }
 		$err_message=1;	
 	}
 }
 
-?>
-<?php
 $form_user = formData('form_user','R');
 
 $res = sqlStatement("select distinct LEFT(date,10) as date from log order by date desc limit 30");
@@ -80,19 +92,15 @@ $sqlQuery = "SELECT username, fname, lname FROM users " .
   "WHERE active = 1 AND ( info IS NULL OR info NOT LIKE '%Inactive%' ) ";
 
 $ures = sqlStatement($sqlQuery);
-?>
 
-<?php 
 $get_sdate = $start_date ? $start_date : date("Y-m-d");
 $get_edate = $end_date ? $end_date : date("Y-m-d");
-?>
+$sortby = formData('sortby', 'G');
 
+if (!$_REQUEST['form_csvexport']) {
+?>
 <br>
 <FORM METHOD="GET" name="theform" id="theform">
-<?php
-
-$sortby = formData('sortby', 'G');
-?>
 <input type="hidden" name="sortby" id="sortby" value="<?php echo $sortby; ?>">
 <table>
 <tr><td>
@@ -174,8 +182,12 @@ echo "</select>\n";
 <tr>
 <td>
 <!-- Not used -->
-</td><td>
+</td>
+<td>
 <input type='submit' name='form_refresh' value="<?php xl('Refresh','e') ?>" />
+</td>
+<td>
+<!-- Not used -->
 </td>
 <td>
 <input type='submit' name='form_csvexport' value="<?php xl('Export to CSV','e') ?>" />
@@ -184,7 +196,20 @@ echo "</select>\n";
 </table>
 </FORM>
 
-<?php if ($start_date && $end_date && $err_message != 1) { ?>
+<?php
+} // end not export
+
+if ($start_date && $end_date && $err_message != 1) {
+  if ($_REQUEST['form_csvexport']) {
+    // CSV headers:
+    echo '"' . xl('Date'    ) . '",';
+    echo '"' . xl('Event'   ) . '",';
+    echo '"' . xl('User'    ) . '",';
+    echo '"' . xl('Group'   ) . '",';
+    echo '"' . xl('Comments') . '"' . "\n";
+  }
+  else { // not export
+?>
 <div id="logview">
 <table>
  <tr>
@@ -195,6 +220,8 @@ echo "</select>\n";
   <th id="sortby_comments" class="text" title="<?php xl('Sort by Comments','e'); ?>"><?php  xl('Comments','e'); ?></th>
  </tr>
 <?php
+  } // end not export
+
 $eventname = formData('eventname','G');
 
 if ($ret = getEvents(array('sdate' => $get_sdate,'edate' => $get_edate, 'user' => $form_user, 'sortby' => $_GET['sortby'], 'levent' =>$eventname))) {
@@ -203,6 +230,14 @@ if ($ret = getEvents(array('sdate' => $get_sdate,'edate' => $get_edate, 'user' =
     $patterns = array ('/^success/','/^failure/','/ encounter/');
     $replace = array (xl('success'), xl('failure'), xl('encounter','',' '));
     $trans_comments = preg_replace($patterns, $replace, $iter["comments"]);
+    if ($_REQUEST['form_csvexport']) {
+      echo '"' . oeFormatShortDate(substr($iter["date"], 0, 10)) . substr($iter["date"], 10) . '",';
+      echo '"' . xl($iter["event"]    ) . '",';
+      echo '"' . xl($iter["user"]     ) . '",';
+      echo '"' . xl($iter["groupname"]) . '",';
+      echo '"' . $trans_comments        . '"' . "\n";
+    }
+    else { // not export
 ?>
  <TR class="oneresult">
   <TD class="text"><?php echo oeFormatShortDate(substr($iter["date"], 0, 10)) . substr($iter["date"], 10) ?></TD>
@@ -212,13 +247,21 @@ if ($ret = getEvents(array('sdate' => $get_sdate,'edate' => $get_edate, 'user' =
   <TD class="text"><?php echo $trans_comments?></TD>
  </TR>
 <?php
+    } // end not export
   }
 }
+
+if (!$_REQUEST['form_csvexport']) {
 ?>
 </table>
 </div>
 
-<?php } ?>
+<?php
+} // end not export
+} // end query results display
+
+if (!$_REQUEST['form_csvexport']) {
+?>
 
 </body>
 
@@ -251,4 +294,6 @@ Calendar.setup({inputField:"end_date", ifFormat:"%Y-%m-%d", button:"img_end_date
 </script>
 
 </html>
-
+<?php
+} // end not export
+?>
