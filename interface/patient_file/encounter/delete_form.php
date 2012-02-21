@@ -15,7 +15,7 @@ $returnurl = $GLOBALS['concurrent_layout'] ? 'encounter_top.php' : 'patient_enco
 
 if ($_POST['confirm']) {
     // set the deleted flag of the indicated form
-    $sql = "update forms set deleted=1 where id=".$_POST['id'];
+    $sql = "update forms set deleted = 1 where id = " . $_POST['id'];
     if ($_POST['id'] != "*" && $_POST['id'] != '') sqlInsert($sql);
     // log the event   
     newEvent("delete", $_SESSION['authUser'], $_SESSION['authProvider'], "Form ".$_POST['formname']." deleted from Encounter ".$_POST['encounter']);
@@ -39,21 +39,22 @@ if ($_POST['confirm']) {
 
 <body class="body_top">
 
-<span class="title">Delete Encounter Form</span>
+<span class="title">Delete Visit Data</span>
 
 <form method="post" action="<?php echo $rootdir;?>/patient_file/encounter/delete_form.php" name="my_form" id="my_form">
 <?php
 // output each GET variable as a hidden form input
 foreach ($_GET as $key => $value) {
-    echo '<input type="hidden" id="'.$key.'" name="'.$key.'" value="'.$value.'"/>'."\n";
+    echo '<input type="hidden" id="' . $key . '" name="' . $key . '" value="' . $value . '"/>' . "\n";
+$frow = sqlQuery("SELECT form_name FROM forms WHERE id = '" . $_GET['id'] . "'");
 }
 ?>
 <input type="hidden" id="confirm" name="confirm" value="1"/>
 <p>
-You are about to delete the form '<?php echo $_GET['formname']; ?>' from <?php xl('This Encounter','e'); ?>.
+<?php echo xl('You are about to delete') . ' ' . $frow['form_name'] . ' ' . xl('data from this visit'); ?>.
 </p>
-<input type="button" id="confirmbtn" name="confirmbtn" value="Yes, Delete this form">
-<input type="button" id="cancel" name="cancel" value="Cancel">
+<input type="button" id="confirmbtn" name="confirmbtn" value="<?php echo xl('Yes, delete data'); ?>">
+<input type="button" id="cancel" name="cancel" value="<?php echo xl('Cancel'); ?>">
 </form>
 
 </body>
@@ -67,7 +68,7 @@ $(document).ready(function(){
 });
 
 function ConfirmDelete() {
-    if (confirm("This action cannot be undone. Are you sure you wish to delete this form?")) {
+    if (confirm("<?php echo xl('This action cannot be undone. Are you sure you wish to delete this record?'); ?>")) {
         top.restoreSession();
         $("#my_form").submit();
         return true;
