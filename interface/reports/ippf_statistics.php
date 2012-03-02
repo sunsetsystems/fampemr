@@ -120,7 +120,8 @@ if (empty($form_by_arr)) {
   $form_by_arr = array($tmp[0]);
 }
 // Default Columns selection, don't understand this, should be array('.total') instead?
-if (empty($form_show)) $form_show = array('1');
+// if (empty($form_show)) $form_show = array('1');
+if (empty($form_show)) $form_show = array();
 
 // This sets up the array of date periods for which detail is wanted.
 // Key is the period start date, value is the column header.
@@ -139,7 +140,7 @@ if ($form_periods) {
     $date1mm = substr($date1, 5, 2);
     $date1dd = substr($date1, 8, 2);
     if ($form_periods == '1') { // Months
-      $arr_periods[$date1] = $arr_months[$date1mm - 1];
+      $arr_periods[$date1] = $arr_months[$date1mm - 1] . ' ' . $date1yy;
       if (++$date1mm > 12) {
         ++$date1yy;
         $date1mm = '01';
@@ -147,7 +148,7 @@ if ($form_periods) {
     }
     else if ($form_periods == '2') {        // Quarters
       $date1qq = (int)(($date1mm - 1) / 3); // Quarter number 0-3
-      $arr_periods[$date1] = $arr_quarters[$date1qq];
+      $arr_periods[$date1] = $arr_quarters[$date1qq] . ' ' . $date1yy;
       $date1mm = ($date1qq + 1) * 3 + 1;
       if ($date1mm > 12) {
         ++$date1yy;
@@ -161,15 +162,18 @@ if ($form_periods) {
     }
     $date1dd = '01';
     $date1 = sprintf('%04d-%02d-%02d', $date1yy, $date1mm, $date1dd);
-    if (++$i > 100) die("Too many periods from '$from_date' to '$to_date', stopping at '$date1'"); // debugging
+    if (++$i > 100) {
+      $alertmsg = xl('More than 100 periods from') . " $from_date " . xl('to') .
+        " $to_date, " . xl('stopping at') . " $date1";
+      break;
+    }
   }
 }
 $arr_periods[''] = xl('Total');
 
-// Array of clinic headers.  This will be built dynamically if needed.
-// Key is clinic (facility) ID, value is clinic name.
+// Array of clinics. Key is clinic (facility) ID, value is clinic name.
 //
-// $arr_clinics = array('' => xl('Total'));
+$arr_clinics = array();
 
 // Compute age in years given a DOB and "as of" date.
 //
@@ -219,6 +223,7 @@ function genAnyCell($data, $align='left', $class='', $colspan=1) {
     if ($form_output == 3) {
       if ($cellcount) echo ',';
       echo '"' . $datum . '"';
+      while ($colspan-- > 1) echo ',""';
     }
     else {
       echo "  <td";
@@ -459,14 +464,15 @@ function getGcacClientStatus($row) {
 // For a given clinic (or '' for clinic totals) this sets up the empty
 // accumulators for each needed period and for the total of all periods.
 // Or if that is already done for the clinic, no action is taken.
+// Also the array to relate clinic IDs to names is built.
 //
 function needClinicArray($key, $clinicid) {
   global $areport, $arr_clinics, $arr_periods, $arr_show;
-  // if (empty($arr_clinics[$key1])) {
-  //   $row = sqlQuery("SELECT name FROM facility WHERE id = '$key1'");
-  //   $name = empty($row['name']) ? 'Unknown' : $row['name'];
-  //   $arr_clinics[$key1] = $name;
-  // }
+  if (empty($arr_clinics[$clinicid])) {
+    $row = sqlQuery("SELECT name FROM facility WHERE id = '$clinicid'");
+    $name = empty($row['name']) ? (xl('Unnamed Clinic') . " #$clinicid") : $row['name'];
+    $arr_clinics[$clinicid] = $name;
+  }
   if (!empty($areport[$key]['.dtl'][$clinicid])) return;
   $areport[$key]['.dtl'][$clinicid] = array();
   foreach ($arr_periods as $pdate => $dummy) {
@@ -520,7 +526,7 @@ function loadColumnData($key, $row, $quantity=1) {
   global $form_clinics, $form_periods, $arr_periods;
 
   // If we are counting new acceptors, then this must be a report of contraceptive
-  // methods and a contraceptive start date is provided.
+  // methods or contraceptive products, and a contraceptive start date is provided.
   if ($form_content == '3' || $form_content == '6') {
     if (empty($row['contrastart'])) return;
   }
@@ -593,6 +599,53 @@ function loadColumnData($key, $row, $quantity=1) {
     $arr_titles[$askey][$status] += $quantity;
   }
   *******************************************************************/
+}
+// This determines a key for the product with highest CYP in a visit.
+//
+function product_contraception_scan($pid, $encounter) {
+  global $contra_group_name;
+  $current_cyp = -1;
+  $current_drug_id = 0;
+  $current_name = '';
+  $sql = "SELECT d.drug_id, d.name, d.related_code " .
+    "FROM drug_sales AS ds, drugs AS d WHERE " .
+    "ds.pid = '$pid' AND ds.encounter = '$encounter' AND " .
+    "ds.quantity > 0 AND d.related_code != '' AND " .
+    "d.drug_id = ds.drug_id";
+  $dsres = sqlStatement($sql);
+  while ($dsrow = sqlFetchArray($dsres)) {
+    $relcodes = explode(';', $dsrow['related_code']);
+    foreach ($relcodes as $relstring) {
+      if ($relstring === '') continue;
+      list($reltype, $relcode) = explode(':', $relstring);
+      if ($reltype !== 'IPPF') continue;
+      if (
+        preg_match('/^11....110/'    , $relcode) ||
+        preg_match('/^11...[1-5]999/', $relcode) ||
+        preg_match('/^112152010/'    , $relcode) ||
+        preg_match('/^11317[1-2]111/', $relcode) ||
+        preg_match('/^12118[1-2].13/', $relcode) ||
+        preg_match('/^121181999/'    , $relcode) ||
+        preg_match('/^122182.13/'    , $relcode) ||
+        preg_match('/^122182999/'    , $relcode)
+      ) {
+        $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
+          "code_type = '11' AND code = '$relcode' LIMIT 1");
+        $cyp = 0 + $tmprow['cyp_factor'];
+        if ($cyp > $current_cyp) {
+          $current_cyp     = $cyp;
+          $current_ippf    = $relcode;
+          $current_name    = $dsrow['name'];
+        }
+      }
+    }
+  }
+  $key = '{(' . xl('None') . ')}(' . xl('No Product') . ')';
+  if ($current_cyp > 0) {
+    getContraceptiveMethod($current_ippf);
+    $key = '{' . $contra_group_name . '}' . $current_name;
+  }
+  return $key;
 }
 
 // This is called for each IPPF service code that is selected.
@@ -951,6 +1004,12 @@ function uses_description($form_by) {
     $form_by === '20' || $form_by === '104');
 }
 
+function uses_group_names($form_by) {
+  global $form_output;
+  if ($form_output != 3) return false;
+  return ($form_by === '6'  || $form_by === '7' || $form_by === '105');
+}
+
 function writeSubtotals($last_group, &$asubtotals, $form_by) {
   if ($last_group) {
     if (preg_match('/^(\d\d\d\d\d) (.*)/', $last_group, $tmp)) {
@@ -969,8 +1028,20 @@ function writeSubtotals($last_group, &$asubtotals, $form_by) {
   }
 }
 
+// This supports uksort() on clinic IDs.
+//
+function clinic_compare($a, $b) {
+  global $arr_clinics;
+  if ($a == $b) return  0; // they are the same
+  if (!$a     ) return  1; // a is for totals
+  if (!$b     ) return -1; // b is for totals
+  if ($a == -1) return  1; // a is unassigned clinic
+  if ($b == -1) return -1; // b is unassigned clinic
+  return $arr_clinics[$a] < $arr_clinics[$b] ? -1 : ($arr_clinics[$a] > $arr_clinics[$b] ? 1 : 0);
+}
+
 $arr_show   = array(
-  '.total' => array('title' => xl('Total')),
+  // '.total' => array('title' => xl('Total')),
   '.age2'  => array('title' => xl('Age Category') . ' (2)'),
   '.age9'  => array('title' => xl('Age Category') . ' (9)'),
 ); // info about selectable columns
@@ -1219,7 +1290,7 @@ while ($lrow = sqlFetchArray($lres)) {
    <select name='form_periods'
     title='<?php xl('To generate a column for each period','e'); ?>'>
 <?php
-  foreach (array(0 => xl('None'), 1 => xl('Months'), 2 => xl('Quarters'), 3 => xl('Years')) as $key => $value) {
+  foreach (array(0 => xl('Total - All'), 1 => xl('Months'), 2 => xl('Quarters'), 3 => xl('Years')) as $key => $value) {
     echo "    <option value='$key'";
     if ($key == $form_periods) echo " selected";
     echo ">$value</option>\n";
@@ -1310,6 +1381,10 @@ if ($_POST['form_submit']) {
     else if ($form_sexes == '2') $sexcond = "AND pd.sex LIKE 'Male' ";
     else if ($form_sexes == '3') $sexcond = "AND pd.sex NOT LIKE 'Male' AND pd.sex NOT LIKE 'Female' ";
 
+    if ($form_by == '105' && $form_content != 5 && $form_content != 3 && $form_content != 6) {
+      $alertmsg = xl("Contraceptive Products report requires Contraceptive Products or New Acceptors content type.");
+    }
+
     // In the case where content is contraceptive product sales, we
     // scan product sales at the top level because it is important to
     // account for each of them only once.  For each sale we determine
@@ -1384,9 +1459,6 @@ if ($_POST['form_submit']) {
         }
       }
     }
-    else if ($form_by == '105') {
-      $alertmsg = xl("Contraceptive Products report requires Contraceptive Products content type.");
-    }
 
     // Get referrals and related patient data.
     if ($form_content != 5 && ($form_by === '9' || $form_by === '10' ||
@@ -1433,131 +1505,12 @@ if ($_POST['form_submit']) {
       }
     }
 
-    // Reporting New Acceptors by Contraceptive Method (or method after abortion)
-    // is a special case that gets one method on each contraceptive start date.
+    // Reporting New Acceptors by contraceptive method (or method after abortion)
+    // or by contraceptive product is a special case that gets one method or product
+    // on each contraceptive start date.
     //
     if ($form_content == 3 || $form_content == 6) {
-     if ($form_by === '6' || $form_by === '7') {
-      /***************************************************************
-      // This gets us all MA codes, with encounter and patient
-      // info attached and grouped by patient and encounter.
-      $query = "SELECT " .
-        "pd.pid, pd.regdate, " .
-        "pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, " .
-        "pd.contrastart, pd.ippfconmeth, pd.referral_source$pd_fields " .
-        "FROM patient_data AS pd " .
-        "WHERE pd.contrastart IS NOT NULL AND " .
-        "pd.contrastart != '0000-00-00' AND " .
-        "pd.contrastart >= '$from_date' AND " .
-        "pd.contrastart <= '$to_date' $sexcond";
-      $query .= "ORDER BY pd.pid";
-      $res = sqlStatement($query);
-      //
-      while ($row = sqlFetchArray($res)) {
-        $contrastart = $row['contrastart'];
-        $ippfconmeth = $row['ippfconmeth'];
-        $thispid     = $row['pid'];
-        $row['encdate'] = "$contrastart 00:00:00";
-        //
-        if ($ippfconmeth) {
-          process_ippf_code($row, $ippfconmeth);
-        }
-        // If no method saved in patient_data, get it from the visit.
-        else {
-          $contraception_code = '';
-          $contraception_cyp  = -1;
-          $query = "SELECT " .
-            "pd.regdate, " .
-            "pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, " .
-            "pd.contrastart, pd.ippfconmeth, pd.referral_source$pd_fields, " .
-            "fe.pid, fe.encounter, fe.date AS encdate, " .
-            "f.user AS provider, " .
-            "b.code_type, b.code, c.related_code, lo.title AS lo_title " .
-            "FROM form_encounter AS fe " .
-            "JOIN forms AS f ON f.pid = fe.pid AND f.encounter = fe.encounter AND " .
-            "f.formdir = 'newpatient' AND f.form_id = fe.id AND f.deleted = 0 " .
-            "JOIN patient_data AS pd ON pd.pid = fe.pid $sexcond" .
-            "LEFT OUTER JOIN billing AS b ON " .
-            "b.pid = fe.pid AND b.encounter = fe.encounter AND b.activity = 1 " .
-            "AND b.code_type = 'MA' " .
-            "LEFT OUTER JOIN codes AS c ON b.code_type = 'MA' AND c.code_type = '12' AND " .
-            "c.code = b.code AND c.modifier = b.modifier " .
-            "LEFT OUTER JOIN list_options AS lo ON " .
-            "lo.list_id = 'superbill' AND lo.option_id = c.superbill " .
-            "WHERE fe.pid = '$thispid' AND fe.date >= '$contrastart 00:00:00' AND " .
-            "fe.date <= '$contrastart 23:59:59' ";
-          if ($form_facility) {
-            $query .= "AND fe.facility_id = '$form_facility' ";
-          }
-          $query .= "ORDER BY fe.encounter, b.code";
-          // echo "<!-- $query -->\n"; // debugging
-          $bres = sqlStatement($query);
-          while ($brow = sqlFetchArray($bres)) {
-            if ($brow['code_type'] === 'MA') {
-              if (!empty($brow['related_code'])) {
-                $relcodes = explode(';', $brow['related_code']);
-                foreach ($relcodes as $codestring) {
-                  if ($codestring === '') continue;
-                  list($codetype, $relcode) = explode(':', $codestring);
-                  if ($codetype !== 'IPPF') continue;
-                  // Code below borrowed from function contraceptionClass() in the Fee Sheet.
-                  if (
-                    preg_match('/^11....110/'    , $relcode) ||
-                    preg_match('/^11...[1-5]999/', $relcode) ||
-                    preg_match('/^112152010/'    , $relcode) ||
-                    preg_match('/^11317[1-2]111/', $relcode) ||
-                    preg_match('/^12118[1-2].13/', $relcode) ||
-                    preg_match('/^121181999/'    , $relcode) ||
-                    preg_match('/^122182.13/'    , $relcode) ||
-                    preg_match('/^122182999/'    , $relcode)
-                  ) {
-                    $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
-                      "code_type = '11' AND code = '$relcode' LIMIT 1");
-                    $cyp = 0 + $tmprow['cyp_factor'];
-                    if ($cyp > $contraception_cyp) {
-                      $contraception_cyp = $cyp;
-                      $contraception_code = $relcode;
-                    }
-                  }
-                  // End borrowed code.
-                }
-              }
-            }
-          } // end while
-          if ($contraception_code) {
-            process_ippf_code($row, $contraception_code);
-            // echo "<!-- process_ippf_code(row, $contraception_code) -->\n"; // debugging
-          }
-        }
-      }
-      ***************************************************************/
-
-      /***************************************************************
-      // This counts instances of "contraception starting" for the MA.  Note that a
-      // client could be counted twice, once for nonsurgical and once for surgical.
-      // Note also that we filter based on contrastart date, which is usually
-      // the same as encounter date but might not be.
-      $query = "SELECT " .
-        "d2.field_value AS contrastart, d3.field_value AS ippfconmeth, " .
-        "fe.pid, fe.encounter, fe.date AS encdate, " .
-        "f.user AS provider, " .
-        "pd.regdate, pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, " .
-        "pd.referral_source$pd_fields " .
-        "FROM forms AS f " .
-        "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'contratype' AND " .
-        "(d1.field_value = '2' OR d1.field_value = 3) " .
-        "JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'contrastart' AND " .
-        "d2.field_value IS NOT NULL AND d2.field_value >= '$from_date' AND d2.field_value <= '$to_date' " .
-        "LEFT JOIN lbf_data AS d3 ON d3.form_id = f.form_id AND d3.field_id = 'ippfconmeth' " .
-        "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter ";
-      if ($form_facility) {
-        $query .= "AND fe.facility_id = '$form_facility' ";
-      }
-      $query .=
-        "JOIN patient_data AS pd ON pd.pid = f.pid $sexcond " .
-        "WHERE f.formdir = 'LBFcontra' AND f.deleted = 0 " .
-        "ORDER BY fe.pid, fe.encounter, f.form_id";
-      ***************************************************************/
+     if ($form_by === '6' || $form_by === '7' || $form_by === '105') {
 
       // This counts instances of "contraception starting" for the MA.  Note that a
       // client could be counted twice, once for nonsurgical and once for surgical.
@@ -1595,7 +1548,8 @@ if ($_POST['form_submit']) {
       $query .=
         "ORDER BY fe.pid, fe.encounter, f.form_id";
 
-      echo "<!-- $query -->\n"; // debugging
+      // echo "<!-- $query -->\n"; // debugging
+
       $res = sqlStatement($query);
       //
       while ($row = sqlFetchArray($res)) {
@@ -1605,71 +1559,19 @@ if ($_POST['form_submit']) {
         $thisenc     = $row['encounter'];
         // echo "<!-- '$thispid' '$thisenc' '$contrastart' '$ippfconmeth' -->\n"; // debugging
 
-        /*************************************************************
-        if ($ippfconmeth) {
+        if ($form_by == '105') {
+          // For contraceptive product reporting we build a key containing
+          // the group and product names of the associated product sale with
+          // highest CYP.
+          loadColumnData(product_contraception_scan($thispid, $thisenc), $row);
+        }
+        else {
           process_ippf_code($row, $ippfconmeth);
         }
-        // If no method saved in patient_data, get it from the visit.
-        else {
-          $contraception_code = '';
-          $contraception_cyp  = -1;
-          $query = "SELECT " .
-            "b.code_type, b.code, c.related_code, lo.title AS lo_title " .
-            "FROM billing AS b WHERE " .
-            "b.pid = '$thispid' AND b.encounter = '$thisenc' AND b.activity = 1 " .
-            "AND b.code_type = 'MA' " .
-            "LEFT OUTER JOIN codes AS c ON b.code_type = 'MA' AND c.code_type = '12' AND " .
-            "c.code = b.code AND c.modifier = b.modifier " .
-            "LEFT OUTER JOIN list_options AS lo ON " .
-            "lo.list_id = 'superbill' AND lo.option_id = c.superbill " .
-            "ORDER BY b.code";
-          // echo "<!-- $query -->\n"; // debugging
-          $bres = sqlStatement($query);
-          while ($brow = sqlFetchArray($bres)) {
-            if ($brow['code_type'] === 'MA') {
-              if (!empty($brow['related_code'])) {
-                $relcodes = explode(';', $brow['related_code']);
-                foreach ($relcodes as $codestring) {
-                  if ($codestring === '') continue;
-                  list($codetype, $relcode) = explode(':', $codestring);
-                  if ($codetype !== 'IPPF') continue;
-                  // Code below borrowed from function contraceptionClass() in the Fee Sheet.
-                  if (
-                    preg_match('/^11....110/'    , $relcode) ||
-                    preg_match('/^11...[1-5]999/', $relcode) ||
-                    preg_match('/^112152010/'    , $relcode) ||
-                    preg_match('/^11317[1-2]111/', $relcode) ||
-                    preg_match('/^12118[1-2].13/', $relcode) ||
-                    preg_match('/^121181999/'    , $relcode) ||
-                    preg_match('/^122182.13/'    , $relcode) ||
-                    preg_match('/^122182999/'    , $relcode)
-                  ) {
-                    $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
-                      "code_type = '11' AND code = '$relcode' LIMIT 1");
-                    $cyp = 0 + $tmprow['cyp_factor'];
-                    if ($cyp > $contraception_cyp) {
-                      $contraception_cyp = $cyp;
-                      $contraception_code = $relcode;
-                    }
-                  }
-                  // End borrowed code.
-                }
-              }
-            }
-          } // end while
-          if ($contraception_code) {
-            process_ippf_code($row, $contraception_code);
-            // echo "<!-- process_ippf_code(row, $contraception_code) -->\n"; // debugging
-          }
-        }
-        *************************************************************/
-
-        process_ippf_code($row, $ippfconmeth);
-
       } // end while
      }
      else { // content is new acceptors but incompatible report type
-      $alertmsg = xl("New Acceptors content type is valid only for contraceptive method reporting.");
+      $alertmsg = xl("New Acceptors content type is valid only for contraceptive method or product reporting.");
      }
     } // end if
 
@@ -1744,6 +1646,7 @@ if ($_POST['form_submit']) {
     $period_col_count = 1;          // 1 for the ending totals column
     foreach ($form_show as $value) {
       if ($value == '.total') {     // Total Services
+        // .total is obsolete but keeping this code just in case.
         ++$period_col_count;
       }
       else if ($value == '.age2') { // Age
@@ -1810,7 +1713,11 @@ if ($_POST['form_submit']) {
     // If the key is an MA or IPPF code, then add a column for its description.
     if (uses_description($form_by)) {
       genHeadCell(array(xl('Code'), xl('Description')));
-    } else {
+    }
+    else if (uses_group_names($form_by)) {
+      genHeadCell(array(xl('Group'), xl('Method')));
+    }
+    else {
       genHeadCell('', 'left', 2);
     }
     // Generate headings for values to be shown.
@@ -1859,16 +1766,16 @@ if ($_POST['form_submit']) {
 
     foreach ($areport as $key => $varr) {
       $display_key = $key;
+      // Get group name, if any, for this key.
+      $this_group = '';
+      if (preg_match('/^{(.*)}(.*)/', $key, $tmp)) {
+        $this_group = $tmp[1];
+        $display_key = $tmp[2];
+      }
       if ($form_output != 3 && $form_content != '2' && $form_content != '3' && $form_content != '4') {
-        // Get group name, if any, for this key.
         // If it is a group change and there is a non-empty $last_group,
         // generate a subtotals line and clear subtotals array.
         // Set $last_group to the current group name.
-        $this_group = '';
-        if (preg_match('/^{(.*)}(.*)/', $key, $tmp)) {
-          $this_group = $tmp[1];
-          $display_key = $tmp[2];
-        }
         if ($this_group != $last_group) {
           if ($last_group_count > 1) {
             // Write subtotals only if more than one row in the group.
@@ -1900,6 +1807,12 @@ if ($_POST['form_submit']) {
         if (!empty($crow['code_text'])) $dispkey[1] = $crow['code_text'];
       }
 
+      // Or if a separate column for group name is needed, do that.
+      else if (uses_group_names($form_by)) {
+        $dispkey = array($this_group, $display_key);
+        $dispspan = 1;
+      }
+
       // If writing clinic-specific rows then write a title line for the key.
       if ($form_clinics) {
         genStartRow("bgcolor='#dddddd'");
@@ -1909,7 +1822,8 @@ if ($_POST['form_submit']) {
         $encount = 0;
       }
 
-      ksort($varr); // TBD: Probably sort by clinic name with '' last.
+      // Sort by clinic name with totals last.
+      uksort($varr['.dtl'], 'clinic_compare');
 
       foreach ($varr['.dtl'] as $clikey => $cliarr) {
         $bgcolor = (++$encount & 1) ? "#ddddff" : "#ffdddd";
@@ -1924,7 +1838,8 @@ if ($_POST['form_submit']) {
             $tmp = sqlQuery("SELECT name FROM facility WHERE id = '$clikey'");
             $cliname = $tmp['name'];
           }
-          genAnyCell($cliname, $clikey ? 'right' : 'left', 'detail', 2);
+          // genAnyCell($cliname, $clikey ? 'right' : 'left', 'detail', 2);
+          genAnyCell($cliname, 'right', 'detail', 2);
         }
         else {
           genAnyCell($dispkey, 'left', 'detail', $dispspan);
@@ -1935,6 +1850,8 @@ if ($_POST['form_submit']) {
 
         // Loop on periods to write the numeric data.
         foreach ($arr_periods as $perkey => $dummy) {
+          $totalsvcs = $areport[$key]['.dtl'][$clikey][$perkey]['.wom'] +
+                       $areport[$key]['.dtl'][$clikey][$perkey]['.men'];
           foreach ($form_show as $value) {
             if ($value == '.total') { // Total Services
               genNumCell($totalsvcs, $cnum++, $clikey);
@@ -1957,8 +1874,6 @@ if ($_POST['form_submit']) {
           }
 
           // Write this period's Total column data.
-          $totalsvcs = $areport[$key]['.dtl'][$clikey][$perkey]['.wom'] +
-                       $areport[$key]['.dtl'][$clikey][$perkey]['.men'];
           if (!$clikey) {
             $atotals[$cnum]    += $totalsvcs;
             $asubtotals[$cnum] += $totalsvcs;
