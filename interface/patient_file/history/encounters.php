@@ -110,6 +110,7 @@ function showDocument(&$drow) {
 </style>
 
 <script type="text/javascript" src="<?php echo $GLOBALS['webroot'] ?>/library/js/jquery.js"></script>
+<script type="text/javascript" src="<?php echo $GLOBALS['webroot'] ?>/library/js/ajtooltip.js"></script>
 
 <script language="JavaScript">
 
@@ -159,6 +160,13 @@ function editNote(feid) {
     var c = "<div id='"+ feid +"' title='<?php xl('Click to edit','e'); ?>' class='text billing_note_text'>" +
             fenote + "</div>";
     setDivContent('note_' + feid, c);
+ }
+
+ // Mouseover handler for encounter form names. Brings up a custom tooltip
+ // to display the form's contents.
+ function efmouseover(elem, ptid, encid, formname, formid) {
+  ttMouseOver(elem, "encounters_ajax.php?ptid=" + ptid + "&encid=" + encid +
+   "&formname=" + formname + "&formid=" + formid);
  }
 
 </script>
@@ -297,13 +305,14 @@ if ($result = getEncounters($pid)) {
         echo "<tr class='encrow text";
         // This color should be moved to the stylesheet when porting to current code.
         if (!$billed) echo " openvisit";
-        echo "' id='".$rawdata."' title='" .
-          xl('View encounter','','',' ') .
-          "$pid.{$iter['encounter']}'";
+        echo "' id='".$rawdata."'";
         echo ">\n";
 
         // show encounter date
-        echo "<td valign='top'>" . oeFormatShortDate($raw_encounter_date) . "</td>\n";
+        echo "<td valign='top' title='" .
+          xl('View encounter','','',' ') .
+          "$pid.{$iter['encounter']}'>" .
+          oeFormatShortDate($raw_encounter_date) . "</td>\n";
 
         // show if unbilled
         echo "<td valign='top'>" . ($billed ? xl('No') : xl('Yes')) . "</td>\n";
@@ -366,29 +375,13 @@ if ($result = getEncounters($pid)) {
                     ($auth_notes && $enc['user'] == $_SESSION['authUser']) ||
                     ($auth_relaxed && ($formdir == 'sports_fitness' || $formdir == 'podiatry'))) ;
                 else continue;
-    
-                // build the potentially HUGE tooltip used by ttshow
-                $title = xl('View encounter');
-                //
-                // Normally skip the tooltip because of poor database performance.
-                // However athletic teams want it.
-                //
-                if ($GLOBALS['athletic_team']) {
-                  if ($enc['formdir'] != 'physical_exam' && substr($enc['formdir'],0,3) != 'LBF') {
-                    $frow = sqlQuery("select * from form_" . $enc['formdir'] .
-                                    " where id = " . $enc['form_id']);
-                    foreach ($frow as $fkey => $fvalue) {
-                        if (! preg_match('/[A-Za-z]/', $fvalue)) continue;
-                        if ($title) $title .= "; ";
-                        $title .= strtoupper($fkey) . ': ' . $fvalue;
-                    }
-                    $title = htmlspecialchars(strtr($title, "\t\n\r", "   "), ENT_QUOTES);
-                  }
-                } // end athletic team
 
-                echo "<span class='form_tt' title=\"$title\">";
+                echo "<div " .
+                  "onmouseover='efmouseover(this,$pid," . $iter['encounter'] . ",\"" .
+                  $enc['formdir'] . "\"," . $enc['form_id'] . ")' " .
+                  "onmouseout='ttMouseOut()'>";
                 echo xl_form_title($enc['form_name']);
-                echo "</span><br>";
+                echo "</div><!-- <br> -->";
 
             } // end encounter Forms loop
     
@@ -580,6 +573,11 @@ while ($drow && $count <= $N) {
 </table>
 
 </div> <!-- end 'pastenc' large outer DIV -->
+
+<div id='tooltipdiv'
+ style='position:absolute;width:400pt;border:1px solid black;padding:2px;background-color:#ffffaa;visibility:hidden;z-index:1000;font-size:9pt;'
+></div>
+
 </body>
 
 <script language="javascript">
@@ -597,45 +595,7 @@ $(document).ready(function(){
     $(".billing_note_text").mouseover(function() { $(this).toggleClass("billing_note_text_highlight"); });
     $(".billing_note_text").mouseout(function() { $(this).toggleClass("billing_note_text_highlight"); });
     $(".billing_note_text").click(function(evt) { evt.stopPropagation(); editNote(this.id); });
-
-    // set up the tooltip function
-    //tooltip();
 });
-
-/* COMMENTED out July 2009 -- JRM
-this.tooltip = function(){  
-    // CONFIG
-    xOffset = 10;
-    yOffset = 20;       
-    // these 2 variable determine popup's distance from the cursor
-    // you might want to adjust to get the right result     
-    // END CONFIG
-
-    // display the floating tooltip paragraph
-    $(".form_tt").hover(function(e){                                             
-        this.t = this.title;
-        this.title = "";                                      
-        $("#patient_pastenc").append("<p class='tooltip text'>"+ this.t +"</p>");
-        $(".tooltip")
-            .css("top",(e.pageY - xOffset) + "px")
-            .css("left",(e.pageX + yOffset) + "px")
-            .fadeIn("fast");        
-    },
-
-    // destroy the tooltip paragraph
-    function(){
-        this.title = this.t;        
-        $(".tooltip").remove();
-    }); 
-
-    // mouse moves on tooltip paragraph
-    $(".form_tt").mousemove(function(e){
-        $(".tooltip")
-            .css("top",(e.pageY - xOffset) + "px")
-            .css("left",(e.pageX + yOffset) + "px");
-    }); 
-};
-*/
 
 </script>
 

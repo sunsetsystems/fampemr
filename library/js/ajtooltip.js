@@ -1,4 +1,4 @@
-// Copyright (C) 2009 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2009, 2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -30,6 +30,7 @@ var ttTimerId = 0;
 var ttElem = null;
 var ttobject = null;
 var ttUrl = '';
+var ttWantContent = false;
 
 function ttClearTimer() {
  if (ttTimerId) {
@@ -38,32 +39,33 @@ function ttClearTimer() {
   ttElem = null;
   ttUrl = '';
  }
+ ttWantContent = false;
 }
 
 // timer completion handler
 function ttMake() {
+ ttWantContent = true;
+ $.getScript(ttUrl);
+ ttTimerId = 0;
+}
+
+// this is called by the ajax script
+function ttCallback(str) {
+ if (!ttWantContent) return;
  ttobject = document.getElementById("tooltipdiv");
- // ttobject.innerHTML = (ttTitle.length > 0) ? ttTitle : 'Loading...';
- ttobject.innerHTML = '&nbsp;';
+ ttobject.innerHTML = str;
  var x = ttGetX(ttElem);
  var dw = window.innerWidth ? window.innerWidth - 20 : document.body.clientWidth;
  if (dw && dw < (x + ttobject.offsetWidth)) {
   x = dw - ttobject.offsetWidth;
   if (x < 0) x = 0;
  }
- // var y = ttGetY(ttElem) - ttobject.offsetHeight - 10;
- // if (y < 0) y = ttGetY(ttElem) + ttElem.offsetHeight + 10;
  var dh = window.innerHeight ? window.innerHeight : document.body.clientHeight;
- var y = ttGetY(ttElem) + ttobject.offsetHeight + 10;
- if (y + 40 > dh) y = 0;
+ var y = ttGetY(ttElem) + ttElem.offsetHeight;
  ttobject.style.left = x;
  ttobject.style.top  = y;
  ttobject.style.visibility='visible';
- // if (!ttElem.ttTitle) {
-  myUrl = ttUrl;
-  $.getScript(ttUrl);
- // }
- ttTimerId = 0;
+ ttWantContent = false;
  ttElem = null;
 }
 
