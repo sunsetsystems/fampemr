@@ -764,12 +764,11 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
         addForm($encounter, 'Contraception', $newid, 'LBFccicon', $pid, $userauthorized);
       }
     }
-    else if (!empty($csrow) && $csrow['field_value'] != $ippfconmeth) {
+    else if (empty($csrow) || $csrow['field_value'] != $ippfconmeth) {
       // Contraceptive method does not match what is in an existing Contraception
-      // form for this visit.  Open that form and it will present an appropriate
-      // message.
+      // form for this visit, or there is no such form.  Open the form.
       formJump("{$GLOBALS['rootdir']}/patient_file/encounter/view_form.php" .
-        "?formname=LBFccicon&id=" . $csrow['form_id']);
+        "?formname=LBFccicon&id=" . (empty($csrow) ? 0 : $csrow['form_id']));
       formFooter();
       exit;
     }
