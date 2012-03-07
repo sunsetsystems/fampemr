@@ -212,7 +212,7 @@ function sel_related() {
 <?php
   echo "$formtitle " . xl('for') . ' ';
   echo $enrow['fname'] . ' ' . $enrow['mname'] . ' ' . $enrow['lname'];
-  echo ' ' . xl('on') . ' ' . substr($enrow['date'], 0, 10);
+  echo ' ' . xl('on') . ' ' . oeFormatShortDate(substr($enrow['date'], 0, 10));
 ?>
 </p>
 
