@@ -1074,9 +1074,14 @@ while ($lrow = sqlFetchArray($lres)) {
     header("Pragma: public");
     header("Expires: 0");
     header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
-    header("Content-Type: application/force-download");
+    header("Content-Type: application/force-download; charset=utf-8");
     header("Content-Disposition: attachment; filename=service_statistics_report.csv");
     header("Content-Description: File Transfer");
+    // Prepend a BOM (Byte Order Mark) header to mark the data as UTF-8.  This is
+    // said to work for Excel 2007 pl3 and up and perhaps also Excel 2003 pl3.  See:
+    // http://stackoverflow.com/questions/155097/microsoft-excel-mangles-diacritics-in-csv-files
+    // http://crashcoursing.blogspot.com/2011/05/exporting-csv-with-special-characters.html
+    echo "\xEF\xBB\xBF";
   }
   else {
 ?>
