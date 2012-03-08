@@ -1,4 +1,10 @@
 <?php
+
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+
 require_once("../globals.php");
 require_once("$srcdir/log.inc");
 require_once("$srcdir/formdata.inc.php");
@@ -205,7 +211,9 @@ if ($start_date && $end_date && $err_message != 1) {
     echo '"' . xl('Date'    ) . '",';
     echo '"' . xl('Event'   ) . '",';
     echo '"' . xl('User'    ) . '",';
-    echo '"' . xl('Group'   ) . '",';
+    if (empty($GLOBALS['disable_non_default_groups'])) {
+      echo '"' . xl('Group'   ) . '",';
+    }
     echo '"' . xl('Comments') . '"' . "\n";
   }
   else { // not export
@@ -216,7 +224,9 @@ if ($start_date && $end_date && $err_message != 1) {
   <th id="sortby_date" class="text" title="<?php xl('Sort by date/time','e'); ?>"><?php xl('Date','e'); ?></th>
   <th id="sortby_event" class="text" title="<?php xl('Sort by Event','e'); ?>"><?php  xl('Event','e'); ?></th>
   <th id="sortby_user" class="text" title="<?php xl('Sort by User','e'); ?>"><?php  xl('User','e'); ?></th>
+<?php if (empty($GLOBALS['disable_non_default_groups'])) { ?>
   <th id="sortby_group" class="text" title="<?php xl('Sort by Group','e'); ?>"><?php  xl('Group','e'); ?></th>
+<?php } ?>
   <th id="sortby_comments" class="text" title="<?php xl('Sort by Comments','e'); ?>"><?php  xl('Comments','e'); ?></th>
  </tr>
 <?php
@@ -234,7 +244,9 @@ if ($ret = getEvents(array('sdate' => $get_sdate,'edate' => $get_edate, 'user' =
       echo '"' . oeFormatShortDate(substr($iter["date"], 0, 10)) . substr($iter["date"], 10) . '",';
       echo '"' . xl($iter["event"]    ) . '",';
       echo '"' . xl($iter["user"]     ) . '",';
-      echo '"' . xl($iter["groupname"]) . '",';
+      if (empty($GLOBALS['disable_non_default_groups'])) {
+        echo '"' . xl($iter["groupname"]) . '",';
+      }
       echo '"' . $trans_comments        . '"' . "\n";
     }
     else { // not export
@@ -243,7 +255,9 @@ if ($ret = getEvents(array('sdate' => $get_sdate,'edate' => $get_edate, 'user' =
   <TD class="text"><?php echo oeFormatShortDate(substr($iter["date"], 0, 10)) . substr($iter["date"], 10) ?></TD>
   <TD class="text"><?php echo xl($iter["event"])?></TD>
   <TD class="text"><?php echo $iter["user"]?></TD>
+<?php if (empty($GLOBALS['disable_non_default_groups'])) { ?>
   <TD class="text"><?php echo $iter["groupname"]?></TD>
+<?php } ?>
   <TD class="text"><?php echo $trans_comments?></TD>
  </TR>
 <?php
@@ -283,7 +297,9 @@ $(document).ready(function(){
     $("#sortby_date").click(function() { $("#sortby").val("date"); $("#theform").submit(); });
     $("#sortby_event").click(function() { $("#sortby").val("event"); $("#theform").submit(); });
     $("#sortby_user").click(function() { $("#sortby").val("user"); $("#theform").submit(); });
+<?php if (empty($GLOBALS['disable_non_default_groups'])) { ?>
     $("#sortby_group").click(function() { $("#sortby").val("groupname"); $("#theform").submit(); });
+<?php } ?>
     $("#sortby_comments").click(function() { $("#sortby").val("comments"); $("#theform").submit(); });
 });
 
