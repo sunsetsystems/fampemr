@@ -453,3 +453,14 @@ CREATE INDEX `type` ON `lists` (`type`);
 CREATE INDEX `pid` ON `lists` (`pid`);
 #EndIf
 
+#IfNotRow2D list_options list_id lists option_id paymethod
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','paymethod','Payment Methods', 1,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','Cash' ,'Cash' ,10,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','Check','Check',20,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','MC'   ,'MC'   ,30,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','VISA' ,'VISA' ,40,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','AMEX' ,'AMEX' ,50,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','DISC' ,'DISC' ,60,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','Other','Other',70,0);
+#EndIf
+

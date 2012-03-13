@@ -3169,3 +3169,12 @@ INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('reftype','3
 INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('reftype','4' ,'Inbound External',30);
 INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('reftype','5' ,'Inbound Internal',40);
 
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','paymethod','Payment Methods', 1,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','Cash' ,'Cash' ,10,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','Check','Check',20,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','MC'   ,'MC'   ,30,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','VISA' ,'VISA' ,40,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','AMEX' ,'AMEX' ,50,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','DISC' ,'DISC' ,60,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','Other','Other',70,0);
+

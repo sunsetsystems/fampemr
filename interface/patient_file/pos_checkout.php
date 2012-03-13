@@ -36,6 +36,7 @@ require_once("$srcdir/formatting.inc.php");
 require_once("$srcdir/formdata.inc.php");
 require_once("../../custom/code_types.inc.php");
 require_once("$srcdir/calendar_events.inc.php");
+require_once("$srcdir/options.inc.php");
 
 $currdecimals = $GLOBALS['currency_decimals'];
 
@@ -598,6 +599,7 @@ function markTaxes($taxrates) {
   }
 }
 
+/*********************************************************************
 $payment_methods = array(
   'Cash',
   'Check',
@@ -606,6 +608,7 @@ $payment_methods = array(
   'AMEX',
   'DISC',
   'Other');
+*********************************************************************/
 
 $alertmsg = ''; // anything here pops up in an alert box
 
@@ -1101,14 +1104,17 @@ if ($inv_encounter) {
    <?php xl('Payment Method','e'); ?>:
   </td>
   <td>
-   <select name='form_method'>
-<?
+<?php
+ /********************************************************************
+ echo "   <select name='form_method'>\n";
  foreach ($payment_methods as $value) {
   echo "    <option value='$value'";
   echo ">$value</option>\n";
  }
+ echo"   </select>\n";
+ ********************************************************************/
+ echo generate_select_list('form_method', 'paymethod', '', '', '');
 ?>
-   </select>
   </td>
  </tr>
 
