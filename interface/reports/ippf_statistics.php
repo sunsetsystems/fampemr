@@ -600,6 +600,7 @@ function loadColumnData($key, $row, $quantity=1) {
   }
   *******************************************************************/
 }
+
 // This determines a key for the product with highest CYP in a visit.
 //
 function product_contraception_scan($pid, $encounter) {
@@ -646,6 +647,65 @@ function product_contraception_scan($pid, $encounter) {
     $key = '{' . $contra_group_name . '}' . $current_name;
   }
   return $key;
+}
+
+// This gets the "normalized" contraception code of the service with highest CYP
+// in a visit, similarly to the method that the Fee Sheet uses to assign a value
+// for newmethod.  Currently this function is only needed for the special case where
+// LBFccicon indicates a New User but no method is in the form, which in turn
+// happens only for conversions of old data from release 3.2.0.7.
+//
+function service_contraception_scan($pid, $encounter) {
+  $contraception_code = '';
+  $contraception_cyp  = -1;
+  $query = "SELECT " .
+    "b.code_type, b.code, c.related_code " .
+    "FROM billing AS b " .
+    "JOIN codes AS c ON b.code_type = 'MA' AND c.code_type = '12' AND " .
+    "c.code = b.code AND c.modifier = b.modifier AND c.related_code != '' " .
+    "WHERE b.pid = '$pid' AND b.encounter = '$encounter' AND b.activity = 1 " .
+    "AND b.code_type = 'MA'";
+  $bres = sqlStatement($query);
+  while ($brow = sqlFetchArray($bres)) {
+    $relcodes = explode(';', $brow['related_code']);
+    foreach ($relcodes as $codestring) {
+      if ($codestring === '') continue;
+      list($codetype, $relcode) = explode(':', $codestring);
+      if ($codetype !== 'IPPF') continue;
+      if (
+        preg_match('/^11....110/'    , $relcode) ||
+        preg_match('/^11...[1-5]999/', $relcode) ||
+        preg_match('/^112152010/'    , $relcode) ||
+        preg_match('/^11317[1-2]111/', $relcode) ||
+        preg_match('/^12118[1-2].13/', $relcode) ||
+        preg_match('/^121181999/'    , $relcode) ||
+        preg_match('/^122182.13/'    , $relcode) ||
+        preg_match('/^122182999/'    , $relcode)
+      ) {
+        $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
+          "code_type = '11' AND code = '$relcode' LIMIT 1");
+        $cyp = 0 + $tmprow['cyp_factor'];
+        if ($cyp > $contraception_cyp) {
+          $contraception_cyp = $cyp;
+          $contraception_code = $relcode;
+        }
+      }
+    }
+  } // end while
+  if ($contraception_code) {
+    if (preg_match('/^12/', $contraception_code)) {
+      // Identify the method with the IPPF code for the corresponding surgical procedure.
+      $contraception_code = substr($contraception_code, 0, 7) . '13';
+    }
+    else {
+      // Xavier confirms that the codes for Cervical Cap (112152010 and 112152011) are
+      // an unintended change in pattern, but at this point we have to live with it.
+      // -- Rod 2011-09-26
+      $contraception_code = substr($contraception_code, 0, 6) . '110';
+      if ($contraception_code == '112152110') $contraception_code = '112152010';
+    }
+  }
+  return $contraception_code;
 }
 
 // This is called for each IPPF service code that is selected.
@@ -1536,7 +1596,7 @@ if ($_POST['form_submit']) {
       if ($form_content == 3) {
         // Content type 3, IPPF new acceptors
         $query .=
-          "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
+          "LEFT JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
           "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
           "JOIN patient_data AS pd ON pd.pid = f.pid $sexcond " .
           "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND " .
@@ -1571,6 +1631,11 @@ if ($_POST['form_submit']) {
           loadColumnData(product_contraception_scan($thispid, $thisenc), $row);
         }
         else {
+          // If the new method is missing, try to get it from the billing table.
+          // That should happen only for old data from sites upgraded from release 3.2.0.7.
+          if (empty($ippfconmeth)) {
+            $ippfconmeth = service_contraception_scan($row['pid'], $row['encounter']);
+          }
           process_ippf_code($row, $ippfconmeth);
         }
       } // end while
