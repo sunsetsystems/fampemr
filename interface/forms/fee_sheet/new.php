@@ -405,7 +405,7 @@ function echoProdLine($lino, $drug_id, $rx = FALSE, $del = FALSE, $units = NULL,
     if (fees_are_used()) {
       echo "  <td class='billcell' align='right'>" .
         "<input type='text' name='prod[$lino][price]' " .
-        "value='$price' size='6'";
+        "value='$price' size='6' onchange='setSaveAndClose()'";
       if (acl_check('acct','disc'))
         echo " style='text-align:right'";
       else

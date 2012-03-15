@@ -1611,18 +1611,31 @@ if ($_POST['form_submit']) {
           "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 ";
       }
       $query .=
-        "ORDER BY fe.pid, fe.encounter, f.form_id";
+        "ORDER BY fe.pid, encdate DESC, fe.encounter DESC, f.form_id";
 
       // echo "<!-- $query -->\n"; // debugging
 
       $res = sqlStatement($query);
+      $lastpid = 0;
+      $lastyear = '0000';
       //
       while ($row = sqlFetchArray($res)) {
         $contrastart = $row['contrastart'];
         $ippfconmeth = $row['ippfconmeth'];
         $thispid     = $row['pid'];
         $thisenc     = $row['encounter'];
-        // echo "<!-- '$thispid' '$thisenc' '$contrastart' '$ippfconmeth' -->\n"; // debugging
+        $thisyear    = substr($contrastart, 0, 4);
+
+        // Leslie on 2012-03-12 says IPPF New Users may only be reported once per calendar year.
+        // While on this, we'll also make sure "acceptors new to modern contraception" happen
+        // only once regardless of the year.  Note we are sorting by descending date within
+        // pid, so only the last occurrence per client will be reported.
+        if ($thispid == $lastpid && ($thisyear == $lastyear || $form_content != 3)) {
+          continue;
+        }
+
+        $lastpid = $thispid;
+        $lastyear = $thisyear;
 
         if ($form_by == '105') {
           // For contraceptive product reporting we build a key containing
