@@ -983,6 +983,7 @@ if (!empty($reg)) {
           <?php genPopLink(xl('Cash Rec'),'../billing/sl_receipts_report.php'); ?>
           <?php genPopLink(xl('Front Rec'),'front_receipts_report.php'); ?>
           <?php genPopLink(xl('Pmt Method'),'receipts_by_method_report.php'); ?>
+          <?php genPopLink(xl('Meth by Inv'),'methods_by_invoice.php'); ?>
           <?php genPopLink(xl('Collections'),'collections_report.php'); ?>
         </ul>
       </li>
