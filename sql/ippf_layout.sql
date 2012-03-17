@@ -2024,3 +2024,22 @@ INSERT INTO layout_options VALUES ('LBFccicon', 'provider' , '1', 'Service Provi
 INSERT INTO layout_options VALUES ('LBFccicon', 'mcreason' , '1', 'Reason for Method Change',
   7,  1, 1, 0, 0, 'mcreason'   , 1, 3, '', '', 'Reason for method change');
 
+-- The following added 2012-03-17:
+
+-- Set group names for IPPF contraceptive methods.
+UPDATE list_options SET mapping = 'Pills'          WHERE list_id = 'ippfconmeth' AND option_id LIKE '11110%'  AND mapping = '';
+UPDATE list_options SET mapping = 'Injectables'    WHERE list_id = 'ippfconmeth' AND option_id LIKE '11111%'  AND mapping = '';
+UPDATE list_options SET mapping = 'Implants'       WHERE list_id = 'ippfconmeth' AND option_id LIKE '11112%'  AND mapping = '';
+UPDATE list_options SET mapping = 'Hormonal Other' WHERE list_id = 'ippfconmeth' AND option_id LIKE '11113%'  AND mapping = '';
+UPDATE list_options SET mapping = 'Barrier'        WHERE list_id = 'ippfconmeth' AND option_id LIKE '11214%'  AND mapping = '';
+UPDATE list_options SET mapping = 'Barrier'        WHERE list_id = 'ippfconmeth' AND option_id LIKE '11215%'  AND mapping = '';
+UPDATE list_options SET mapping = 'Spermicides'    WHERE list_id = 'ippfconmeth' AND option_id LIKE '11216%'  AND mapping = '';
+UPDATE list_options SET mapping = 'IUD'            WHERE list_id = 'ippfconmeth' AND option_id LIKE '11317%'  AND mapping = '';
+UPDATE list_options SET mapping = 'Female VSC'     WHERE list_id = 'ippfconmeth' AND option_id LIKE '121181%' AND mapping = '';
+UPDATE list_options SET mapping = 'Male VSC'       WHERE list_id = 'ippfconmeth' AND option_id LIKE '121182%' AND mapping = '';
+UPDATE list_options SET mapping = 'EC'             WHERE list_id = 'ippfconmeth' AND option_id LIKE '14521%'  AND mapping = '';
+
+-- Set flags to indicate which are the modern conraceptive methods.
+UPDATE list_options SET option_value = 0 WHERE list_id = 'contrameth';
+UPDATE list_options SET option_value = 1 WHERE list_id = 'contrameth' AND mapping LIKE '%:1%';
+
