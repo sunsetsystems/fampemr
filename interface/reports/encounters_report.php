@@ -49,7 +49,7 @@ $orderby = $ORDERHASH[$form_orderby];
 // Get the info.
 //
 $query = "SELECT " .
-  "fe.encounter, fe.date, fe.reason, " .
+  "fe.encounter, fe.date, fe.reason, fe.provider_id, " .
   "f.formdir, f.form_name, " .
   "p.fname, p.mname, p.lname, p.pid, p.pubpid, " .
   "u.lname AS ulname, u.fname AS ufname, u.mname AS umname " .
@@ -106,6 +106,9 @@ $res = sqlStatement($query);
 
 <link rel=stylesheet href="<?php echo $css_header;?>" type="text/css">
 <style type="text/css">
+
+.provname  {font-size:10pt; font-weight:bold;}
+.billcodes {font-size:8pt;}
 
 /* specifically include & exclude from printing */
 @media print {
@@ -358,6 +361,7 @@ if ($res) {
   $total_encounters = 0;
   while ($row = sqlFetchArray($res)) {
     $patient_id = $row['pid'];
+    $def_provider_id = 0 + $row['provider_id'];
 
     $docname = '-- ' . xl('Unassigned') . ' --';
     if (!empty($row['ulname']) || !empty($row['ufname'])) {
@@ -382,17 +386,47 @@ if ($res) {
       $coded = "";
       $billed_count = 0;
       $unbilled_count = 0;
-      if ($billres = getBillingByEncounter($row['pid'], $row['encounter'],
-        "code_type, code, code_text, billed"))
-      {
-        foreach ($billres as $billrow) {
-          // $title = addslashes($billrow['code_text']);
-          if ($billrow['code_type'] != 'COPAY' && $billrow['code_type'] != 'TAX') {
-            $coded .= $billrow['code'] . ', ';
-            if ($billrow['billed']) ++$billed_count; else ++$unbilled_count;
+      $last_provider_id = -1;
+
+      // if ($billres = getBillingByEncounter($row['pid'], $row['encounter'],
+      //   "code_type, code, code_text, billed"))
+
+      $billres = sqlStatement("SELECT " .
+        "b.code_type, b.code, b.code_text, b.billed, u.id, " .
+        "u.lname, u.fname, u.username " .
+        "FROM billing AS b " .
+        "LEFT JOIN users AS u ON u.id = IF(b.provider_id, b.provider_id, '$def_provider_id') " .
+        "WHERE " .
+        "b.pid = '" . $row['pid'] . "' AND " .
+        "b.encounter = '" . $row['encounter'] . "' AND " .
+        "b.activity = 1 " .
+        "ORDER BY u.lname, u.fname, u.id, b.code_type, b.code");
+
+      while ($billrow = sqlFetchArray($billres)) {
+        // $title = addslashes($billrow['code_text']);
+        if ($billrow['code_type'] != 'COPAY' && $billrow['code_type'] != 'TAX') {
+          $provider_id = empty($billrow['id']) ? 0 : 0 + $billrow['id'];
+          if ($provider_id != $last_provider_id) {
+            $last_provider_id = $provider_id;
+            $provname = 'Unknown';
+            if ($provider_id) {
+              if (empty($billrow['lname'])) {
+                $provname = '(' . $billrow['username'] . ')';
+              }
+              else {
+                $provname = $billrow['lname'];
+                if ($billrow['fname']) $provname .= ',' . substr($billrow['fname'], 0, 1);
+              }
+            }
+            if (!empty($coded)) $coded .= '<br />';
+            $coded .= "<span class='provname'>$provname:</span> ";
           }
+          else {
+            $coded .= ", ";
+          }
+          $coded .= $billrow['code'];
+          if ($billrow['billed']) ++$billed_count; else ++$unbilled_count;
         }
-        $coded = substr($coded, 0, strlen($coded) - 2);
       }
 
       // Figure product sales into billing status.
@@ -430,7 +464,7 @@ if ($res) {
   <td>
    <?php echo $encnames; ?>&nbsp;
   </td>
-  <td>
+  <td class='billcodes'>
    <?php echo $coded; ?>
   </td>
  </tr>
