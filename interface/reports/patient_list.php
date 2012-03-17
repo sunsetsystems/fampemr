@@ -13,6 +13,9 @@
  require_once("$srcdir/patient.inc");
  require_once("$srcdir/formatting.inc.php");
 
+ $form_filter_type = empty($_POST['form_filter_type']) ? 0 : 0 + $_POST['form_filter_type'];
+ $form_facility = empty($_POST['form_facility']) ? 0 : 0 + $_POST['form_facility'];
+
  // $from_date = fixDate($_POST['form_from_date'], date('Y-01-01'));
  // $to_date   = fixDate($_POST['form_to_date'], date('Y-12-31'));
  $from_date = fixDate($_POST['form_from_date'], '');
@@ -28,9 +31,18 @@
 <script type="text/javascript" src="../../library/overlib_mini.js"></script>
 <script type="text/javascript" src="../../library/textformat.js"></script>
 <script type="text/javascript" src="../../library/dialog.js"></script>
+
 <script language="JavaScript">
  var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
+
+ function filterTypeChanged() {
+  var f = document.forms[0];
+  if (f.form_filter_type) {
+   f.form_facility.disabled = f.form_filter_type.value == 0;
+  }
+ }
 </script>
+
 <link rel='stylesheet' href='<?php echo $css_header ?>' type='text/css'>
 <style type="text/css">
 
@@ -97,9 +109,6 @@
 
 <body class="body_top">
 
-<!-- Required for the popup date selectors -->
-<div id="overDiv" style="position:absolute; visibility:hidden; z-index:1000;"></div>
-
 <center>
 
 <h2><?php xl('Patient List','e'); ?></h2>
@@ -113,6 +122,44 @@
 <form name='theform' method='post' action='patient_list.php'>
 
 <table>
+<?php
+// Query for facilities and find out if more than one. 
+$query = "SELECT id, name FROM facility ORDER BY name";
+$fres = sqlStatement($query);
+if (mysql_num_rows($fres) > 1) {
+?>
+ <tr>
+  <td>
+   <select name='form_filter_type' onchange='filterTypeChanged()'>
+<?php
+  foreach (array(
+    0 => xl('All Clients / All Facilities'),
+    1 => xl('Clients with first visit at'),
+    2 => xl('Clients with last visit at'),
+  ) as $key => $value) {
+    echo "    <option value='$key'";
+    if ($key == $form_filter_type) echo " selected";
+    echo ">$value</option>\n";
+  }
+?>
+   </select>
+<?php
+  // Build a drop-down list of facilities.
+  echo "   <select name='form_facility'>\n";
+  while ($frow = sqlFetchArray($fres)) {
+    $facid = $frow['id'];
+    echo "    <option value='$facid'";
+    if ($facid == $form_facility) echo " selected";
+    echo ">" . $frow['name'] . "\n";
+  }
+  echo "   </select>\n";
+?>
+  </td>
+ </tr>
+<?php
+}
+?>
+
  <tr>
   <td>
    <select name='form_having'>
@@ -174,7 +221,13 @@
    "LEFT OUTER JOIN insurance_data AS i2 ON " .
    "i2.pid = p.pid AND i2.type = 'secondary' " .
    "LEFT OUTER JOIN insurance_companies AS c2 ON " .
-   "c2.id = i2.provider " .
+   "c2.id = i2.provider ";
+  if ($form_filter_type) {
+    $aord = $form_filter_type == '1' ? 'ASC' : 'DESC';
+    $query .= "WHERE (SELECT facility_id FROM form_encounter WHERE
+      pid = p.pid ORDER BY date $aord, encounter $aord LIMIT 1) = '$form_facility' ";
+  }
+  $query .=
    "GROUP BY p.lname, p.fname, p.mname, p.pid, i1.date, i2.date " .
    "ORDER BY p.lname, p.fname, p.mname, p.pid, i1.date DESC, i2.date DESC";
   $res = sqlStatement($query);
@@ -256,5 +309,6 @@
 <script language="Javascript">
  Calendar.setup({inputField:"form_from_date", ifFormat:"%Y-%m-%d", button:"img_from_date"});
  Calendar.setup({inputField:"form_to_date", ifFormat:"%Y-%m-%d", button:"img_to_date"});
+ filterTypeChanged();
 </script>
 </html>
