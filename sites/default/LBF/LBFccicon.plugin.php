@@ -81,6 +81,8 @@ function LBFccicon_javascript() {
   }
 
   echo "
+var pastmodern_autoset = false;
+
 // Respond to selection of a current method.
 // If it is unassigned or not modern, ask if a modern method was used anywhere before.
 // Otherwise if new method != current then ask reason for method change.
@@ -89,9 +91,11 @@ function current_method_changed() {
  f.form_pastmodern.disabled = true;
  f.form_mcreason.disabled = true;
  if (f.form_curmethod.selectedIndex <= 0 || contraMapping[f.form_curmethod.value] == '00000') {
-  // Enable past use question iff no modern current method and only if the
-  // global option is set to record all acceptors new to modern contraception.
-  f.form_pastmodern.disabled = " . ($GLOBALS['gbl_new_acceptor_policy'] == '3' ? 'false' : 'true') . ";
+  if (!pastmodern_autoset) {
+   // Enable past use question iff no modern current method and only if the
+   // global option is set to record all acceptors new to modern contraception.
+   f.form_pastmodern.disabled = " . ($GLOBALS['gbl_new_acceptor_policy'] == '3' ? 'false' : 'true') . ";
+  }
  }
  else {
   // Here there is a current modern method.  Use its regex pattern to decide if
@@ -111,8 +115,11 @@ function current_method_changed() {
 // we do want to save the default values that were set for them.
 function mysubmit() {
  var f = document.forms[0];
+ f.form_newmauser.disabled = false;
+ f.form_pastmodern.disabled = false;
  f.form_newmethod.disabled = false;
  f.form_provider.disabled = false;
+ f.form_mcreason.disabled = false;
  top.restoreSession();
  return true;
 }
@@ -126,6 +133,11 @@ function LBFccicon_javascript_onload() {
   global $formid, $pid, $encounter;
   global $contraception_code, $contraception_cyp, $contraception_prov;
 
+  $encrow = sqlQuery("SELECT date, provider_id FROM form_encounter " .
+    "WHERE pid = '$pid' AND encounter = '$encounter' " .
+    "ORDER BY id DESC LIMIT 1");
+  $encdate = $encrow['date'];
+
   $billresult = getBillingByEncounter($pid, $encounter, "*");
   foreach ($billresult as $iter) {
     _LBFccicon_contraception_scan($iter["code_type"], trim($iter["code"]), $iter['provider_id']);
@@ -133,10 +145,7 @@ function LBFccicon_javascript_onload() {
 
   // If no provider at the line level, use the encounter's default provider.
   if (empty($contraception_prov)) {
-    $tmp = sqlQuery("SELECT provider_id FROM form_encounter " .
-      "WHERE pid = '$pid' AND encounter = '$encounter' " .
-      "ORDER BY id DESC LIMIT 1");
-    $contraception_prov = 0 + $tmp['provider_id'];
+    $contraception_prov = 0 + $encrow['provider_id'];
   }
 
   // Normalize the IPPF service code to what we use in our list of methods.
@@ -158,9 +167,45 @@ function LBFccicon_javascript_onload() {
     }
   }
 
+  // Get details of the last previous instance of this form, if any.
+  // * "First contraception at this clinic" should be auto-set to NO
+  //   and disabled if that question was answered previously.
+  // * "Previous modern contraceptive use" should auto-set to YES
+  //   and disabled it was YES previously.
+  //
+  $js_extra = "";
+  $prvrow = sqlQuery("SELECT " .
+    "d1.field_value AS newmauser, " .
+    "d2.field_value AS pastmodern " .
+    "FROM forms AS f " .
+    "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
+    "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmauser' " .
+    "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'pastmodern' " .
+    "WHERE f.pid = '$pid' AND " .
+    "f.formdir = 'LBFccicon' AND " .
+    "f.deleted = 0 AND " .
+    "f.form_id != '$formid' AND " .
+    "fe.date < '$encdate' " .
+    "ORDER BY fe.date DESC, f.form_id DESC LIMIT 1");
+  if (!empty($prvrow)) {
+    $js_extra .=
+      "// There was a previous instance of this form so we know they are not a new MA user.\n" .
+      "f.form_newmauser.selectedIndex = 1;\n" .
+      "f.form_newmauser.disabled = true;\n";
+    if (!empty($prvrow['pastmodern'])) {
+      $js_extra .=
+        "\n// Past Modern was previously true so must also be true now.\n" .
+        "f.form_pastmodern.selectedIndex = 2;\n" .
+        "f.form_pastmodern.disabled = true;\n" .
+        "pastmodern_autoset = true;\n";
+    }
+  }
+
   echo "
 var f = document.forms[0];
 var sel;
+
+$js_extra
 
 current_method_changed();
 
