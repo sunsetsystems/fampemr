@@ -308,7 +308,7 @@ function getContraceptiveMethod($code) {
   $row = sqlQuery("SELECT title, mapping FROM list_options WHERE " .
     "list_id = 'ippfconmeth' AND option_id = '$code'");
   if (!empty($row['title'])) {
-    $key = $row['title'];
+    $key = xl_list_label($row['title']);
     if (!empty($row['mapping'])) {
       $contra_group_name = substr($code, 0, 5) . ' ' . $row['mapping'];
     }
