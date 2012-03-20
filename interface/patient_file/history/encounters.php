@@ -388,15 +388,6 @@ if ($result = getEncounters($pid)) {
             echo "</div>";
             echo "</td>\n";
 
-            // show user (Provider) for the encounter
-            $provname = '&nbsp;';
-            if (!empty($result4['lname']) || !empty($result4['fname'])) {
-              $provname = $result4['lname'];
-              if (!empty($result4['fname']) || !empty($result4['mname']))
-                $provname .= ', ' . $result4['fname'] . ' ' . $result4['mname'];
-            }
-            echo "<td>$provname</td>\n";
-
         } // end not billing view
 
         //this is where we print out the text of the billing that occurred on this encounter
@@ -405,12 +396,63 @@ if ($result = getEncounters($pid)) {
             if ($erow['user'] == $_SESSION['authUser'])
                 $thisauth = $auth_coding;
         }
-        $coded = "";
+
+        $hprovs = ''; // will hold html for providers
+        $hcodes = ''; // will hold html for billing details
+        $def_provider_id = 0 + $result4['provider_id'];
+        $last_provider_id = -1;
+        $def_provider_used = false;
+
         $arid = 0;
         if ($thisauth && $auth_sensitivity) {
             $binfo = array('', '', '', '', '');
-            if ($subresult2 = getBillingByEncounter($pid, $iter['encounter'], "code_type, code, modifier, code_text, fee"))
-            {
+            $subresult2 = array();
+
+            $billres = sqlStatement("SELECT " .
+              "b.code_type, b.code, b.modifier, b.code_text, b.fee, " .
+              "u.id, u.lname, u.fname, u.username " .
+              "FROM billing AS b " .
+              "LEFT JOIN users AS u ON u.id = IF(b.provider_id, b.provider_id, '$def_provider_id') " .
+              "WHERE " .
+              "b.pid = '$pid' AND " .
+              "b.encounter = '" . $iter['encounter'] . "' AND " .
+              "b.activity = 1 " .
+              "ORDER BY u.lname, u.fname, u.id, b.code_type, b.code");
+
+            while ($billrow = sqlFetchArray($billres)) {
+              // if ($billrow['code_type'] != 'COPAY' && $billrow['code_type'] != 'TAX') {
+              if (true) {
+                $subresult2[] = $billrow;
+                $provider_id = empty($billrow['id']) ? 0 : 0 + $billrow['id'];
+                if ($provider_id != $last_provider_id) {
+                  $last_provider_id = $provider_id;
+                  $provname = '(' . xl('Unknown') . ')';
+                  if ($provider_id) {
+                    if (empty($billrow['lname']) && empty($billrow['fname'])) {
+                      $provname = '(' . xl('No name') . ')';
+                    }
+                    else {
+                      $provname = $billrow['lname'];
+                      if ($billrow['fname']) $provname .= ', ' . $billrow['fname'];
+                    }
+                  }
+                  if (!empty($hprovs)) $hprovs .= '<br />';
+                  if ($provider_id == $def_provider_id) {
+                    $def_provider_used = true;
+                    $hprovs .= "<b>$provname</b>";
+                  }
+                  else {
+                    $hprovs .= "$provname";
+                  }
+                }
+                else {
+                  $hprovs .= "&nbsp;<br />";
+                }
+              }
+            }
+
+            if ($subresult2) { // if there is at least one billing item
+
                 // Get A/R info, if available, for this encounter.
                 $arinvoice = array();
                 $arlinkbeg = "";
@@ -502,15 +544,41 @@ if ($result = getEncounters($pid)) {
                 }
             } // end if there is billing
 
-            echo "<td class='text'>".$binfo[0]."</td>\n";
+            // echo "<td class='text'>".$binfo[0]."</td>\n";
+            $hcodes .= "<td class='text'>" . $binfo[0] . "</td>\n";
             for ($i = 1; $i < 5; ++$i) {
-                echo "<td class='text right'>". $binfo[$i]."</td>\n";
+                // echo "<td class='text right'>". $binfo[$i]."</td>\n";
+                $hcodes .= "<td class='text right'>" . $binfo[$i] . "</td>\n";
             }
         } // end if authorized
 
         else {
-            echo "<td class='text' valign='top' colspan='5' rowspan='$encounter_rows'>(No access)</td>\n";
+            // echo "<td class='text' valign='top' colspan='5' rowspan='$encounter_rows'>(No access)</td>\n";
+            $hcodes .= "<td class='text' valign='top' colspan='5' rowspan='$encounter_rows'>(No access)</td>\n";
         }
+
+        // Write the providers column if this is the clinical view.
+        if (!$billing_view) {
+          if (!$def_provider_used) {
+            // show default provider for the encounter
+            $provname = '(' . xl('Unknown') . ')';
+            if ($def_provider_id) {
+              if (empty($result4['lname']) && empty($result4['fname'])) {
+                $provname = '(' . xl('No name') . ')';
+              }
+              else {
+                $provname = $result4['lname'];
+                if ($result4['fname']) $provname .= ', ' . $result4['fname'];
+              }
+            }
+            if (!empty($hprovs)) $hprovs .= '<br />';
+            $hprovs .= "<b>$provname</b>";
+          }
+          echo "<td>$hprovs</td>\n";
+        }
+
+        // Write the billing info.
+        echo $hcodes;
 
         // show insurance
         if (!$GLOBALS['athletic_team'] && !$GLOBALS['ippf_specific']) {
