@@ -1415,54 +1415,6 @@ ALTER TABLE patient_data ADD contrastart DATE DEFAULT NULL;
 ALTER TABLE patient_data ADD ippfconmeth varchar(255) NOT NULL DEFAULT '';
 #EndIf
 
-# This is garbage that should be deleted.
-#
-# #IfNotRow2D list_options list_id lbfnames option_id LBFcontra
-# INSERT INTO list_options ( list_id, option_id, title, seq ) VALUES ('lbfnames','LBFcontra','Contraception',1);
-# DELETE FROM layout_options WHERE form_id = 'LBFcontra';
-# INSERT INTO layout_options VALUES ('LBFcontra','contratype' ,'1','Action'    , 1,1,2, 0, 0,'contratype' ,1,3,'','' ,'Contraception action');
-# INSERT INTO layout_options VALUES ('LBFcontra','ippfconmeth','1','Method'    , 2,1,1, 0, 0,'ippfconmeth',1,3,'','' ,'Contraception method');
-# INSERT INTO layout_options VALUES ('LBFcontra','contrastart','1','Start Date', 3,4,1,10,10,''           ,1,3,'','D','Contraception start date');
-# # This section creates LBFcontra visit forms to replace contraception dates/methods in demographics.
-# INSERT INTO lbf_data (field_id, field_value)
-#   SELECT 'contratype', pd.pid FROM patient_data AS pd, form_encounter AS fe
-#   WHERE pd.contrastart IS NOT NULL
-#   AND fe.pid = pd.pid
-#   AND fe.date >= pd.contrastart
-#   GROUP BY pd.pid;
-# INSERT INTO lbf_data (form_id, field_id, field_value)
-#   SELECT MAX(ld.form_id), 'contrastart', pd.contrastart
-#   FROM patient_data AS pd, form_encounter AS fe, lbf_data AS ld
-#   WHERE pd.contrastart IS NOT NULL
-#   AND fe.pid = pd.pid
-#   AND fe.date >= pd.contrastart
-#   AND ld.field_id = 'contratype'
-#   AND ld.field_value = pd.pid
-#   GROUP BY pd.pid;
-# INSERT INTO lbf_data (form_id, field_id, field_value)
-#   SELECT MAX(ld.form_id), 'ippfconmeth', pd.ippfconmeth
-#   FROM patient_data AS pd, form_encounter AS fe, lbf_data AS ld
-#   WHERE pd.contrastart IS NOT NULL
-#   AND pd.ippfconmeth != ''
-#   AND fe.pid = pd.pid
-#   AND fe.date >= pd.contrastart
-#   AND ld.field_id = 'contratype'
-#   AND ld.field_value = pd.pid
-#   GROUP BY pd.pid;
-# INSERT INTO forms (date, encounter, form_name, form_id, pid, user, groupname, authorized, formdir)
-#   SELECT CURRENT_DATE, MIN(fe.encounter), 'Contraception Start', MAX(ld.form_id), pd.pid, 'admin', 'Default', '1', 'LBFcontra'
-#   FROM patient_data AS pd, form_encounter AS fe, lbf_data AS ld
-#   WHERE pd.contrastart IS NOT NULL
-#   AND fe.pid = pd.pid
-#   AND fe.date >= pd.contrastart
-#   AND ld.field_id = 'contratype'
-#   AND ld.field_value = pd.pid
-#   GROUP BY pd.pid;
-# UPDATE forms AS f, lbf_data AS ld SET ld.field_value = '3' WHERE
-#   f.formdir = 'LBFcontra' AND f.deleted = 0 AND ld.form_id = f.form_id AND
-#   ld.field_id = 'contratype' AND ld.field_value = f.pid;
-# #EndIf
-
 #IfNotRow2D list_options list_id lbfnames option_id LBFccicon
 INSERT INTO list_options (list_id,option_id,title,seq,option_value) VALUES ('lbfnames','LBFccicon','Contraception',1,5);
 DELETE FROM layout_options WHERE form_id = 'LBFccicon';
@@ -1482,37 +1434,57 @@ INSERT INTO layout_options VALUES ('LBFccicon', 'mcreason' , '1', 'Reason for Me
   7,  1, 1, 0, 0, 'mcreason'   , 1, 3, '', '', 'Reason for method change');
 
 # This section creates LBFccicon visit forms to replace contraception dates/methods in demographics.
-# Fields needed: newmauser (always 1), newmethod.
+# Fields generated: newmauser (always 1), newmethod (only if present in demographics, probably not).
 #
 # Create newmauser data item for each patient contrastart that assigns the form_id and
 # temporarily holds the pid.  This pid is later used for matching to get the new form ID.
 INSERT INTO lbf_data (field_id, field_value)
-  SELECT 'newmauser', pd.pid FROM patient_data AS pd, form_encounter AS fe
-  WHERE pd.contrastart IS NOT NULL
-  AND fe.pid = pd.pid
-  AND fe.date >= pd.contrastart
-  GROUP BY pd.pid;
+  SELECT 'newmauser', pd.pid FROM patient_data AS pd
+  WHERE pd.contrastart IS NOT NULL AND pd.contrastart NOT LIKE '0%';
+#
 # Create newmethod data item for each such patient that also has a starting method defined.
 INSERT INTO lbf_data (form_id, field_id, field_value)
   SELECT MAX(ld.form_id), 'newmethod', pd.ippfconmeth
-  FROM patient_data AS pd, form_encounter AS fe, lbf_data AS ld
-  WHERE pd.contrastart IS NOT NULL
+  FROM patient_data AS pd, lbf_data AS ld
+  WHERE pd.contrastart IS NOT NULL AND pd.contrastart NOT LIKE '0%'
   AND pd.ippfconmeth != ''
-  AND fe.pid = pd.pid
-  AND fe.date >= pd.contrastart
   AND ld.field_id = 'newmauser'
   AND ld.field_value = pd.pid
   GROUP BY pd.pid;
-# Create the corresponding forms table entry.
+#
+# Create form_encounter table entries for missing encounters.
+SELECT @i:=(SELECT id FROM sequences);
+INSERT INTO form_encounter (date, reason, pid, encounter)
+  SELECT pd.contrastart, 'PreOpenEMR Data', pd.pid, @i:=@i+1
+  FROM patient_data AS pd, lbf_data AS ld
+  WHERE pd.contrastart IS NOT NULL AND pd.contrastart NOT LIKE '0%'
+  AND (SELECT COUNT(*) FROM form_encounter WHERE pid = pd.pid AND date = pd.contrastart) = 0
+  AND ld.field_id = 'newmauser'
+  AND ld.field_value = pd.pid;
+# Update sequences table to hold the next encounter number.
+UPDATE sequences set id = @i;
+#
+# Create the forms table entries for missing encounters.
+INSERT INTO forms (date, encounter, form_name, form_id, pid, user, groupname, authorized, formdir)
+  SELECT CURRENT_DATE, fe.encounter, 'New Patient Encounter', fe.id, pd.pid, 'admin', 'Default', '1', 'newpatient'
+  FROM patient_data AS pd, form_encounter AS fe
+  WHERE pd.contrastart IS NOT NULL AND pd.contrastart NOT LIKE '0%'
+  AND fe.pid = pd.pid
+  AND fe.date = pd.contrastart
+  AND fe.reason = 'PreOpenEMR Data'
+  AND (SELECT COUNT(*) FROM forms WHERE pid = pd.pid AND encounter = fe.encounter AND formdir = 'newpatient' and deleted = 0) = 0;
+#
+# Create the forms table entries for Contraception.
 INSERT INTO forms (date, encounter, form_name, form_id, pid, user, groupname, authorized, formdir)
   SELECT CURRENT_DATE, MIN(fe.encounter), 'Contraception Initial Consult', MAX(ld.form_id), pd.pid, 'admin', 'Default', '1', 'LBFccicon'
   FROM patient_data AS pd, form_encounter AS fe, lbf_data AS ld
-  WHERE pd.contrastart IS NOT NULL
+  WHERE pd.contrastart IS NOT NULL AND pd.contrastart NOT LIKE '0%'
   AND fe.pid = pd.pid
-  AND fe.date >= pd.contrastart
+  AND fe.date = pd.contrastart
   AND ld.field_id = 'newmauser'
   AND ld.field_value = pd.pid
   GROUP BY pd.pid;
+#
 # Clean up the newmauser data items.
 UPDATE forms AS f, lbf_data AS ld SET ld.field_value = '1' WHERE
   f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND
