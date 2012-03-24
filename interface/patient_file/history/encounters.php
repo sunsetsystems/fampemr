@@ -288,7 +288,8 @@ if ($result = getEncounters($pid)) {
         }
 
         // We will call a visit "open" if it is not billed.
-        $billed = isEncounterBilled($pid, $iter['encounter']);
+        // Dummy encounters from conversion of contraception start dates are considered billed.
+        $billed = $result4['reason'] == 'PreOpenEMR Data' || isEncounterBilled($pid, $iter['encounter']);
 
         // Fetch all forms for this encounter, if the user is authorized to see
         // this encounter's notes and this is the clinical view.
