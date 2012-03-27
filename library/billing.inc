@@ -205,7 +205,7 @@ function updateClaim($newversion, $patient_id, $encounter_id, $payer_id=-1, $pay
 //
 function isEncounterBilled($pid, $encounter) {
   $billed = -1; // no chargeable services yet
-  // UNION removes duplicate rows and that works fine here.
+
   $bres = sqlStatement("SELECT " .
     "billing.billed FROM billing, code_types WHERE " .
     "billing.pid = '$pid' AND " .
@@ -215,7 +215,8 @@ function isEncounterBilled($pid, $encounter) {
     "UNION " .
     "SELECT billed FROM drug_sales WHERE " .
     "pid = '$pid' AND " .
-    "encounter = '" . $iter['encounter'] . "'");
+    "encounter = '$encounter'");
+
   while ($brow = sqlFetchArray($bres)) {
     if ($brow['billed'] == 0) {
       $billed = 0;
