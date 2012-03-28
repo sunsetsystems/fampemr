@@ -464,3 +464,7 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('paymethod','Other','Other',70,0);
 #EndIf
 
+#IfNotIndex openemr_postcalendar_events pc_eventDate
+CREATE INDEX `pc_eventDate` ON `openemr_postcalendar_events` (`pc_eventDate`);
+#EndIf
+
