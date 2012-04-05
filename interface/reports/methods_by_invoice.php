@@ -27,7 +27,8 @@ $patients = array();
 $form_orderby = empty($_REQUEST['form_orderby']) ? 'date' : $_REQUEST['form_orderby'];
 
 function bucks($amount) {
-  if ($amount) echo oeFormatMoney($amount);
+  if ($amount) return oeFormatMoney($amount);
+  return '';
 }
 
 function recordPayment($encdate, $patient_id, $encounter_id,
@@ -175,6 +176,28 @@ while ($mrow = sqlFetchArray($mres)) {
 }
 $metharray['zzz'] = array('title' => xl('Unassigned'), 'paytotal' => 0);
 //
+if ($_POST['form_csvexport']) {
+  header("Pragma: public");
+  header("Expires: 0");
+  header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+  header("Content-Type: application/force-download");
+  header("Content-Disposition: attachment; filename=receipts_by_payment_method.csv");
+  header("Content-Description: File Transfer");
+  // CSV headers:
+  echo '"' . xl('ID'         ) . '",';
+  echo '"' . xl('Patient'    ) . '",';
+  echo '"' . xl('Invoice'    ) . '",';
+  echo '"' . xl('Svc Date'   ) . '",';
+  echo '"' . xl('Charges'    ) . '",';
+  echo '"' . xl('Adjustments') . '",';
+  echo '"' . xl('Total Paid' ) . '",';
+  echo '"' . xl('Balance'    ) . '",';
+  foreach ($metharray as $key => $value) {
+    echo '"' . $value['title'] . '",';
+  }
+  echo '"' . xl('User'       ) . '"' . "\n";
+} // end export
+else {
 ?>
 <html>
 <head>
@@ -245,6 +268,8 @@ echo "   </select>\n";
    &nbsp;
    <input type='submit' name='form_refresh' value="<?xl('Refresh','e')?>">
    &nbsp;
+   <input type='submit' name='form_csvexport' value="<?php xl('Export to CSV','e') ?>">
+   &nbsp;
    <input type='button' value='<?php xl('Print','e'); ?>' onclick='window.print()' />
   </td>
  </tr>
@@ -254,6 +279,7 @@ echo "   </select>\n";
   </td>
  </tr>
 <?php
+} // end not export
 
 if (isset($_POST['form_orderby'])) {
   $from_date = $form_from_date;
@@ -350,6 +376,8 @@ if (isset($_POST['form_orderby'])) {
       $rowmethod, 0, $row['pay_amount'], $row['adj_amount'], $row['username']);
   }
 
+  if (!$_POST['form_csvexport']) {
+
   // echo "<!-- insarray:\n"; print_r($insarray); echo " -->\n"; // debugging
 ?>
 
@@ -398,6 +426,8 @@ foreach ($metharray as $key => $value) {
  </tr>
 
 <?php
+  } // end not export
+
   uksort($insarray, 'sortCmp1'); // sort by first key
   $encount = 0;
   $displevel = 1;
@@ -453,10 +483,26 @@ foreach ($metharray as $key => $value) {
         $subpaytotal += $totpaid;
         $subuser      = $encarray['#U'];
 
-        ++$encount;
-        // $bgcolor = "#" . (($encount & 1) ? "ddddff" : "ffdddd");
-        $bgcolor = "#ddddff";
-        echo " <tr bgcolor='$bgcolor'>\n";
+        if ($_POST['form_csvexport']) {
+          echo '"'  . $disp_id   . '"';
+          echo ',"' . $disp_name . '"';
+          echo ',"' . "$ptid.$encid" . '"';
+          echo ',"' . $disp_dos . '"';
+          echo ',"' . bucks($encarray['#$']) . '"';
+          echo ',"' . bucks($encarray['#@']) . '"';
+          echo ',"' . bucks($totpaid) . '"';
+          echo ',"' . bucks($encarray['#$'] - $encarray['#@'] - $totpaid) . '"';
+          foreach ($metharray as $meth => $dummy) {
+            echo ',"' . bucks($encarray[$meth]) . '"';
+          }
+          echo ',"' . $encarray['#U'] . '"' . "\n";
+        }
+        else {
+
+          ++$encount;
+          // $bgcolor = "#" . (($encount & 1) ? "ddddff" : "ffdddd");
+          $bgcolor = "#ddddff";
+          echo " <tr bgcolor='$bgcolor'>\n";
 ?>
   <td class="detail">
    <?php echo $disp_id; ?>
@@ -471,29 +517,31 @@ foreach ($metharray as $key => $value) {
    <?php echo $disp_dos; ?>
   </td>
   <td class="detail" align="right">
-   <?php bucks($encarray['#$']); ?>
+   <?php echo bucks($encarray['#$']); ?>
   </td>
   <td class="detail" align="right">
-   <?php bucks($encarray['#@']); ?>
+   <?php echo bucks($encarray['#@']); ?>
   </td>
   <td class="detail" align="right">
-   <?php bucks($totpaid); ?>
+   <?php echo bucks($totpaid); ?>
   </td>
   <td class="detail" align="right">
-   <?php bucks($encarray['#$'] - $encarray['#@'] - $totpaid); ?>
+   <?php echo bucks($encarray['#$'] - $encarray['#@'] - $totpaid); ?>
   </td>
 <?php
-        foreach ($metharray as $meth => $dummy) {
-          echo "  <td class='detail' align='right'>\n";
-          bucks($encarray[$meth]);
+          foreach ($metharray as $meth => $dummy) {
+            echo "  <td class='detail' align='right'>\n";
+            echo bucks($encarray[$meth]);
+            echo "  </td>\n";
+          }
+
+          echo "  <td class='detail'>\n";
+          echo $encarray['#U'];
           echo "  </td>\n";
-        }
 
-        echo "  <td class='detail'>\n";
-        echo $encarray['#U'];
-        echo "  </td>\n";
+          echo " </tr>\n";
 
-        echo " </tr>\n";
+        } // end not export
 
         $displevel = 3;
       }
@@ -501,38 +549,41 @@ foreach ($metharray as $key => $value) {
       $displevel = 2;
     }
 
-    if ($form_orderby == 'user' && $subcnttotal) {
-      if (empty($subuser)) $subuser = xl('Unassigned');
+    if (!$_POST['form_csvexport']) {
+
+      if ($form_orderby == 'user' && $subcnttotal) {
+        if (empty($subuser)) $subuser = xl('Unassigned');
 ?>
  <tr bgcolor="#dddddd" style="font-weight:bold">
   <td class="detail" colspan="4">
    <?php echo xl('Subtotals for') . ' ' . $subuser; ?>
   </td>
   <td class="detail" align="right">
-   <?php bucks($subchgtotal); ?>
+   <?php echo bucks($subchgtotal); ?>
   </td>
   <td class="detail" align="right">
-   <?php bucks($subadjtotal); ?>
+   <?php echo bucks($subadjtotal); ?>
   </td>
   <td class="detail" align="right">
-   <?php bucks($subpaytotal); ?>
+   <?php echo bucks($subpaytotal); ?>
   </td>
   <td class="detail" align="right">
-   <?php bucks($subchgtotal - $subadjtotal - $subpaytotal); ?>
+   <?php echo bucks($subchgtotal - $subadjtotal - $subpaytotal); ?>
   </td>
 <?php
-  foreach ($metharray as $meth => $value) {
-    echo "  <td class='detail' align='right'>\n";
-    bucks($value['subtotal']);
-    echo "  </td>\n";
-  }
+        foreach ($metharray as $meth => $value) {
+          echo "  <td class='detail' align='right'>\n";
+          echo bucks($value['subtotal']);
+          echo "  </td>\n";
+        }
 ?>
   <td class="detail">
    <?php echo $subuser; ?>
   </td>
  </tr>
 <?php
-    }
+      }
+    } // end not export
 
     $displevel = 1;
   }
@@ -541,27 +592,29 @@ foreach ($metharray as $key => $value) {
   foreach ($metharray as $meth => $value) {
     $grandpaytotal += $value['paytotal'];
   }
+
+  if (!$_POST['form_csvexport']) {
 ?>
  <tr bgcolor="#dddddd" style="font-weight:bold">
   <td class="detail" colspan="4">
    <?php xl('Grand Totals','e'); ?>
   </td>
   <td class="detail" align="right">
-   <?php bucks($grandchgtotal); ?>
+   <?php echo bucks($grandchgtotal); ?>
   </td>
   <td class="detail" align="right">
-   <?php bucks($grandadjtotal); ?>
+   <?php echo bucks($grandadjtotal); ?>
   </td>
   <td class="detail" align="right">
-   <?php bucks($grandpaytotal); ?>
+   <?php echo bucks($grandpaytotal); ?>
   </td>
   <td class="detail" align="right">
-   <?php bucks($grandchgtotal - $grandadjtotal - $grandpaytotal); ?>
+   <?php echo bucks($grandchgtotal - $grandadjtotal - $grandpaytotal); ?>
   </td>
 <?php
   foreach ($metharray as $meth => $value) {
     echo "  <td class='detail' align='right'>\n";
-    bucks($value['paytotal']);
+    echo bucks($value['paytotal']);
     echo "  </td>\n";
   }
 ?>
@@ -571,7 +624,10 @@ foreach ($metharray as $key => $value) {
  </tr>
 
 <?php
+  } // end not export
 } // end form refresh
+
+if (!$_POST['form_csvexport']) {
 ?>
 
 </table>
@@ -591,3 +647,6 @@ foreach ($metharray as $key => $value) {
 </script>
 
 </html>
+<?php
+} // end not export
+?>
