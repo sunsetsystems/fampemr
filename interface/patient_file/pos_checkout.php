@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2006-2011 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2006-2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -29,9 +29,6 @@ require_once("../globals.php");
 require_once("$srcdir/acl.inc");
 require_once("$srcdir/patient.inc");
 require_once("$srcdir/billing.inc");
-require_once("$srcdir/sql-ledger.inc");
-require_once("$srcdir/freeb/xmlrpc.inc");
-require_once("$srcdir/freeb/xmlrpcs.inc");
 require_once("$srcdir/formatting.inc.php");
 require_once("$srcdir/formdata.inc.php");
 require_once("../../custom/code_types.inc.php");
@@ -40,7 +37,8 @@ require_once("$srcdir/options.inc.php");
 
 $currdecimals = $GLOBALS['currency_decimals'];
 
-$INTEGRATED_AR = $GLOBALS['oer_config']['ws_accounting']['enabled'] === 2;
+if ($GLOBALS['oer_config']['ws_accounting']['enabled'] !== 2)
+  die("SQL-Ledger not supported!");
 
 $details = empty($_GET['details']) ? 0 : 1;
 
@@ -80,154 +78,6 @@ function updateInvoiceRefNumber() {
   return $irnumber;
 }
 
-//////////////////////////////////////////////////////////////////////
-// The following functions are inline here temporarily, and should be
-// moved to an includable module for common use.  In particular
-// WSClaim.class.php should be rewritten to use them.
-//////////////////////////////////////////////////////////////////////
-
-// Initialize the array of invoice information for posting to the
-// accounting system.
-//
-function invoice_initialize(& $invoice_info, $patient_id, $provider_id,
-  $payer_id = 0, $encounter = 0, $dosdate = '')
-{
-  $db = $GLOBALS['adodb']['db'];
-
-  // Get foreign ID (customer) for patient.
-  $sql = "SELECT foreign_id from integration_mapping as im " .
-    "LEFT JOIN patient_data as pd on im.local_id=pd.id " .
-    "where pd.pid = '" .
-    $patient_id .
-    "' and im.local_table='patient_data' and im.foreign_table='customer'";
-  $result = $db->Execute($sql);
-  if($result && !$result->EOF) {
-    $foreign_patient_id = $result->fields['foreign_id'];
-  }
-  else {
-    return "Patient '" . $patient_id . "' has not yet been posted to the accounting system.";
-  }
-
-  // Get foreign ID (salesman) for provider.
-  $sql = "SELECT foreign_id from integration_mapping WHERE " .
-    "local_id = $provider_id AND local_table='users' and foreign_table='salesman'";
-  $result = $db->Execute($sql);
-  if($result && !$result->EOF) {
-    $foreign_provider_id = $result->fields['foreign_id'];
-  }
-  else {
-    return "Provider '" . $provider_id . "' has not yet been posted to the accounting system.";
-  }
-
-  // Get foreign ID (customer) for insurance payer.
-  if ($payer_id && ! $GLOBALS['insurance_companies_are_not_customers']) {
-    $sql = "SELECT foreign_id from integration_mapping WHERE " .
-      "local_id = $payer_id AND local_table = 'insurance_companies' AND foreign_table='customer'";
-    $result = $db->Execute($sql);
-    if($result && !$result->EOF) {
-      $foreign_payer_id = $result->fields['foreign_id'];
-    }
-    else {
-      return "Payer '" . $payer_id . "' has not yet been posted to the accounting system.";
-    }
-  } else {
-    $foreign_payer_id = $payer_id;
-  }
-
-  // Create invoice notes for the new invoice that list the patient's
-  // insurance plans.  This is so that when payments are posted, the user
-  // can easily see if a secondary claim needs to be submitted.
-  //
-  $insnotes = "";
-  $insno = 0;
-  foreach (array("primary", "secondary", "tertiary") as $instype) {
-    ++$insno;
-    $sql = "SELECT insurance_companies.name " .
-      "FROM insurance_data, insurance_companies WHERE " .
-      "insurance_data.pid = $patient_id AND " .
-      "insurance_data.type = '$instype' AND " .
-      "insurance_companies.id = insurance_data.provider " .
-      "ORDER BY insurance_data.date DESC LIMIT 1";
-    $result = $db->Execute($sql);
-    if ($result && !$result->EOF && $result->fields['name']) {
-      if ($insnotes) $insnotes .= "\n";
-      $insnotes .= "Ins$insno: " . $result->fields['name'];
-    }
-  }
-  $invoice_info['notes'] = $insnotes;
-
-  if (preg_match("/(\d\d\d\d)\D*(\d\d)\D*(\d\d)/", $dosdate, $matches)) {
-    $dosdate = $matches[2] . '-' . $matches[3] . '-' . $matches[1];
-  } else {
-    $dosdate = date("m-d-Y");
-  }
-
-  $invoice_info['salesman']   = $foreign_provider_id;
-  $invoice_info['customerid'] = $foreign_patient_id;
-  $invoice_info['payer_id']   = $foreign_payer_id;
-  $invoice_info['invoicenumber'] = $patient_id . "." . $encounter;
-  $invoice_info['dosdate'] = $dosdate;
-  $invoice_info['items'] = array();
-  $invoice_info['total'] = '0.00';
-
-  return '';
-}
-
-function invoice_add_line_item(& $invoice_info, $code_type, $code,
-  $code_text, $amount, $units=1)
-{
-  $units = max(1, intval(trim($units)));
-  $amount = sprintf("%01.2f", $amount);
-  $price = $amount / $units;
-  $tmp = sprintf("%01.2f", $price);
-  if (abs($price - $tmp) < 0.000001) $price = $tmp;
-  $tii = array();
-  $tii['maincode'] = $code;
-  $tii['itemtext'] = "$code_type:$code";
-  if ($code_text) $tii['itemtext'] .= " $code_text";
-  $tii['qty'] = $units;
-  $tii['price'] = $price;
-  $tii['glaccountid'] = $GLOBALS['oer_config']['ws_accounting']['income_acct'];
-  $invoice_info['total'] = sprintf("%01.2f", $invoice_info['total'] + $amount);
-  $invoice_info['items'][] = $tii;
-  return '';
-}
-
-function invoice_post(& $invoice_info)
-{
-  $function['ezybiz.add_invoice'] = array(new xmlrpcval($invoice_info, "struct"));
-
-  list($name, $var) = each($function);
-  $f = new xmlrpcmsg($name, $var);
-
-  $c = new xmlrpc_client($GLOBALS['oer_config']['ws_accounting']['url'],
-    $GLOBALS['oer_config']['ws_accounting']['server'],
-    $GLOBALS['oer_config']['ws_accounting']['port']);
-
-  $c->setCredentials($GLOBALS['oer_config']['ws_accounting']['username'],
-    $GLOBALS['oer_config']['ws_accounting']['password']);
-
-  $r = $c->send($f);
-  if (!$r) return "XMLRPC send failed";
-
-  // We are not doing anything with the return value yet... should we?
-  $tv = $r->value();
-  if (is_object($tv)) {
-    $value = $tv->getval();
-  }
-  else {
-    $value = null;  
-  }
-
-  if ($r->faultCode()) {
-    return "Fault: Code: " . $r->faultCode() . " Reason '" . $r->faultString() . "'";
-  }
-
-  return '';
-}
-
-///////////// End of SQL-Ledger invoice posting functions ////////////
-
 // Output HTML for an invoice line item.
 //
 $prevsvcdate = '';
@@ -265,7 +115,7 @@ function receiptPaymentLine($paydate, $amount, $description='') {
 // or for the encounter specified as a GET parameter.
 //
 function generate_receipt($patient_id, $encounter=0) {
-  global $sl_err, $sl_cash_acc, $css_header, $details, $INTEGRATED_AR, $rapid_data_entry;
+  global $sl_err, $sl_cash_acc, $css_header, $details, $rapid_data_entry;
 
   // Get details for what we guess is the primary facility.
   $frow = sqlQuery("SELECT * FROM facility " .
@@ -275,49 +125,18 @@ function generate_receipt($patient_id, $encounter=0) {
 
   // Get the most recent invoice data or that for the specified encounter.
   //
-  if ($INTEGRATED_AR) {
-    if ($encounter) {
-      $ferow = sqlQuery("SELECT id, date, encounter FROM form_encounter " .
-        "WHERE pid = '$patient_id' AND encounter = '$encounter'");
-    } else {
-      $ferow = sqlQuery("SELECT id, date, encounter FROM form_encounter " .
-        "WHERE pid = '$patient_id' " .
-        "ORDER BY id DESC LIMIT 1");
-    }
-    if (empty($ferow)) die(xl("This patient has no activity."));
-    $trans_id = $ferow['id'];
-    $encounter = $ferow['encounter'];
-    $svcdate = substr($ferow['date'], 0, 10);
-  }
-  else {
-    SLConnect();
-    //
-    $arres = SLQuery("SELECT * FROM ar WHERE " .
-      "invnumber LIKE '$patient_id.%' " .
+  if ($encounter) {
+    $ferow = sqlQuery("SELECT id, date, encounter FROM form_encounter " .
+      "WHERE pid = '$patient_id' AND encounter = '$encounter'");
+  } else {
+    $ferow = sqlQuery("SELECT id, date, encounter FROM form_encounter " .
+      "WHERE pid = '$patient_id' " .
       "ORDER BY id DESC LIMIT 1");
-    if ($sl_err) die($sl_err);
-    if (!SLRowCount($arres)) die(xl("This patient has no activity."));
-    $arrow = SLGetRow($arres, 0);
-    //
-    $trans_id = $arrow['id'];
-    //
-    // Determine the date of service.  An 8-digit encounter number is
-    // presumed to be a date of service imported during conversion or
-    // associated with prescriptions only.  Otherwise look it up in the
-    // form_encounter table.
-    //
-    $svcdate = "";
-    list($trash, $encounter) = explode(".", $arrow['invnumber']);
-    if (strlen($encounter) >= 8) {
-      $svcdate = substr($encounter, 0, 4) . "-" . substr($encounter, 4, 2) .
-        "-" . substr($encounter, 6, 2);
-    }
-    else if ($encounter) {
-      $tmp = sqlQuery("SELECT date FROM form_encounter WHERE " .
-        "encounter = $encounter");
-      $svcdate = substr($tmp['date'], 0, 10);
-    }
-  } // end not $INTEGRATED_AR
+  }
+  if (empty($ferow)) die(xl("This patient has no activity."));
+  $trans_id = $ferow['id'];
+  $encounter = $ferow['encounter'];
+  $svcdate = substr($ferow['date'], 0, 10);
 
   // Get invoice reference number.
   $encrow = sqlQuery("SELECT invoice_refno FROM form_encounter WHERE " .
@@ -389,59 +208,44 @@ function generate_receipt($patient_id, $encounter=0) {
 <?php
   $charges = 0.00;
 
-  if ($INTEGRATED_AR) {
-    // Product sales
-    $inres = sqlStatement("SELECT s.sale_id, s.sale_date, s.fee, " .
-      "s.quantity, s.drug_id, d.name " .
-      "FROM drug_sales AS s LEFT JOIN drugs AS d ON d.drug_id = s.drug_id " .
-      // "WHERE s.pid = '$patient_id' AND s.encounter = '$encounter' AND s.fee != 0 " .
-      "WHERE s.pid = '$patient_id' AND s.encounter = '$encounter' " .
-      "ORDER BY s.sale_id");
-    while ($inrow = sqlFetchArray($inres)) {
-      $charges += sprintf('%01.2f', $inrow['fee']);
-      receiptDetailLine($inrow['sale_date'], $inrow['name'],
-        $inrow['fee'], $inrow['quantity']);
-    }
-    // Service and tax items
-    $inres = sqlStatement("SELECT * FROM billing WHERE " .
-      "pid = '$patient_id' AND encounter = '$encounter' AND " .
-      // "code_type != 'COPAY' AND activity = 1 AND fee != 0 " .
-      "code_type != 'COPAY' AND activity = 1 " .
-      "ORDER BY id");
-    while ($inrow = sqlFetchArray($inres)) {
-      $charges += sprintf('%01.2f', $inrow['fee']);
-      receiptDetailLine($svcdate, $inrow['code_text'],
-        $inrow['fee'], $inrow['units']);
-    }
-    // Adjustments.
-    $inres = sqlStatement("SELECT " .
-      "a.code, a.modifier, a.memo, a.payer_type, a.adj_amount, a.pay_amount, " .
-      "s.payer_id, s.reference, s.check_date, s.deposit_date " .
-      "FROM ar_activity AS a " .
-      "LEFT JOIN ar_session AS s ON s.session_id = a.session_id WHERE " .
-      "a.pid = '$patient_id' AND a.encounter = '$encounter' AND " .
-      "a.adj_amount != 0 " .
-      "ORDER BY s.check_date, a.sequence_no");
-    while ($inrow = sqlFetchArray($inres)) {
-      $charges -= sprintf('%01.2f', $inrow['adj_amount']);
-      $payer = empty($inrow['payer_type']) ? 'Pt' : ('Ins' . $inrow['payer_type']);
-      receiptDetailLine($svcdate, $payer . ' ' . $inrow['memo'],
-        0 - $inrow['adj_amount'], 1);
-    }
-  } // end $INTEGRATED_AR
-  else {
-    // Request all line items with money belonging to the invoice.
-    $inres = SLQuery("SELECT * FROM invoice WHERE " .
-      "trans_id = $trans_id AND sellprice != 0 ORDER BY id");
-    if ($sl_err) die($sl_err);
-    for ($irow = 0; $irow < SLRowCount($inres); ++$irow) {
-      $row = SLGetRow($inres, $irow);
-      $amount = sprintf('%01.2f', $row['sellprice'] * $row['qty']);
-      $charges += $amount;
-      $desc = preg_replace('/^.{1,6}:/', '', $row['description']);
-      receiptDetailLine($svcdate, $desc, $amount, $row['qty']);
-    }
-  } // end not $INTEGRATED_AR
+  // Product sales
+  $inres = sqlStatement("SELECT s.sale_id, s.sale_date, s.fee, " .
+    "s.quantity, s.drug_id, d.name " .
+    "FROM drug_sales AS s LEFT JOIN drugs AS d ON d.drug_id = s.drug_id " .
+    // "WHERE s.pid = '$patient_id' AND s.encounter = '$encounter' AND s.fee != 0 " .
+    "WHERE s.pid = '$patient_id' AND s.encounter = '$encounter' " .
+    "ORDER BY s.sale_id");
+  while ($inrow = sqlFetchArray($inres)) {
+    $charges += sprintf('%01.2f', $inrow['fee']);
+    receiptDetailLine($inrow['sale_date'], $inrow['name'],
+      $inrow['fee'], $inrow['quantity']);
+  }
+  // Service and tax items
+  $inres = sqlStatement("SELECT * FROM billing WHERE " .
+    "pid = '$patient_id' AND encounter = '$encounter' AND " .
+    // "code_type != 'COPAY' AND activity = 1 AND fee != 0 " .
+    "code_type != 'COPAY' AND activity = 1 " .
+    "ORDER BY id");
+  while ($inrow = sqlFetchArray($inres)) {
+    $charges += sprintf('%01.2f', $inrow['fee']);
+    receiptDetailLine($svcdate, $inrow['code_text'],
+      $inrow['fee'], $inrow['units']);
+  }
+  // Adjustments.
+  $inres = sqlStatement("SELECT " .
+    "a.code, a.modifier, a.memo, a.payer_type, a.adj_amount, a.pay_amount, " .
+    "s.payer_id, s.reference, s.check_date, s.deposit_date " .
+    "FROM ar_activity AS a " .
+    "LEFT JOIN ar_session AS s ON s.session_id = a.session_id WHERE " .
+    "a.pid = '$patient_id' AND a.encounter = '$encounter' AND " .
+    "a.adj_amount != 0 " .
+    "ORDER BY s.check_date, a.sequence_no");
+  while ($inrow = sqlFetchArray($inres)) {
+    $charges -= sprintf('%01.2f', $inrow['adj_amount']);
+    $payer = empty($inrow['payer_type']) ? 'Pt' : ('Ins' . $inrow['payer_type']);
+    receiptDetailLine($svcdate, $payer . ' ' . $inrow['memo'],
+      0 - $inrow['adj_amount'], 1);
+  }
 ?>
 
  <tr>
@@ -459,51 +263,30 @@ function generate_receipt($patient_id, $encounter=0) {
  </tr>
 
 <?php
-  if ($INTEGRATED_AR) {
-    // Get co-pays.
-    $inres = sqlStatement("SELECT fee, code_text FROM billing WHERE " .
-      "pid = '$patient_id' AND encounter = '$encounter' AND " .
-      "code_type = 'COPAY' AND activity = 1 AND fee != 0 " .
-      "ORDER BY id");
-    while ($inrow = sqlFetchArray($inres)) {
-      $charges += sprintf('%01.2f', $inrow['fee']);
-      receiptPaymentLine($svcdate, 0 - $inrow['fee'], $inrow['code_text']);
-    }
-    // Get other payments.
-    $inres = sqlStatement("SELECT " .
-      "a.code, a.modifier, a.memo, a.payer_type, a.adj_amount, a.pay_amount, " .
-      "s.payer_id, s.reference, s.check_date, s.deposit_date " .
-      "FROM ar_activity AS a " .
-      "LEFT JOIN ar_session AS s ON s.session_id = a.session_id WHERE " .
-      "a.pid = '$patient_id' AND a.encounter = '$encounter' AND " .
-      "a.pay_amount != 0 " .
-      "ORDER BY s.check_date, a.sequence_no");
-    $payer = empty($inrow['payer_type']) ? 'Pt' : ('Ins' . $inrow['payer_type']);
-    while ($inrow = sqlFetchArray($inres)) {
-      $charges -= sprintf('%01.2f', $inrow['pay_amount']);
-      receiptPaymentLine($svcdate, $inrow['pay_amount'],
-        $payer . ' ' . $inrow['reference']);
-    }
-  } // end $INTEGRATED_AR
-  else {
-    $chart_id_cash = SLQueryValue("select id from chart where accno = '$sl_cash_acc'");
-    if ($sl_err) die($sl_err);
-    if (! $chart_id_cash) die("There is no COA entry for cash account '$sl_cash_acc'");
-    //
-    // Request all cash entries belonging to the invoice.
-    $atres = SLQuery("SELECT * FROM acc_trans WHERE " .
-      "trans_id = $trans_id AND chart_id = $chart_id_cash ORDER BY transdate");
-    if ($sl_err) die($sl_err);
-    //
-    for ($irow = 0; $irow < SLRowCount($atres); ++$irow) {
-      $row = SLGetRow($atres, $irow);
-      $amount = sprintf('%01.2f', $row['amount']); // negative
-      $charges += $amount;
-      $rowsource = $row['source'];
-      if (strtolower($rowsource) == 'co-pay') $rowsource = '';
-      receiptPaymentLine($row['transdate'], 0 - $amount, $rowsource);
-    }
-  } // end not $INTEGRATED_AR
+  // Get co-pays.
+  $inres = sqlStatement("SELECT fee, code_text FROM billing WHERE " .
+    "pid = '$patient_id' AND encounter = '$encounter' AND " .
+    "code_type = 'COPAY' AND activity = 1 AND fee != 0 " .
+    "ORDER BY id");
+  while ($inrow = sqlFetchArray($inres)) {
+    $charges += sprintf('%01.2f', $inrow['fee']);
+    receiptPaymentLine($svcdate, 0 - $inrow['fee'], $inrow['code_text']);
+  }
+  // Get other payments.
+  $inres = sqlStatement("SELECT " .
+    "a.code, a.modifier, a.memo, a.payer_type, a.adj_amount, a.pay_amount, " .
+    "s.payer_id, s.reference, s.check_date, s.deposit_date " .
+    "FROM ar_activity AS a " .
+    "LEFT JOIN ar_session AS s ON s.session_id = a.session_id WHERE " .
+    "a.pid = '$patient_id' AND a.encounter = '$encounter' AND " .
+    "a.pay_amount != 0 " .
+    "ORDER BY s.check_date, a.sequence_no");
+  $payer = empty($inrow['payer_type']) ? 'Pt' : ('Ins' . $inrow['payer_type']);
+  while ($inrow = sqlFetchArray($inres)) {
+    $charges -= sprintf('%01.2f', $inrow['pay_amount']);
+    receiptPaymentLine($svcdate, $inrow['pay_amount'],
+      $payer . ' ' . $inrow['reference']);
+  }
 ?>
  <tr>
   <td colspan='5'>&nbsp;</td>
@@ -544,7 +327,7 @@ function generate_receipt($patient_id, $encounter=0) {
 </body>
 </html>
 <?php
-  if (!$INTEGRATED_AR) SLClose();
+
 } // end function generate_receipt()
 
 // Function to output a line item for the input form.
@@ -599,17 +382,6 @@ function markTaxes($taxrates) {
   }
 }
 
-/*********************************************************************
-$payment_methods = array(
-  'Cash',
-  'Check',
-  'MC',
-  'VISA',
-  'AMEX',
-  'DISC',
-  'Other');
-*********************************************************************/
-
 $alertmsg = ''; // anything here pops up in an alert box
 
 // If the Save button was clicked...
@@ -639,38 +411,19 @@ if ($_POST['form_save']) {
   if (! $form_encounter) {
     $form_encounter = substr($dosdate,0,4) . substr($dosdate,5,2) . substr($dosdate,8,2);
     $tmp = '';
-    if ($INTEGRATED_AR) {
-      while (true) {
-        $ferow = sqlQuery("SELECT id FROM form_encounter WHERE " .
-          "pid = '$form_pid' AND encounter = '$form_encounter$tmp'");
-        if (empty($ferow)) break;
-        $tmp = $tmp ? $tmp + 1 : 1;
-      }
-    }
-    else {
-      SLConnect();
-      while (SLQueryValue("select id from ar where " .
-        "invnumber = '$form_pid.$form_encounter$tmp'")) {
-        $tmp = $tmp ? $tmp + 1 : 1;
-      }
-      SLClose();
+    while (true) {
+      $ferow = sqlQuery("SELECT id FROM form_encounter WHERE " .
+        "pid = '$form_pid' AND encounter = '$form_encounter$tmp'");
+      if (empty($ferow)) break;
+      $tmp = $tmp ? $tmp + 1 : 1;
     }
     $form_encounter .= $tmp;
   }
 
-  if ($INTEGRATED_AR) {
-    // Delete any TAX rows from billing because they will be recalculated.
-    sqlStatement("UPDATE billing SET activity = 0 WHERE " .
-      "pid = '$form_pid' AND encounter = '$form_encounter' AND " .
-      "code_type = 'TAX'");
-  }
-  else {
-    // Initialize an array of invoice information for posting.
-    $invoice_info = array();
-    $msg = invoice_initialize($invoice_info, $form_pid,
-    $_POST['form_provider'], $_POST['form_payer'], $form_encounter, $dosdate);
-    if ($msg) die($msg);
-  }
+  // Delete any TAX rows from billing because they will be recalculated.
+  sqlStatement("UPDATE billing SET activity = 0 WHERE " .
+    "pid = '$form_pid' AND encounter = '$form_encounter' AND " .
+    "code_type = 'TAX'");
 
   $form_amount = $_POST['form_amount'];
   $lines = $_POST['line'];
@@ -680,12 +433,6 @@ if ($_POST['form_save']) {
     $code_type = $line['code_type'];
     $id        = $line['id'];
     $amount    = sprintf('%01.2f', trim($line['amount']));
-
-    if (!$INTEGRATED_AR) {
-      $msg = invoice_add_line_item($invoice_info, $code_type,
-        $line['code'], $line['description'], $amount, $line['units']);
-      if ($msg) die($msg);
-    }
 
     if ($code_type == 'PROD') {
       // Product sales. The fee and encounter ID may have changed.
@@ -722,30 +469,23 @@ if ($_POST['form_save']) {
       $amount  = sprintf('%01.2f', trim($_POST['form_discount']) * $form_amount / 100);
     }
     $memo = xl('Discount');
-    if ($INTEGRATED_AR) {
-      $time = date('Y-m-d H:i:s');
-      $query = "INSERT INTO ar_activity ( " .
-        "pid, encounter, code, modifier, payer_type, post_user, post_time, " .
-        "session_id, memo, adj_amount " .
-        ") VALUES ( " .
-        "'$form_pid', " .
-        "'$form_encounter', " .
-        "'', " .
-        "'', " .
-        "'0', " .
-        "'" . $_SESSION['authUserID'] . "', " .
-        "'$time', " .
-        "'0', " .
-        "'$memo', " .
-        "'$amount' " .
-        ")";
-      sqlStatement($query);
-    }
-    else {
-      $msg = invoice_add_line_item($invoice_info, 'DISCOUNT',
-        '', $memo, 0 - $amount);
-      if ($msg) die($msg);
-    }
+    $time = date('Y-m-d H:i:s');
+    $query = "INSERT INTO ar_activity ( " .
+      "pid, encounter, code, modifier, payer_type, post_user, post_time, " .
+      "session_id, memo, adj_amount " .
+      ") VALUES ( " .
+      "'$form_pid', " .
+      "'$form_encounter', " .
+      "'', " .
+      "'', " .
+      "'0', " .
+      "'" . $_SESSION['authUserID'] . "', " .
+      "'$time', " .
+      "'0', " .
+      "'$memo', " .
+      "'$amount' " .
+      ")";
+    sqlStatement($query);
   }
 
   // Post payment.
@@ -753,23 +493,11 @@ if ($_POST['form_save']) {
     $amount  = sprintf('%01.2f', trim($_POST['form_amount']));
     $form_source = trim($_POST['form_source']);
     $paydesc = trim($_POST['form_method']);
-    if ($INTEGRATED_AR) {
-      // Post the payment as a billed copay into the billing table.
-      // Maybe this should even be done for the SL case.
-      if (!empty($form_source)) $paydesc .= " $form_source";
-      addBilling($form_encounter, 'COPAY', $amount, $paydesc, $form_pid,
-        0, 0, '', '', 0 - $amount, '', '', 1);
-    }
-    else {
-      $msg = invoice_add_line_item($invoice_info, 'COPAY',
-        $paydesc, $form_source, 0 - $amount);
-      if ($msg) die($msg);
-    }
-  }
-
-  if (!$INTEGRATED_AR) {
-    $msg = invoice_post($invoice_info);
-    if ($msg) die($msg);
+    // Post the payment as a billed copay into the billing table.
+    // Maybe this should even be done for the SL case.
+    if (!empty($form_source)) $paydesc .= " $form_source";
+    addBilling($form_encounter, 'COPAY', $amount, $paydesc, $form_pid,
+      0, 0, '', '', 0 - $amount, '', '', 1);
   }
 
   // If applicable, set the invoice reference number.
@@ -1105,14 +833,6 @@ if ($inv_encounter) {
   </td>
   <td>
 <?php
- /********************************************************************
- echo "   <select name='form_method'>\n";
- foreach ($payment_methods as $value) {
-  echo "    <option value='$value'";
-  echo ">$value</option>\n";
- }
- echo"   </select>\n";
- ********************************************************************/
  echo generate_select_list('form_method', 'paymethod', '', '', '');
 ?>
   </td>
@@ -1209,39 +929,6 @@ else if (!empty($GLOBALS['gbl_mask_invoice_number'])) {
  Calendar.setup({inputField:"form_date", ifFormat:"%Y-%m-%d", button:"img_date"});
  computeTotals();
 <?php
-// The following is removed, perhaps temporarily, because gcac reporting
-// no longer depends on gcac issues.  -- Rod 2009-08-11
-/*********************************************************************
-// Custom code for IPPF. Try to make sure that a GCAC issue is linked to this
-// visit if it contains GCAC-related services.
-if ($gcac_related_visit) {
-  $grow = sqlQuery("SELECT l.id, l.title, l.begdate, ie.pid " .
-    "FROM lists AS l " .
-    "LEFT JOIN issue_encounter AS ie ON ie.pid = l.pid AND " .
-    "ie.encounter = '$inv_encounter' AND ie.list_id = l.id " .
-    "WHERE l.pid = '$pid' AND " .
-    "l.activity = 1 AND l.type = 'ippf_gcac' " .
-    "ORDER BY ie.pid DESC, l.begdate DESC LIMIT 1");
-  // Note that reverse-ordering by ie.pid is a trick for sorting
-  // issues linked to the encounter (non-null values) first.
-  if (empty($grow['pid'])) { // if there is no linked GCAC issue
-    if (!empty($grow)) { // there is one that is not linked
-      echo " if (confirm('" . xl('OK to link the GCAC issue dated') . " " .
-        $grow['begdate'] . " " . xl('to this visit?') . "')) {\n";
-      echo "  $.getScript('link_issue_to_encounter.php?issue=" . $grow['id'] .
-        "&thisenc=$inv_encounter');\n";
-      echo " } else";
-    }
-    echo " if (confirm('" . xl('Are you prepared to complete a new GCAC issue for this visit?') . "')) {\n";
-    echo "  dlgopen('summary/add_edit_issue.php?thisenc=$inv_encounter" .
-      "&thistype=ippf_gcac', '_blank', 700, 600);\n";
-    echo " } else {\n";
-    echo "  $.getScript('link_issue_to_encounter.php?thisenc=$inv_encounter');\n";
-    echo " }\n";
-  }
-} // end if ($gcac_related_visit)
-*********************************************************************/
-
 if ($gcac_related_visit && !$gcac_service_provided) {
   // Skip this warning if the GCAC visit form is not allowed.
   $grow = sqlQuery("SELECT COUNT(*) AS count FROM list_options " .
