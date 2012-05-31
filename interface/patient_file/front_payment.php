@@ -14,6 +14,7 @@ require_once("$srcdir/sl_eob.inc.php");
 require_once("$srcdir/invoice_summary.inc.php");
 require_once("../../custom/code_types.inc.php");
 require_once("$srcdir/formatting.inc.php");
+require_once("$srcdir/options.inc.php");
 
 $INTEGRATED_AR = $GLOBALS['oer_config']['ws_accounting']['enabled'] === 2;
 ?>
@@ -169,14 +170,30 @@ function calcTaxes($row, $amount) {
   return $total;
 }
 
-$payment_methods = array(
-  xl('Cash'),
-  xl('Check'),
-  xl('MC'),
-  xl('VISA'),
-  xl('AMEX'),
-  xl('DISC'),
-  xl('Other'));
+function postPayment($form_pid, $enc, $form_method, $form_source, $amount) {
+  global $INTEGRATED_AR;
+  if ($INTEGRATED_AR) {
+    $thissrc = '';
+    if ($form_method) {
+      $thissrc .= $form_method;
+      if ($form_source) $thissrc .= " $form_source";
+    }
+    $session_id = 0; // Is this OK?
+    arPostPayment($form_pid, $enc, $session_id, $amount, '', 0, $thissrc, 0);
+  }
+  else {
+    $thissrc = 'Pt/';
+    if ($form_method) {
+      $thissrc .= $form_method;
+      if ($form_source) $thissrc .= " $form_source";
+    }
+    $trans_id = SLQueryValue("SELECT id FROM ar WHERE " .
+      "ar.invnumber = '$form_pid.$enc' LIMIT 1");
+    if (! $trans_id) die("Cannot find invoice '$form_pid.$enc'!");
+    slPostPayment($trans_id, $amount, date('Y-m-d'), $thissrc,
+      '', 0, 0);
+  }
+}
 
 $now = time();
 $today = date('Y-m-d', $now);
@@ -201,44 +218,31 @@ if ($_POST['form_save']) {
   $form_method = trim($_POST['form_method']);
   $form_source = trim($_POST['form_source']);
 
-  // Post payments for unbilled encounters.  These go into the billing table.
+  // Post payments for unbilled encounters.
   if ($_POST['form_upay']) {
     foreach ($_POST['form_upay'] as $enc => $payment) {
       if ($amount = 0 + $payment) {
         if (!$enc) $enc = todaysEncounter($form_pid);
-        addBilling($enc, 'COPAY', sprintf('%.2f', $amount),
-          $form_method, $form_pid, 1, $_SESSION["authUserID"],
-          '', 1, 0 - $amount, '', '');
+        if ($INTEGRATED_AR) {
+          postPayment($form_pid, $enc, $form_method, $form_source, $amount);
+        }
+        else {
+          // Since unbilled, the invoice does not exist in SQL-Ledger and
+          // we can only post to the billing table.
+          addBilling($enc, 'COPAY', sprintf('%.2f', $amount),
+            $form_method, $form_pid, 1, $_SESSION["authUserID"],
+            '', 1, 0 - $amount, '', '');
+        }
         frontPayment($form_pid, $enc, $form_method, $form_source, $amount, 0);
       }
     }
   }
 
-  // Post payments for previously billed encounters.  These go to A/R.
+  // Post payments for previously billed encounters.
   if ($_POST['form_bpay']) {
     foreach ($_POST['form_bpay'] as $enc => $payment) {
       if ($amount = 0 + $payment) {
-        if ($INTEGRATED_AR) {
-          $thissrc = '';
-          if ($form_method) {
-            $thissrc .= $form_method;
-            if ($form_source) $thissrc .= " $form_source";
-          }
-          $session_id = 0; // Is this OK?
-          arPostPayment($form_pid, $enc, $session_id, $amount, '', 0, $thissrc, 0);
-        }
-        else {
-          $thissrc = 'Pt/';
-          if ($form_method) {
-            $thissrc .= $form_method;
-            if ($form_source) $thissrc .= " $form_source";
-          }
-          $trans_id = SLQueryValue("SELECT id FROM ar WHERE " .
-            "ar.invnumber = '$form_pid.$enc' LIMIT 1");
-          if (! $trans_id) die("Cannot find invoice '$form_pid.$enc'!");
-          slPostPayment($trans_id, $amount, date('Y-m-d'), $thissrc,
-            '', 0, 0);
-        }
+        postPayment($form_pid, $enc, $form_method, $form_source, $amount);
         frontPayment($form_pid, $enc, $form_method, $form_source, 0, $amount);
       }
     }
@@ -465,15 +469,9 @@ function calctotal() {
    <?php xl('Payment Method','e'); ?>:
   </td>
   <td>
-   <select name='form_method'>
 <?php
-  foreach ($payment_methods as $value) {
-    echo "    <option value='$value'";
-    if ($value == $payrow['method']) echo " selected";
-    echo ">$value</option>\n";
-  }
+  echo generate_select_list('form_method', 'paymethod', '', '', '');
 ?>
-   </select>
   </td>
  </tr>
 

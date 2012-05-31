@@ -15,9 +15,11 @@
 // (1) Drug sales may or may not be associated with an encounter;
 //     they are if they are paid for concurrently with an encounter, or
 //     if they are "product" (non-prescription) sales via the Fee Sheet.
+//     UPDATE: ENCOUNTER IS NOW ALWAYS REQUIRED.
 // (2) Drug sales without an encounter will have 20YYMMDD, possibly
 //     with a suffix, as the encounter-number portion of their invoice
 //     number.
+//     UPDATE: ENCOUNTER IS NOW ALWAYS REQUIRED.
 // (3) Payments are saved as AR only, don't mess with the billing table.
 //     See library/classes/WSClaim.class.php for posting code.
 // (4) On checkout, the billing and drug_sales table entries are marked
@@ -34,6 +36,7 @@ require_once("$srcdir/formdata.inc.php");
 require_once("../../custom/code_types.inc.php");
 require_once("$srcdir/calendar_events.inc.php");
 require_once("$srcdir/options.inc.php");
+require_once("$srcdir/sl_eob.inc.php");
 
 $currdecimals = $GLOBALS['currency_decimals'];
 
@@ -111,11 +114,13 @@ function receiptPaymentLine($paydate, $amount, $description='') {
   echo " </tr>\n";
 }
 
+//////////////////////////////////////////////////////////////////////
+//
 // Generate a receipt from the last-billed invoice for this patient,
 // or for the encounter specified as a GET parameter.
 //
 function generate_receipt($patient_id, $encounter=0) {
-  global $sl_err, $sl_cash_acc, $css_header, $details, $rapid_data_entry;
+  global $css_header, $details, $rapid_data_entry;
 
   // Get details for what we guess is the primary facility.
   $frow = sqlQuery("SELECT * FROM facility " .
@@ -197,6 +202,7 @@ function generate_receipt($patient_id, $encounter=0) {
 </p>
 <center>
 <table cellpadding='5'>
+<?php if ($details) { ?>
  <tr>
   <td><b><?php xl('Date','e'); ?></b></td>
   <td><b><?php xl('Description','e'); ?></b></td>
@@ -204,6 +210,7 @@ function generate_receipt($patient_id, $encounter=0) {
   <td align='right'><b><?php echo $details ? xl('Qty'  ) : '&nbsp;'; ?></b></td>
   <td align='right'><b><?php xl('Total','e'); ?></b></td>
  </tr>
+<?php } ?>
 
 <?php
   $charges = 0.00;
@@ -328,18 +335,21 @@ function generate_receipt($patient_id, $encounter=0) {
 </html>
 <?php
 
-} // end function generate_receipt()
+}
+// end function generate_receipt()
+//
+//////////////////////////////////////////////////////////////////////
 
 // Function to output a line item for the input form.
 //
-$lino = 0;
+$totalchg = 0;
 function write_form_line($code_type, $code, $id, $date, $description,
   $amount, $units, $taxrates) {
-  global $lino;
+  global $lino, $totalchg;
   $amount = sprintf("%01.2f", $amount);
   if (empty($units)) $units = 1;
   $price = $amount / $units; // should be even cents, but ok here if not
-  if ($code_type == 'COPAY' && !$description) $description = xl('Payment');
+  // if ($code_type == 'COPAY' && !$description) $description = xl('Payment');
   echo " <tr>\n";
   echo "  <td>" . oeFormatShortDate($date);
   echo "<input type='hidden' name='line[$lino][code_type]' value='$code_type'>";
@@ -352,16 +362,49 @@ function write_form_line($code_type, $code, $id, $date, $description,
   echo "</td>\n";
   echo "  <td>$description</td>";
   echo "  <td align='right'>$units</td>";
+  // While this is an input field due to old logic, it's always read-only now.
   echo "  <td align='right'><input type='text' name='line[$lino][amount]' " .
        "value='$amount' size='6' maxlength='8'";
   // Modifying prices requires the acct/disc permission.
   // if ($code_type == 'TAX' || ($code_type != 'COPAY' && !acl_check('acct','disc')))
   echo " style='text-align:right;background-color:transparent' readonly";
-  // else echo " style='text-align:right' onkeyup='computeTotals()'";
+  // else echo " style='text-align:right' onkeyup='billingChanged()'";
+  echo "></td>\n";
+  echo " </tr>\n";
+  ++$lino;
+  $totalchg += $amount;
+}
+
+
+
+// Function to output a past payment/adjustment line to the form.
+//
+function write_old_payment_line($pay_type, $date, $method, $reference, $amount) {
+  global $lino;
+  $amount = sprintf("%01.2f", $amount);
+  echo " <tr>\n";
+  echo "  <td>" . htmlspecialchars($pay_type ) . "</td>\n";
+  echo "  <td>" . htmlspecialchars($method   ) . "</td>\n";
+  echo "  <td>" . htmlspecialchars($reference) . "</td>\n";
+  echo "  <td align='right'><input type='text' name='oldpay[$lino][amount]' " .
+       "value='$amount' size='6' maxlength='8'";
+  echo " style='text-align:right;background-color:transparent' readonly";
   echo "></td>\n";
   echo " </tr>\n";
   ++$lino;
 }
+
+// Array of HTML for the 4 cells of an input payment row.
+// "%d" will be replaced by a payment line number on the client side.
+//
+$aCellHTML = array(
+  htmlspecialchars(xl('New Payment')),
+  strtr(generate_select_list('payment[%d][method]', 'paymethod', '', '', ''), array("\n" => "")),
+  "<input type='text' name='payment[%d][refno]' size='10' />",
+  "<input type='text' name='payment[%d][amount]' size='6' style='text-align:right' onkeyup='setComputedValues()' />",
+);
+
+
 
 // Create the taxes array.  Key is tax id, value is
 // (description, rate, accumulated total).
@@ -389,9 +432,8 @@ $alertmsg = ''; // anything here pops up in an alert box
 if ($_POST['form_save']) {
 
   // On a save, do the following:
-  // Flag drug_sales and billing items as billed.
-  // Post the corresponding invoice with its payment(s) to sql-ledger
-  // and be careful to use a unique invoice number.
+  // Flag this form's drug_sales and billing items as billed.
+  // Post payments and be careful to use a unique invoice number.
   // Call the generate-receipt function.
   // Exit.
 
@@ -409,6 +451,7 @@ if ($_POST['form_save']) {
   // date, with an optional suffix to ensure that it's unique.
   //
   if (! $form_encounter) {
+    /*****************************************************************
     $form_encounter = substr($dosdate,0,4) . substr($dosdate,5,2) . substr($dosdate,8,2);
     $tmp = '';
     while (true) {
@@ -418,6 +461,9 @@ if ($_POST['form_save']) {
       $tmp = $tmp ? $tmp + 1 : 1;
     }
     $form_encounter .= $tmp;
+    *****************************************************************/
+    // The above seems obsolete. Nothing should be sold without an encounter form.
+    die("Internal error: Encounter ID is missing!");
   }
 
   // Delete any TAX rows from billing because they will be recalculated.
@@ -434,6 +480,7 @@ if ($_POST['form_save']) {
     $id        = $line['id'];
     $amount    = sprintf('%01.2f', trim($line['amount']));
 
+    /*****************************************************************
     if ($code_type == 'PROD') {
       // Product sales. The fee and encounter ID may have changed.
       $query = "update drug_sales SET fee = '$amount', " .
@@ -441,15 +488,17 @@ if ($_POST['form_save']) {
       "sale_id = '$id'";
       sqlQuery($query);
     }
-    else if ($code_type == 'TAX') {
-      // In the SL case taxes show up on the invoice as line items.
-      // Otherwise we gotta save them somewhere, and in the billing
-      // table with a code type of TAX seems easiest.
+    else
+    *****************************************************************/
+    if ($code_type == 'TAX') {
+      // We must save taxes somewhere, and in the billing table with
+      // a code type of TAX seems easiest.
       // They will have to be stripped back out when building this
       // script's input form.
       addBilling($form_encounter, 'TAX', 'TAX', 'Taxes', $form_pid, 0, 0,
         '', '', $amount, '', '', 1);
     }
+    /*****************************************************************
     else {
       // Because there is no insurance here, there is no need for a claims
       // table entry and so we do not call updateClaim().  Note we should not
@@ -458,7 +507,16 @@ if ($_POST['form_save']) {
       "bill_date = NOW() WHERE id = '$id'";
       sqlQuery($query);
     }
+    *****************************************************************/
   }
+
+  // Flag the encounter as billed.
+  $query = "UPDATE billing SET billed = 1, bill_date = NOW() WHERE " .
+    "pid = '$form_pid' AND encounter = '$form_encounter' AND activity = 1";
+  sqlQuery($query);
+  $query = "update drug_sales SET billed = 1 WHERE " .
+    "pid = '$form_pid' AND encounter = '$form_encounter'";
+  sqlQuery($query);
 
   // Post discount.
   if ($_POST['form_discount']) {
@@ -488,6 +546,9 @@ if ($_POST['form_save']) {
     sqlStatement($query);
   }
 
+
+
+  /*******************************************************************
   // Post payment.
   if ($_POST['form_amount']) {
     $amount  = sprintf('%01.2f', trim($_POST['form_amount']));
@@ -499,6 +560,25 @@ if ($_POST['form_save']) {
     addBilling($form_encounter, 'COPAY', $amount, $paydesc, $form_pid,
       0, 0, '', '', 0 - $amount, '', '', 1);
   }
+  *******************************************************************/
+
+  // Post the payments.
+  if (is_array($_POST['payment'])) {
+    $lines = $_POST['payment'];
+    for ($lino = 0; isset($lines[$lino]['amount']); ++$lino) {
+      $line = $lines[$lino];
+      $amount = sprintf('%01.2f', trim($line['amount']));
+      if ($amount != 0.00) {
+        $method = $line['method'];
+        $refno  = $line['refno'];
+        if ($method !== '' && $refno !== '') $method .= " $refno";
+        $session_id = 0; // Is this OK?
+        arPostPayment($form_pid, $form_encounter, $session_id, $amount, '', 0, $method, 0);
+      }
+    }
+  }
+
+
 
   // If applicable, set the invoice reference number.
   $invoice_refno = '';
@@ -563,12 +643,17 @@ while ($urow = sqlFetchArray($ures)) {
   $arr_users[$urow['id']] = '1';
 }
 
+
+
 // Now write a data entry form:
 // List unbilled billing items (cpt, hcpcs, copays) for the patient.
 // List unbilled product sales for the patient.
 // Present an editable dollar amount for each line item, a total
 // which is also the default value of the input payment amount,
 // and OK and Cancel buttons.
+
+
+
 ?>
 <html>
 <head>
@@ -622,7 +707,8 @@ while ($urow = sqlFetchArray($ures)) {
   return 0;
  }
 
- // This mess recomputes the invoice total and optionally applies a discount.
+ // This mess recomputes total charges and optionally applies a discount.
+ // As a side effect the tax line items are recomputed.
  function computeDiscountedTotals(discount, visible) {
   clearTax(visible);
   var f = document.forms[0];
@@ -652,8 +738,35 @@ while ($urow = sqlFetchArray($ures)) {
   return total - discount;
  }
 
- // Recompute displayed amounts with any discount applied.
- function computeTotals() {
+
+
+ // This computes and returns the total of payments.
+ function computePaymentTotal() {
+  var f = document.forms[0];
+  var total = 0.00;
+  for (var lino = 0; ('oldpay[' + lino + '][amount]') in f; ++lino) {
+   var amount = parseFloat(f['oldpay[' + lino + '][amount]'].value);
+   if (isNaN(amount)) continue;
+   amount = parseFloat(amount.toFixed(<?php echo $currdecimals ?>));
+   total += amount;
+  }
+  for (var lino = 0; ('payment[' + lino + '][amount]') in f; ++lino) {
+   var amount = parseFloat(f['payment[' + lino + '][amount]'].value);
+   if (isNaN(amount)) continue;
+   amount = parseFloat(amount.toFixed(<?php echo $currdecimals ?>));
+   total += amount;
+  }
+  return total;
+ }
+
+
+
+ // Recompute default payment amount with any discount applied, but
+ // not if there is more than one input payment line.
+ // This is called when the discount amount is changed, and initially.
+ // As a side effect the tax line items are recomputed and
+ // setComputedValues() is called.
+ function billingChanged() {
   var f = document.forms[0];
   var discount = parseFloat(f.form_discount.value);
   if (isNaN(discount)) discount = 0;
@@ -664,16 +777,47 @@ while ($urow = sqlFetchArray($ures)) {
   discount = 0.01 * discount * computeDiscountedTotals(0, false);
 <?php } ?>
   var total = computeDiscountedTotals(discount, true);
-  f.form_amount.value = total.toFixed(<?php echo $currdecimals ?>);
+  // Get out if there is more than one input payment line.
+  if (!('payment[1][amount]' in f)) {
+   f['payment[0][amount]'].value = 0;
+   total -= computePaymentTotal();
+   f['payment[0][amount]'].value = total.toFixed(<?php echo $currdecimals ?>);
+  }
+  setComputedValues();
   return true;
  }
 
- // Function to compute and show discount from total charges less payment.
+
+
+ // Set Total Payments, Difference and Balance Due when any amount changes.
+ function setComputedValues() {
+  var f = document.forms[0];
+  var payment = computePaymentTotal();
+  var difference = computeDiscountedTotals(0, false) - payment;
+  var discount = parseFloat(f.form_discount.value);
+  if (isNaN(discount)) discount = 0;
+<?php if (!$GLOBALS['discount_by_money']) { ?>
+  // This site discounts by percentage, so convert it to a money amount.
+  if (discount > 100) discount = 100;
+  if (discount < 0  ) discount = 0;
+  discount = 0.01 * discount * computeDiscountedTotals(0, false);
+<?php } ?>
+  var balance = difference - discount;
+  f.form_totalpay.value = payment.toFixed(<?php echo $currdecimals ?>);
+  f.form_difference.value = difference.toFixed(<?php echo $currdecimals ?>);
+  f.form_balancedue.value = balance.toFixed(<?php echo $currdecimals ?>);
+  return true;
+ }
+
+
+
+ // This is called when [Compute] is clicked by the user.
+ // Computes and sets the discount value from total charges less payment.
+ // This also calls setComputedValues() so the balance due will be correct.
  function computeDiscount() {
   var f = document.forms[0];
   var charges = computeDiscountedTotals(0, false);
-  var payment = parseFloat(f.form_amount.value);
-  if (isNaN(payment)) payment = 0;
+  var payment = computePaymentTotal();
   var discount = charges - payment;
 <?php if (!$GLOBALS['discount_by_money']) { ?>
   // This site discounts by percentage, so convert to that.
@@ -682,8 +826,36 @@ while ($urow = sqlFetchArray($ures)) {
 <?php } else { ?>
   f.form_discount.value = discount.toFixed(<?php echo $currdecimals ?>);
 <?php } ?>
+  setComputedValues();
   return false;
  }
+
+
+
+ // Add a line for entering a payment.
+ var paylino = 0;
+ function addPayLine() {
+  var table = document.getElementById('paytable');
+  for (var i = 0; i < table.rows.length; ++i) {
+   if (table.rows[i].id == 'totalpay') {
+    var row = table.insertRow(i);
+    var cell;
+<?php
+foreach ($aCellHTML as $ix => $html) {
+  echo "    var html = \"$html\";\n";
+  echo "    cell = row.insertCell($ix);\n";
+  echo "    cell.innerHTML = html.replace(/%d/, paylino);\n";
+}
+?>
+    cell.align = 'right'; // last cell is right-aligned
+    ++paylino;
+    break;
+   }
+  }
+  return false;
+ }
+
+
 
 </script>
 </head>
@@ -696,18 +868,19 @@ while ($urow = sqlFetchArray($ures)) {
 <center>
 
 <p>
-<table cellspacing='5'>
+<table cellspacing='5' id='paytable'>
  <tr>
-  <td colspan='3' align='center'>
+  <td colspan='4' align='center'>
    <b><?php xl('Patient Checkout for ','e'); ?><?php echo $patdata['fname'] . " " .
     $patdata['lname'] . " (" . $patdata['pubpid'] . ")" ?></b>
+    <br />&nbsp;
   </td>
  </tr>
  <tr>
   <td><b><?php xl('Date','e'); ?></b></td>
   <td><b><?php xl('Description','e'); ?></b></td>
-  <td align='right'><b><?php xl('Qty','e'); ?></b></td>
-  <td align='right'><b><?php xl('Amount','e'); ?></b></td>
+  <td align='right'><b><?php xl('Quantity','e'); ?></b></td>
+  <td align='right'><b><?php xl('Charge Amount','e'); ?></b></td>
  </tr>
 <?php
 $inv_encounter = '';
@@ -716,6 +889,15 @@ $inv_provider  = 0;
 $inv_payer     = 0;
 $gcac_related_visit = false;
 $gcac_service_provided = false;
+
+
+
+// This to save copays from the billing table.
+$aCopays = array();
+
+$lino = 0;
+
+
 
 // Process billing table items.  Note this includes co-pays.
 // Items that are not allowed to have a fee are skipped.
@@ -726,6 +908,16 @@ while ($brow = sqlFetchArray($bres)) {
 
   $thisdate = substr($brow['date'], 0, 10);
   $code_type = $brow['code_type'];
+
+
+
+  // Co-pays are saved for later.
+  if ($code_type == 'COPAY') {
+    $aCopays[] = $brow;
+    continue;
+  }
+
+
 
   // Collect tax rates, related code and provider ID.
   $taxrates = '';
@@ -800,8 +992,91 @@ foreach ($taxes as $key => $value) {
   }
 }
 
-// Note that we don't try to get anything from the ar_activity table.  Since
-// this is the checkout, nothing should be there yet for this invoice.
+
+
+// Line for total charges.
+$totalchg = sprintf("%01.2f", $totalchg);
+echo " <tr>\n";
+echo "  <td colspan='3' align='right'><b>" . xl('Total charges this visit') . "</b></td>\n";
+echo "  <td align='right'><input type='text' name='totalchg' " .
+     "value='$totalchg' size='6' maxlength='8' " .
+     "style='text-align:right;background-color:transparent' readonly";
+echo "></td>\n";
+echo " </tr>\n";
+
+
+
+// Start new section for payments.
+echo "  <tr>\n";
+echo "   <td colspan='4'>&nbsp;</td>\n";
+echo "  </tr>\n";
+echo "  <tr>\n";
+echo "   <td><b>" . xl('Type') . "</b></td>\n";
+echo "   <td><b>" . xl('Payment Method') . "</b></td>\n";
+echo "   <td><b>" . xl('Reference') . "</b></td>\n";
+echo "   <td align='right'><b>" . xl('Payment Amount') . "</b></td>\n";
+echo "  </tr>\n";
+
+$lino = 0;
+
+// Write co-pays.
+foreach ($aCopays as $brow) {
+  $thisdate = substr($brow['date'], 0, 10);
+  write_old_payment_line(xl('Prepayment'), $thisdate, $brow['code_text'], '', 0 - $brow['fee']);
+}
+
+// Write ar_activity payments and adjustments.
+$ares = sqlStatement("SELECT " .
+  "a.payer_type, a.adj_amount, a.pay_amount, a.memo, " .
+  "s.session_id, s.reference, s.check_date " .
+  "FROM ar_activity AS a " .
+  "LEFT JOIN ar_session AS s ON s.session_id = a.session_id WHERE " .
+  "a.pid = '$patient_id' AND a.encounter = '$encounter' " .
+  "ORDER BY s.check_date, a.sequence_no");
+while ($arow = sqlFetchArray($ares)) {
+  $memo = $arow['memo'];
+  $reference = $arow['reference'];
+  if (empty($arow['session_id'])) {
+    $atmp = explode(' ', $memo, 2);
+    $memo = $atmp[0];
+    $reference = $atmp[1];
+  }
+  if ($arow['pay_amount'] != 0) {
+    $rowtype = $arow['payer_type'] ? xl('Insurance payment') : xl('Patient payment');
+    write_old_payment_line($rowtype, $thisdate, $memo, $reference, $arow['pay_amount']);
+  }
+  if ($arow['adj_amount'] != 0) {
+    write_old_payment_line(xl('Adjustment'), $thisdate, $memo, $reference, $arow['adj_amount']);
+  }
+}
+
+
+
+// Line for total payments.
+echo " <tr id='totalpay'>\n";
+echo "  <td><a href='#' onclick='return addPayLine()'>[" . xl('Add Row') . "]</a></td>\n";
+echo "  <td colspan='2' align='right'><b>" . xl('Total payments this visit') . "</b></td>\n";
+echo "  <td align='right'><input type='text' name='form_totalpay' " .
+     "value='$amount' size='6' maxlength='8' " .
+     "style='text-align:right;background-color:transparent' readonly";
+echo "></td>\n";
+echo " </tr>\n";
+
+
+
+// Line for Difference.
+echo "  <tr>\n";
+echo "   <td colspan='4'>&nbsp;</td>\n";
+echo "  </tr>\n";
+echo " <tr>\n";
+echo "  <td colspan='3' align='right'><b>" . xl('Difference') . "</b></td>\n";
+echo "  <td align='right'><input type='text' name='form_difference' " .
+     "value='' size='6' maxlength='8' " .
+     "style='text-align:right;background-color:transparent' readonly";
+echo "></td>\n";
+echo " </tr>\n";
+
+
 
 if ($inv_encounter) {
   $erow = sqlQuery("SELECT provider_id FROM form_encounter WHERE " .
@@ -809,9 +1084,38 @@ if ($inv_encounter) {
     "ORDER BY id DESC LIMIT 1");
   $inv_provider = $erow['provider_id'] + 0;
 }
-?>
-</table>
 
+
+
+// Line for Discount.
+echo " <tr>\n";
+echo "  <td colspan='3' align='right'>";
+echo "<a href='#' onclick='return computeDiscount()'>[" . xl('Compute') ."]</a> <b>";
+echo xl('Discount/Adjustment') . "</b></td>\n";
+echo "  <td align='right'><input type='text' name='form_discount' " .
+     "value='' size='6' maxlength='8' onkeyup='billingChanged()' " .
+     "style='text-align:right'";
+echo "></td>\n";
+echo " </tr>\n";
+
+// Line for Balance Due
+echo " <tr>\n";
+echo "  <td colspan='3' align='right'><b>" . xl('Balance Due') . "</b></td>\n";
+echo "  <td align='right'><input type='text' name='form_balancedue' " .
+     "value='' size='6' maxlength='8' " .
+     "style='text-align:right;background-color:transparent' readonly";
+echo "></td>\n";
+echo " </tr>\n";
+
+
+
+?>
+
+
+
+<!--
+
+</table>
 <p>
 <table border='0' cellspacing='4'>
 
@@ -821,7 +1125,7 @@ if ($inv_encounter) {
   </td>
   <td>
    <input type='text' name='form_discount' size='6' maxlength='8' value=''
-    style='text-align:right' onkeyup='computeTotals()'>
+    style='text-align:right' onkeyup='billingChanged()'>
     &nbsp;
    <a href='#' onclick='return computeDiscount()'>[<?php xl('Compute','e'); ?>]</a>
   </td>
@@ -833,7 +1137,7 @@ if ($inv_encounter) {
   </td>
   <td>
 <?php
- echo generate_select_list('form_method', 'paymethod', '', '', '');
+ // echo generate_select_list('form_method', 'paymethod', '', '', '');
 ?>
   </td>
  </tr>
@@ -856,11 +1160,15 @@ if ($inv_encounter) {
   </td>
  </tr>
 
+-->
+
+
+
  <tr>
-  <td>
-   <?php xl('Posting Date','e'); ?>:
+  <td colspan='3' align='right'>
+   <b><?php xl('Posting Date','e'); ?></b>
   </td>
-  <td>
+  <td align='right'>
    <input type='text' size='10' name='form_date' id='form_date'
     value='<?php echo $inv_date ?>'
     title='yyyy-mm-dd date of service'
@@ -878,10 +1186,10 @@ $irnumber = getInvoiceRefNumber();
 if (!empty($irnumber)) {
 ?>
  <tr>
-  <td>
-   <?php xl('Tentative Invoice Ref No','e'); ?>:
+  <td colspan='3' align='right'>
+   <b><?php xl('Tentative Invoice Ref No','e'); ?></b>
   </td>
-  <td>
+  <td align='right'>
    <?php echo $irnumber; ?>
   </td>
  </tr>
@@ -891,10 +1199,10 @@ if (!empty($irnumber)) {
 else if (!empty($GLOBALS['gbl_mask_invoice_number'])) {
 ?>
  <tr>
-  <td>
-   <?php xl('Invoice Reference Number','e'); ?>:
+  <td colspan='3' align='right'>
+   <b><?php xl('Invoice Reference Number','e'); ?></b>
   </td>
-  <td>
+  <td align='right'>
    <input type='text' name='form_irnumber' size='10' value=''
     onkeyup='maskkeyup(this,"<?php echo addslashes($GLOBALS['gbl_mask_invoice_number']); ?>")'
     onblur='maskblur(this,"<?php echo addslashes($GLOBALS['gbl_mask_invoice_number']); ?>")'
@@ -906,7 +1214,7 @@ else if (!empty($GLOBALS['gbl_mask_invoice_number'])) {
 ?>
 
  <tr>
-  <td colspan='2' align='center'>
+  <td colspan='4' align='center'>
    &nbsp;<br>
    <input type='submit' name='form_save' value='<?php xl('Save','e'); ?>'
 <?php if ($rapid_data_entry) echo "    style='background-color:#cc0000';color:#ffffff'"; ?>
@@ -921,13 +1229,15 @@ else if (!empty($GLOBALS['gbl_mask_invoice_number'])) {
  </tr>
 
 </table>
+
 </center>
 
 </form>
 
 <script language='JavaScript'>
  Calendar.setup({inputField:"form_date", ifFormat:"%Y-%m-%d", button:"img_date"});
- computeTotals();
+ addPayLine();
+ billingChanged();
 <?php
 if ($gcac_related_visit && !$gcac_service_provided) {
   // Skip this warning if the GCAC visit form is not allowed.
