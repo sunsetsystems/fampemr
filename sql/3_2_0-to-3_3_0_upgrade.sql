@@ -468,3 +468,18 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 CREATE INDEX `pc_eventDate` ON `openemr_postcalendar_events` (`pc_eventDate`);
 #EndIf
 
+#IfMissingColumn drugs dispensable
+UPDATE drug_sales AS s, prescriptions AS p, form_encounter AS fe
+  SET s.prescription_id = p.id WHERE
+  s.pid > 0 AND
+  s.encounter > 0 AND
+  s.prescription_id = 0 AND
+  fe.pid = s.pid AND
+  fe.encounter = s.encounter AND
+  p.patient_id = s.pid AND
+  p.drug_id = s.drug_id AND
+  p.start_date = fe.date;
+ALTER TABLE drugs
+  ADD dispensable tinyint(1) NOT NULL DEFAULT 1 COMMENT '0 = pharmacy elsewhere, 1 = dispensed here';
+#EndIf
+

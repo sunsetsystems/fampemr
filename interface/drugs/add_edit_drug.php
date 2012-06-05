@@ -127,6 +127,15 @@ function sel_related() {
  dlgopen('../patient_file/encounter/find_code_popup.php', '_blank', 500, 400);
 }
 
+// onclick handle for "allow inventory" checkbox.
+function dispensable_changed() {
+ var f = document.forms[0];
+ var dis = !f.form_dispensable.checked;
+ f.form_allow_multiple.disabled = dis;
+ f.form_allow_combining.disabled = dis;
+ return true;
+}
+
 </script>
 
 </head>
@@ -165,6 +174,7 @@ if (($_POST['form_save'] || $_POST['form_delete']) && !$alertmsg) {
      "route = '"          . escapedff('form_route')         . "', " .
      "cyp_factor = '"     . numericff('form_cyp_factor')    . "', " .
      "related_code = '"   . escapedff('form_related_code')  . "', " .
+     "dispensable = "     . (empty($_POST['form_dispensable'    ]) ? 0 : 1) . ", " .
      "allow_multiple = "  . (empty($_POST['form_allow_multiple' ]) ? 0 : 1) . ", " .
      "allow_combining = " . (empty($_POST['form_allow_combining']) ? 0 : 1) . ", " .
      "active = "          . (empty($_POST['form_active']) ? 0 : 1) . " " .
@@ -185,7 +195,7 @@ if (($_POST['form_save'] || $_POST['form_delete']) && !$alertmsg) {
    $drug_id = sqlInsert("INSERT INTO drugs ( " .
     "name, ndc_number, on_order, reorder_point, max_level, form, " .
     "size, unit, route, cyp_factor, related_code, " .
-    "allow_multiple, allow_combining, active " .
+    "dispensable, allow_multiple, allow_combining, active " .
     ") VALUES ( " .
     "'" . escapedff('form_name')          . "', " .
     "'" . escapedff('form_ndc_number')    . "', " .
@@ -198,6 +208,7 @@ if (($_POST['form_save'] || $_POST['form_delete']) && !$alertmsg) {
     "'" . escapedff('form_route')         . "', " .
     "'" . numericff('form_cyp_factor')    . "', " .
     "'" . escapedff('form_related_code')  . "', " .
+    (empty($_POST['form_dispensable'    ]) ? 0 : 1) . ", " .
     (empty($_POST['form_allow_multiple' ]) ? 0 : 1) . ", " .
     (empty($_POST['form_allow_combining']) ? 0 : 1) . ", " .
     (empty($_POST['form_active']) ? 0 : 1)        .
@@ -282,6 +293,7 @@ else {
   $row = array(
     'name' => '',
     'active' => '1',
+    'dispensable' => '1',
     'allow_multiple' => '1',
     'allow_combining' => '',
     'ndc_number' => '',
@@ -320,6 +332,8 @@ else {
  <tr>
   <td valign='top' nowrap><b><?php xl('Allow','e'); ?>:</b></td>
   <td>
+   <input type='checkbox' name='form_dispensable' value='1' onclick='dispensable_changed();'<?php if ($row['dispensable']) echo ' checked'; ?> />
+   <?php xl('Inventory','e'); ?> &nbsp;
    <input type='checkbox' name='form_allow_multiple' value='1'<?php if ($row['allow_multiple']) echo ' checked'; ?> />
    <?php xl('Multiple Lots','e'); ?> &nbsp;
    <input type='checkbox' name='form_allow_combining' value='1'<?php if ($row['allow_combining']) echo ' checked'; ?> />
@@ -544,6 +558,7 @@ else {
 </form>
 
 <script language="JavaScript">
+dispensable_changed();
 <?php
  if ($alertmsg) {
   echo "alert('" . htmlentities($alertmsg) . "');\n";

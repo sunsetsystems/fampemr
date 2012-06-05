@@ -1,5 +1,5 @@
 <?php
- // Copyright (C) 2006-2010 Rod Roark <rod@sunsetsystems.com>
+ // Copyright (C) 2006-2012 Rod Roark <rod@sunsetsystems.com>
  //
  // This program is free software; you can redistribute it and/or
  // modify it under the terms of the GNU General Public License
@@ -163,8 +163,13 @@ function dosort(orderby) {
    echo "  <td>" .
 	generate_display_field(array('data_type'=>'1','list_id'=>'drug_units'), $row['unit']) .
 	"</td>\n";
-   echo "  <td onclick='doiclick($lastid,0)' title='" . xl('Add new lot and transaction') . "'>" .
-    "<a href='' onclick='return false'>" . xl('New') . "</a></td>\n";
+   if ($row['dispensable']) {
+    echo "  <td onclick='doiclick($lastid,0)' title='" . xl('Add new lot and transaction') . "'>" .
+     "<a href='' onclick='return false'>" . xl('New') . "</a></td>\n";
+   }
+   else {
+    echo "  <td title='" . xl('Inventory not enabled for this product') . "'>&nbsp;</td>\n";
+   }
   } else {
    echo " <tr class='detail' bgcolor='$bgcolor'>\n";
    echo "  <td colspan='7'>&nbsp;</td>\n";

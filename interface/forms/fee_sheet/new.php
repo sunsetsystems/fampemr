@@ -594,9 +594,14 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
     $units     = max(1, intval(trim($iter['units'])));
     $fee       = sprintf('%01.2f',(0 + trim($iter['price'])) * $units);
     $del       = $iter['del'];
+    $rxid      = 0;
 
     // If the item is already in the database...
     if ($sale_id) {
+      $tmprow = sqlQuery("SELECT prescription_id FROM drug_sales WHERE " .
+        "sale_id = '$sale_id'");
+      $rxid = 0 + $tmprow['prescription_id'];
+
       if ($del) {
         // Zero out this sale and reverse its inventory update.  We bring in
         // drug_sales twice so that the original quantity can be referenced
@@ -609,14 +614,9 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
           "di.inventory_id = ds.inventory_id");
         // And delete the sale for good measure.
         sqlStatement("DELETE FROM drug_sales WHERE sale_id = '$sale_id'");
-
-        // If Rx was checked and there is a prescription for this
-        // product/patient/date, delete it also.
-        if (!empty($iter['rx'])) {
-          sqlStatement("DELETE FROM prescriptions WHERE " .
-            "patient_id = '$pid' AND drug_id = '$drug_id' AND " .
-            "start_date = '$visit_date' AND active = 1 " .
-            "ORDER BY id DESC LIMIT 1");
+        // If there was a prescription delete it also.
+        if ($rxid) {
+          sqlStatement("DELETE FROM prescriptions WHERE id = '$rxid'");
         }
       }
       else {
@@ -629,6 +629,10 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
           "dsr.sale_id = '$sale_id' AND ds.sale_id = dsr.sale_id AND " .
           "di.inventory_id = ds.inventory_id";
         sqlStatement($query);
+        // Delete Rx if $rxid and flag not set.
+        if ($GLOBALS['gbl_auto_create_rx'] && $rxid && empty($iter['rx'])) {
+          sqlStatement("DELETE FROM prescriptions WHERE id = '$rxid'");
+        }
       }
     }
 
@@ -639,15 +643,11 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
       if (!$sale_id) die(xl('Insufficient inventory for product ID') . " \"$drug_id\".");
     }
 
-    // If a new prescription is requested, create it.
+    // If a prescription applies, create or update it.
     if (!empty($iter['rx']) && !$del) {
       // If an active rx already exists for this drug and date we will
       // replace it, otherwise we'll make a new one.
-      $rxrow = sqlQuery("SELECT id FROM prescriptions WHERE " .
-        "patient_id = '$pid' AND drug_id = '$drug_id' AND " .
-        "start_date = '$visit_date' AND active = 1 " .
-        "ORDER BY id DESC LIMIT 1");
-      $rxid = empty($rxrow['id']) ? '' : $rxrow['id'];
+      if (empty($rxid)) $rxid = '';
       // Get default drug attributes.
       $drow = sqlQuery("SELECT dt.*, " .
         "d.name, d.form, d.size, d.unit, d.route, d.substitute " .
@@ -677,6 +677,10 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
         $rxobj->set_substitute($drow['substitute']);
         //
         $rxobj->persist();
+        // Set drug_sales.prescription_id to $rxobj->get_id().
+        $rxid = 0 + $rxobj->get_id();
+        sqlStatement("UPDATE drug_sales SET prescription_id = '$rxid' WHERE " .
+          "sale_id = '$sale_id'");
       }
     }
 
@@ -1254,7 +1258,7 @@ $prod_lino = 0;
 while ($srow = sqlFetchArray($sres)) {
   ++$prod_lino;
   $pline = $_POST['prod']["$prod_lino"];
-  $rx    = !empty($pline['rx']); // preserve Rx if checked
+  $rx    = !empty($srow['prescription_id']);
   $del   = $pline['del']; // preserve Delete if checked
   $sale_id = $srow['sale_id'];
   $drug_id = $srow['drug_id'];
@@ -1267,6 +1271,7 @@ while ($srow = sqlFetchArray($sres)) {
     // $fee        = trim($pline['fee']);
     $units = max(1, intval(trim($pline['units'])));
     $fee   = sprintf('%01.2f',(0 + trim($pline['price'])) * $units);
+    $rx    = !empty($pline['rx']);
   }
   echoProdLine($prod_lino, $drug_id, $rx, $del, $units, $fee, $sale_id, $billed);
 }

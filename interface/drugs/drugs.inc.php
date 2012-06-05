@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2006-2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2006-2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -50,9 +50,20 @@ function sellDrug($drug_id, $quantity, $fee, $patient_id=0, $encounter_id=0,
   }
 
   // Get relevant options for this product.
-  $rowdrug = sqlQuery("SELECT allow_combining, reorder_point, name " .
+  $rowdrug = sqlQuery("SELECT allow_combining, reorder_point, name, dispensable " .
     "FROM drugs WHERE drug_id = '$drug_id'");
   $allow_combining = $rowdrug['allow_combining'];
+  $dispensable     = $rowdrug['dispensable'];
+
+  if (!$dispensable) {
+    // Non-dispensable is a much simpler case and does not touch inventory.
+    $sale_id = sqlInsert("INSERT INTO drug_sales ( " .
+      "drug_id, inventory_id, prescription_id, pid, encounter, user, " .
+      "sale_date, quantity, fee ) VALUES ( " .
+      "'$drug_id', 0, '$prescription_id', '$patient_id', " .
+      "'$encounter_id', '$user', '$sale_date', '$quantity', '$fee' )");
+    return $sale_id;
+  }
 
   // Combining is never allowed for prescriptions and will not work with
   // dispense_drug.php.
