@@ -153,6 +153,17 @@ $GLOBALS_METADATA = array(
       xl('Default view style for list of encounters')
     ),
 
+    'gbl_rx_print_style' => array(
+      xl('Printed Prescription Style'),
+      array(
+        '0' => xl('Informal (in-house)'),
+        '1' => xl('Formal with DEA Number'),
+        '2' => xl('Formal without DEA Number'),
+      ),
+      '1',                              // default
+      xl('Style for printed prescriptions')
+    ),
+
     'simplified_demographics' => array(
       xl('Simplified Demographics'),
       'bool',                           // data type

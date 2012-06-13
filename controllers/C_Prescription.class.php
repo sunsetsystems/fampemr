@@ -9,6 +9,7 @@ require_once($GLOBALS['fileroot'] . "/library/classes/Prescription.class.php");
 require_once($GLOBALS['fileroot'] . "/library/classes/Provider.class.php");
 require_once($GLOBALS['fileroot'] . "/library/classes/RXList.class.php");
 require_once($GLOBALS['fileroot'] . "/library/registry.inc");
+require_once($GLOBALS['fileroot'] . "/library/formatting.inc.php");
 
 class C_Prescription extends Controller {
 
@@ -213,10 +214,14 @@ class C_Prescription extends Controller {
     // configurable option.  Faxed prescriptions were not changed.  -- Rod
     // Now it is configureable. Change value in
     //     <openemr root>/includes/config.php - Tekknogenius
-    if ($this->is_faxing || $GLOBALS['oer_config']['prescriptions']['show_DEA'])
-      $pdf->ezText('<b>' . xl('DEA') . ':</b>' . $p->provider->federal_drug_id, 12);
-    else
-      $pdf->ezText('<b>' . xl('DEA') . ':</b> ________________________', 12);
+    if ($GLOBALS['gbl_rx_print_style'] != '0') {
+      if ($this->is_faxing || $GLOBALS['gbl_rx_print_style'] == '1') {
+        $pdf->ezText('<b>' . xl('DEA') . ':</b>' . $p->provider->federal_drug_id, 12);
+      }
+      else {
+        $pdf->ezText('<b>' . xl('DEA') . ':</b> ________________________', 12);
+      }
+    }
 		$pdf->ezColumnsStop();
 		if ($my_y < $pdf->y){
 			$pdf->ezSetY($my_y);
@@ -267,9 +272,17 @@ class C_Prescription extends Controller {
                 echo ('<span class="large">' . $res['addr'] . '</span>');
 	        echo ("</td>\n");
 	        echo ("<td>\n");
-                echo ('<b><span class="large">' .  $p->provider->get_name_display() . '</span></b>'. '<br>');
-                if ($GLOBALS['oer_config']['prescriptions']['show_DEA']) echo ('<span class="large"><b>' . xl('DEA') . ':</b>' . $p->provider->federal_drug_id . '</span>');
-                else echo ('<b><span class="large">' . xl('DEA') . ':</span></b> ________________________');
+          echo ('<b><span class="large">' .  $p->provider->get_name_display() . '</span></b>'. '<br>');
+          if ($GLOBALS['gbl_rx_print_style'] != '0') {
+            echo '<span class="large"><b>' . xl('DEA') . ':</b> ';
+            if ($GLOBALS['gbl_rx_print_style'] == '1') {
+              echo $p->provider->federal_drug_id;
+            }
+            else {
+              echo '________________________';
+            }
+            echo '</span>';
+          }
 	        echo ("</td>\n");
 	        echo ("</tr>\n");
 	        echo ("<tr>\n");
@@ -347,6 +360,17 @@ class C_Prescription extends Controller {
 	        echo (" margin-top: 40pt;\n");
                 echo (" font-size: 12pt;\n");
 	        echo ("}\n");
+
+          echo "div.scriptdiv table {\n";
+          echo " border-collapse: collapse;\n";
+          echo " border: 1px solid black;\n";
+          echo "}\n";
+          echo "div.scriptdiv th, div.scriptdiv td {\n";
+          echo " border: 1px solid black;\n";
+          echo " vertical-align: middle;\n";
+          echo " padding: 3 3 3 3;\n";
+          echo "}\n";
+
                 echo ("</style>\n");
 	    
                 echo ("<title>" . xl('Prescription') . "</title>\n");
@@ -433,7 +457,7 @@ class C_Prescription extends Controller {
 	function multiprint_body(& $pdf, $p){
 		$pdf->ez['leftMargin'] += $pdf->ez['leftMargin'];
 		$pdf->ez['rightMargin'] += $pdf->ez['rightMargin'];
-		$d = $this->get_prescription_body_text($p);
+    $d = $this->get_prescription_body_text($p);
 		if ( $pdf->ezText($d,10,array(),1) ) {
 			$pdf->ez['leftMargin'] -= $pdf->ez['leftMargin'];
 			$pdf->ez['rightMargin'] -= $pdf->ez['rightMargin'];
@@ -443,29 +467,29 @@ class C_Prescription extends Controller {
 			$pdf->ez['leftMargin'] += $pdf->ez['leftMargin'];
 			$pdf->ez['rightMargin'] += $pdf->ez['rightMargin'];
 		}
-		$my_y = $pdf->y;
-		$pdf->ezText($d,10);
-		if($this->pconfig['shading']) {
-			$pdf->setColor(.9,.9,.9);
-			$pdf->filledRectangle($pdf->ez['leftMargin'],$pdf->y,$pdf->ez['pageWidth']-$pdf->ez['rightMargin']-$pdf->ez['leftMargin'],$my_y - $pdf->y);
-			$pdf->setColor(0,0,0);
-		}
-		$pdf->ezSetY($my_y);
-		$pdf->ezText($d,10);
-		$pdf->ez['leftMargin'] = $GLOBALS['oer_config']['prescriptions']['left'];
-		$pdf->ez['rightMargin'] = $GLOBALS['oer_config']['prescriptions']['right'];
-		$pdf->ezText('');
-		$pdf->line($pdf->ez['leftMargin'],$pdf->y,$pdf->ez['pageWidth']-$pdf->ez['rightMargin'],$pdf->y);
-		$pdf->ezText('');
+    $my_y = $pdf->y;
+    $pdf->ezText($d,10);
+    if($this->pconfig['shading']) {
+      $pdf->setColor(.9,.9,.9);
+      $pdf->filledRectangle($pdf->ez['leftMargin'],$pdf->y,$pdf->ez['pageWidth']-$pdf->ez['rightMargin']-$pdf->ez['leftMargin'],$my_y - $pdf->y);
+      $pdf->setColor(0,0,0);
+    }
+    $pdf->ezSetY($my_y);
+    $pdf->ezText($d,10);
+    $pdf->ez['leftMargin'] = $GLOBALS['oer_config']['prescriptions']['left'];
+    $pdf->ez['rightMargin'] = $GLOBALS['oer_config']['prescriptions']['right'];
+    $pdf->ezText('');
+    $pdf->line($pdf->ez['leftMargin'],$pdf->y,$pdf->ez['pageWidth']-$pdf->ez['rightMargin'],$pdf->y);
+    $pdf->ezText('');
 	}
 
-        function multiprintcss_body($p){
-                $d = $this->get_prescription_body_text($p);
-                $patterns = array ('/\n/','/     /');
-	        $replace = array ('<br>','&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;');
-	        $d = preg_replace($patterns, $replace, $d);
-                echo ("<div class='scriptdiv'>\n" . $d . "</div>\n");
-        }
+  function multiprintcss_body($p){
+    $d = $this->get_prescription_body_text($p);
+    $patterns = array ('/\n/','/     /');
+    $replace = array ('<br>','&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;');
+    $d = preg_replace($patterns, $replace, $d);
+    echo ("<div class='scriptdiv'>\n" . $d . "</div>\n");
+  }
 
 	function multiprintfax_action($id = "") {
 		$this->is_print_to_fax=true;
@@ -485,13 +509,67 @@ class C_Prescription extends Controller {
 			,$GLOBALS['oer_config']['prescriptions']['right']
 		);
 		$pdf->selectFont($GLOBALS['fileroot'] . "/library/fonts/Helvetica.afm");
+    $this->_state = false; // Added by Rod - see Controller.class.php
+    $ids = preg_split('/::/', substr($id,1,strlen($id) - 2), -1, PREG_SPLIT_NO_EMPTY);
+
+    // Here is an alternative print style intended for facilities that dispense
+    // in-house and have no need for a formal prescription layout.  The products
+    // are just listed in table format.
+    if ($GLOBALS['gbl_rx_print_style'] == '0') {
+      $table = array();
+      foreach ($ids as $id) {
+        $p = new Prescription($id);
+        $drug_id    = $p->get_drug_id();
+        $patient_id = $p->get_patient_id();
+
+        $dosage     = $p->get_dosage();
+        $interval   = $p->get_interval();
+        $srow = sqlQuery("SELECT s.quantity, s.fee, t.selector " .
+          "FROM drug_sales AS s " .
+          "LEFT JOIN drug_templates AS t ON t.drug_id = s.drug_id " .
+          "WHERE " .
+          "s.pid = '$patient_id' AND s.drug_id = '$drug_id' AND s.prescription_id = '$id' " .
+          "ORDER BY s.sale_id DESC, " .
+          // Here we guess the selector via "best match" on dosage and period.
+          "((t.dosage = '$dosage') + (t.period = '$interval')) DESC LIMIT 1");
+        $selector = $srow['selector'];
+        $quantity = $srow['quantity'];
+        if (empty($quantity)) $quantity = 1;
+        $table[] = array(
+          xl('Code')        => $selector,
+          xl('Description') => $p->get_drug(),
+          xl('Quantity')    => $quantity,
+          xl('Unit Price')  => oeFormatMoney($srow['fee'] / $quantity),
+          xl('Total')       => oeFormatMoney($srow['fee']),
+        );
+      }
+      $this->multiprint_header($pdf, $p);
+      $pdf->ez['leftMargin'] += $pdf->ez['leftMargin'];
+      $pdf->ez['rightMargin'] += $pdf->ez['rightMargin'];
+      $pdf->ezTable($table, '', '', array(
+        // 'showHeadings' => 0,       // no column headings
+        'fontSize'     => 9,       // font size in points
+        'xPos'         => 'left',  // location of positioning bar
+        'xOrientation' => 'right', // position to right of xPos
+        'maxWidth'     => 504,     // max width of table 7 inches
+        'width'        => 288,     // width of table 4 inches
+        'cols'         => array(
+                            xl('Quantity')   => array('justification' => 'right'),
+                            xl('Unit Price') => array('justification' => 'right'),
+                            xl('Total')      => array('justification' => 'right'),
+                          )
+      ));
+      $pdf->ez['leftMargin'] = $GLOBALS['oer_config']['prescriptions']['left'];
+      $pdf->ez['rightMargin'] = $GLOBALS['oer_config']['prescriptions']['right'];
+      $this->multiprint_footer($pdf);
+      $pdf->ezStream();
+      return;
+    }
 
 		// $print_header = true;
 		$on_this_page = 0;
 
 		//print prescriptions body
-		$this->_state = false; // Added by Rod - see Controller.class.php
-		$ids = preg_split('/::/', substr($id,1,strlen($id) - 2), -1, PREG_SPLIT_NO_EMPTY);
 		foreach ($ids as $id) {
 			$p = new Prescription($id);
 			// if ($print_header == true) {
@@ -514,34 +592,78 @@ class C_Prescription extends Controller {
 		return;
 	}
 
-        function multiprintcss_action($id = "") {
-                $_POST['process'] = "true";
-                if(empty($id)) {
-                        $this->function_argument_error();
-                }
-	    
-	        $this->multiprintcss_preheader();
+  function multiprintcss_action($id = "") {
+    $_POST['process'] = "true";
+    if(empty($id)) {
+      $this->function_argument_error();
+    }
+    $this->multiprintcss_preheader();
+    $this->_state = false; // Added by Rod - see Controller.class.php
+    $ids = preg_split('/::/', substr($id,1,strlen($id) - 2), -1, PREG_SPLIT_NO_EMPTY);
 
-                $this->_state = false; // Added by Rod - see Controller.class.php
-                $ids = preg_split('/::/', substr($id,1,strlen($id) - 2), -1, PREG_SPLIT_NO_EMPTY);
+    // Here is an alternative print style intended for facilities that dispense
+    // in-house and have no need for a formal prescription layout.  The products
+    // are just listed in table format.
+    if ($GLOBALS['gbl_rx_print_style'] == '0') {
+      $this->multiprintcss_header(new Prescription($ids[0]));
+      echo "<div class='scriptdiv'>\n";
+      echo " <table border='1' cellspacing='0'>\n";
+      echo "  <tr>\n";
+      echo "   <th align='left' >" . xl('Code') . "</th>\n";
+      echo "   <th align='left' >" . xl('Description') . "</th>\n";
+      echo "   <th align='right'>" . xl('Quantity') . "</th>\n";
+      echo "   <th align='right'>" . xl('Unit Price') . "</th>\n";
+      echo "   <th align='right'>" . xl('Total') . "</th>\n";
+      echo "  </tr>\n";
+      foreach ($ids as $id) {
+        $p = new Prescription($id);
+        $drug_id    = $p->get_drug_id();
+        $patient_id = $p->get_patient_id();
+        $dosage     = $p->get_dosage();
+        $interval   = $p->get_interval();
+        $srow = sqlQuery("SELECT s.quantity, s.fee, t.selector " .
+          "FROM drug_sales AS s " .
+          "LEFT JOIN drug_templates AS t ON t.drug_id = s.drug_id " .
+          "WHERE " .
+          "s.pid = '$patient_id' AND s.drug_id = '$drug_id' AND s.prescription_id = '$id' " .
+          "ORDER BY s.sale_id DESC, " .
+          // Here we guess the selector via "best match" on dosage and period.
+          "((t.dosage = '$dosage') + (t.period = '$interval')) DESC LIMIT 1");
+        $selector = $srow['selector'];
+        $quantity = $srow['quantity'];
+        if (empty($quantity)) $quantity = 1;
+        echo "  <tr>\n";
+        echo "   <td>" . $selector . "</td>\n";
+        echo "   <td>" . $p->get_drug() . "</td>\n";
+        echo "   <td align='right'>" . $quantity . "</td>\n";
+        echo "   <td align='right'>" . oeFormatMoney($srow['fee'] / $quantity) . "</td>\n";
+        echo "   <td align='right'>" . oeFormatMoney($srow['fee']) . "</td>\n";
+        echo "  </tr>\n";
+      }
+      echo " </table>\n";
+      echo "</div>\n";
+      $this->multiprintcss_footer();
+      $this->multiprintcss_postfooter();	        
+      return;
+    }
 
-                $on_this_page = 0;
-                foreach ($ids as $id) {
-                        $p = new Prescription($id);
-                        if ($on_this_page == 0) {
-                                $this->multiprintcss_header($p);
-                        }
-                        if (++$on_this_page > 3 || $p->provider->id != $this->providerid) {
-                                $this->multiprintcss_footer();
-                                $this->multiprintcss_header($p);
-                                $on_this_page = 1;
-                        }
-                        $this->multiprintcss_body($p);
-                }
-                $this->multiprintcss_footer();
-                $this->multiprintcss_postfooter();	        
-                return;
-        }
+    $on_this_page = 0;
+    foreach ($ids as $id) {
+      $p = new Prescription($id);
+      if ($on_this_page == 0) {
+        $this->multiprintcss_header($p);
+      }
+      if (++$on_this_page > 3 || $p->provider->id != $this->providerid) {
+        $this->multiprintcss_footer();
+        $this->multiprintcss_header($p);
+        $on_this_page = 1;
+      }
+      $this->multiprintcss_body($p);
+    }
+    $this->multiprintcss_footer();
+    $this->multiprintcss_postfooter();	        
+    return;
+  }
 
 	function send_action_process($id) {
 		$dummy = ""; // Added by Rod to avoid run-time warnings
