@@ -180,7 +180,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
   $billed = FALSE, $code_text = NULL, $justify = NULL, $provider_id = 0)
 {
   global $code_types, $ndc_applies, $ndc_uom_choices, $justinit, $pid;
-  global $usbillstyle, $justifystyle, $hasCharges;
+  global $usbillstyle, $justifystyle, $hasCharges, $required_code_count;
 
   if ($codetype == 'COPAY') {
     if (!$code_text) $code_text = 'Cash';
@@ -353,8 +353,9 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
     echo " </tr>\n";
   }
 
-  // For Family Planning.  Track contraceptive services.
+  // For Family Planning.  Track services.
   if (!$del) checkForContraception($codetype, $code);
+  if ($codetype == 'MA') ++$required_code_count;
 
   if ($fee != 0) $hasCharges = true;
 }
@@ -365,7 +366,7 @@ function echoProdLine($lino, $drug_id, $rx = FALSE, $del = FALSE, $units = NULL,
   $fee = NULL, $sale_id = 0, $billed = FALSE)
 {
   global $code_types, $ndc_applies, $pid, $usbillstyle, $justifystyle, $hasCharges;
-
+  global $required_code_count;
   $drow = sqlQuery("SELECT name FROM drugs WHERE drug_id = '$drug_id'");
   $code_text = $drow['name'];
 
@@ -432,6 +433,7 @@ function echoProdLine($lino, $drug_id, $rx = FALSE, $del = FALSE, $units = NULL,
   echo " </tr>\n";
 
   if ($fee != 0) $hasCharges = true;
+  ++$required_code_count;
 }
 
 // Build a drop-down list of providers.  This includes users who
@@ -858,7 +860,9 @@ function copayselect() {
 
 function validate(f) {
  var refreshing = f.bn_refresh.clicked ? true : false;
+ var searching  = f.bn_search.clicked  ? true : false;
  f.bn_refresh.clicked = false;
+ f.bn_search.clicked = false;
  for (var lino = 1; f['bill['+lino+'][code_type]']; ++lino) {
   var pfx = 'bill['+lino+']';
   if (f[pfx+'[ndcnum]'] && f[pfx+'[ndcnum]'].value) {
@@ -897,9 +901,19 @@ function validate(f) {
    }
   }
  }
- if (!f.ProviderID.value && !refreshing) {
-  alert('<?php echo xl('Default provider is required.') ?>');
-  return false;
+ if (!refreshing && !searching) {
+  if (!f.ProviderID.value) {
+   alert('<?php echo xl('Default provider is required.') ?>');
+   return false;
+  }
+<?php if (isset($code_types['MA'])) { ?>
+  if (required_code_count == 0) {
+   if (!confirm('<?php echo xl('You have not entered any clinical services or products.' .
+    ' Click Cancel to add them. Or click OK if you want to save as-is.') ?>')) {
+    return false;
+   }
+  }
+<?php } ?>
  }
  top.restoreSession();
  return true;
@@ -1147,7 +1161,8 @@ echo " </tr>\n";
    <input type='text' name='search_term' value=''> &nbsp;
   </td>
   <td>
-   <input type='submit' name='bn_search' value='<?php xl('Search','e');?>'>
+   <input type='submit' name='bn_search' value='<?php xl('Search','e');?>'
+    onclick='return this.clicked = true;'>
   </td>
  </tr>
 </table>
@@ -1183,6 +1198,7 @@ $justinit = "var f = document.forms[0];\n";
 // $encounter_provid = -1;
 
 $hasCharges = false;
+$required_code_count = 0;
 
 // Generate lines for items already in the billing table for this encounter,
 // and also set the rendering provider if we come across one.
@@ -1601,6 +1617,7 @@ if (document.getElementById('img_contrastart')) {
  Calendar.setup({inputField:"contrastart", ifFormat:"%Y-%m-%d", button:"img_contrastart"});
 }
 *********************************************************************/
+var required_code_count = <?php echo $required_code_count; ?>;
 setSaveAndClose();
 <?php echo $justinit; ?>
 </script>

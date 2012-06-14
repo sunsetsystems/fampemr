@@ -60,6 +60,7 @@ if ($report_type == 'm') {
     4 => xl('Unique New Clients'),
     6 => xl('Acceptors New to Modern Contraception'), // new on 2/2012
     5 => xl('Contraceptive Products'),                // reactivated 2/2012
+    // 7 => xl('Administrative Services'),            // TBD: remove this
   );
   $arr_report = array(
     // Items are content|row|column|column|...
@@ -930,6 +931,33 @@ function process_ma_code($row, $code='', $quantity=1) {
   loadColumnData($key, $row, $quantity);
 }
 
+// This is called for each ADM service code that is selected.
+//
+function process_adm_code($row, $code='', $quantity=1) {
+  global $form_by, $arr_content, $form_content;
+
+  if ($code === '') $code = $row['code'];
+  $key = 'ADM:Unspecified';
+
+  // One row for each service category.
+  //
+  if ($form_by === '101') {
+    if (!empty($row['lo_title'])) $key = xl($row['lo_title']);
+  }
+
+  // Specific Services. One row for each ADM code.
+  //
+  else if ($form_by === '102') {
+    $key = "ADM:$code";
+  }
+
+  else {
+    return;
+  }
+
+  loadColumnData($key, $row, $quantity);
+}
+
 function LBFgcac_query($pid, $encounter, $name) {
   $query = "SELECT d.form_id, d.field_value " .
     "FROM forms AS f, form_encounter AS fe, lbf_data AS d " .
@@ -1663,7 +1691,7 @@ if ($_POST['form_submit']) {
     if ($form_content != 5 && $form_by !== '9' && $form_by !== '10' &&
       $form_by !== '14' && $form_by !== '15' && $form_by !== '20')
     {
-      // This gets us all MA codes, with encounter and patient
+      // This gets us all MA and ADM codes, with encounter and patient
       // info attached and grouped by patient and encounter.
       $query = "SELECT " .
         "fe.pid, fe.encounter, fe.date AS encdate, fe.facility_id, " .
@@ -1677,8 +1705,9 @@ if ($_POST['form_submit']) {
         "JOIN patient_data AS pd ON pd.pid = fe.pid $sexcond" .
         "LEFT OUTER JOIN billing AS b ON " .
         "b.pid = fe.pid AND b.encounter = fe.encounter AND b.activity = 1 " .
-        "AND b.code_type = 'MA' " .
-        "LEFT OUTER JOIN codes AS c ON b.code_type = 'MA' AND c.code_type = '12' AND " .
+        "AND ( b.code_type = 'MA' OR b.code_type = 'ADM' ) " .
+        "LEFT OUTER JOIN code_types AS ct ON ct.ct_key = b.code_type " .
+        "LEFT OUTER JOIN codes AS c ON c.code_type = ct.ct_id AND " .
         "c.code = b.code AND c.modifier = b.modifier " .
         "LEFT OUTER JOIN list_options AS lo ON " .
         "lo.list_id = 'superbill' AND lo.option_id = c.superbill " .
@@ -1709,6 +1738,9 @@ if ($_POST['form_submit']) {
               process_ippf_code($row, $code);
             }
           }
+        }
+        else if ($row['code_type'] === 'ADM') {
+          process_adm_code($row);
         }
       } // end while
     } // end if
@@ -1884,9 +1916,15 @@ if ($_POST['form_submit']) {
       if (uses_description($form_by)) {
         $dispkey = array($display_key, '');
         $dispspan = 1;
-        $type = $form_by === '102' ? 12 : 11; // MA or IPPF
-        $crow = sqlQuery("SELECT code_text FROM codes WHERE " .
-          "code_type = '$type' AND code = '$display_key' ORDER BY id LIMIT 1");
+        $sqltype = $form_by === '102' ? 'MA' : 'IPPF'; // MA or IPPF
+        $sqlcode = $display_key;
+        if (substr($display_key, 0, 3) == 'ADM') {
+          $sqltype = 'ADM';
+          $sqlcode = substr($display_key, 4);
+        }
+        $crow = sqlQuery("SELECT c.code_text FROM codes AS c, code_types AS ct WHERE " .
+          "ct.ct_key = '$sqltype' AND c.code_type = ct.ct_id AND c.code = '$sqlcode' " .
+          "ORDER BY c.id LIMIT 1");
         if (!empty($crow['code_text'])) $dispkey[1] = $crow['code_text'];
       }
 
