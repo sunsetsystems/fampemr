@@ -167,6 +167,7 @@ function LBFccicon_javascript_onload() {
     }
   }
 
+  /*******************************************************************
   // Get details of the last previous instance of this form, if any.
   // * "First contraception at this clinic" should be auto-set to NO
   //   and disabled if that question was answered previously.
@@ -195,6 +196,51 @@ function LBFccicon_javascript_onload() {
     if (!empty($prvrow['pastmodern'])) {
       $js_extra .=
         "\n// Past Modern was previously true so must also be true now.\n" .
+        "f.form_pastmodern.selectedIndex = 2;\n" .
+        "f.form_pastmodern.disabled = true;\n" .
+        "pastmodern_autoset = true;\n";
+    }
+  }
+  *******************************************************************/
+  // Get details of previous instances of this form.
+  // * "First contraception at this clinic" should be auto-set to NO
+  //   and disabled if that question was answered previously.
+  // * "Previous modern contraceptive use" should auto-set to YES
+  //   and disabled it was YES previously, or if a modern method was
+  //   indicated in a previous instance of the form.
+  //
+  $newmauser_autoset = false;
+  $pastmodern_autoset = false;
+  $js_extra = "";
+  $prvres = sqlStatement("SELECT " .
+    "d1.field_value AS newmauser, " .
+    "d2.field_value AS pastmodern, " .
+    "d3.field_value AS newmethod " .
+    "FROM forms AS f " .
+    "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
+    "     JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmauser' " .
+    "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'pastmodern' " .
+    "LEFT JOIN lbf_data AS d3 ON d3.form_id = f.form_id AND d3.field_id = 'newmethod' " .
+    "WHERE f.pid = '$pid' AND " .
+    "f.formdir = 'LBFccicon' AND " .
+    "f.deleted = 0 AND " .
+    "f.form_id != '$formid' AND " .
+    "fe.date < '$encdate' " .
+    "ORDER BY fe.date DESC, f.form_id DESC");
+  while ($prvrow = sqlFetchArray($prvres)) {
+    $newmauser_autoset = true;
+    if (!empty($prvrow['pastmodern']) || !empty($prvrow['newmethod'])) {
+      $pastmodern_autoset = true;
+    }
+  }
+  if ($newmauser_autoset) {
+    $js_extra .=
+      "// There was a previous instance of this form so we know they are not a new MA user.\n" .
+      "f.form_newmauser.selectedIndex = 1;\n" .
+      "f.form_newmauser.disabled = true;\n";
+    if ($pastmodern_autoset) {
+      $js_extra .=
+        "\n// Past Modern must also be true now.\n" .
         "f.form_pastmodern.selectedIndex = 2;\n" .
         "f.form_pastmodern.disabled = true;\n" .
         "pastmodern_autoset = true;\n";
