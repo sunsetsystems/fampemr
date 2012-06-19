@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2010-2012 Rod Roark <rod@sunsetsystems.com>
 // Some code was adapted from patient_select.php.
 //
 // This program is free software; you can redistribute it and/or
@@ -10,6 +10,7 @@
 require_once("../globals.php");
 require_once("$srcdir/patient.inc");
 require_once("$srcdir/formdata.inc.php");
+require_once("$srcdir/options.inc.php");
 
 $fstart = $_REQUEST['fstart'] + 0;
 
@@ -188,7 +189,7 @@ if ($fend > $count) $fend = $count;
 <?php
 // This gets address plus other fields that are mandatory, up to a limit of 5.
 $extracols = array();
-$tres = sqlStatement("SELECT field_id, title FROM layout_options " .
+$tres = sqlStatement("SELECT * FROM layout_options " .
   "WHERE form_id = 'DEM' AND field_id != '' AND " .
   "( uor > 1 OR uor > 0 AND edit_options LIKE '%D%' ) AND " .
   "field_id NOT LIKE 'title' AND " .
@@ -196,8 +197,8 @@ $tres = sqlStatement("SELECT field_id, title FROM layout_options " .
   "ORDER BY group_name, seq, title LIMIT 9");
 
 while ($trow = sqlFetchArray($tres)) {
-  $extracols[$trow['field_id']] = $trow['title'];
-  echo "<th class='srMisc'>" . $trow['title'] . "</th>\n";
+  $extracols[$trow['field_id']] = $trow;
+  echo "<th class='srMisc'>" . htmlspecialchars(xl_layout_label($trow['title'])) . "</th>\n";
 }
 ?>
 
@@ -224,8 +225,10 @@ if ($result) {
     echo "'>";
     echo  "<td class='srID'>$relevance</td>\n";
     echo  "<td class='srName'>" . $iter['lname'] . ", " . $iter['fname'] . "</td>\n";
-    foreach ($extracols as $field_id => $title) {
-      echo "<td class='srMisc'>" . $iter[$field_id] . "</td>\n";
+    foreach ($extracols as $field_id => $trow) {
+      echo "<td class='srMisc'>";
+      echo generate_display_field($trow, $iter[$field_id]);
+      echo "</td>\n";
     }
   }
 }

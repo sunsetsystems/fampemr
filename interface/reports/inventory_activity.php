@@ -87,10 +87,10 @@ function thisLineItem($product_id, $warehouse_id, $patient_id, $encounter_id,
   $invnumber = empty($irnumber) ? ($patient_id ? "$patient_id.$encounter_id" : "") : $irnumber;
 
   // Product name for this detail line item.
-  if (empty($rowprod)) $rowprod = 'Unnamed Product';
+  if (empty($rowprod)) $rowprod = xl('Unnamed Product');
 
   // Warehouse name for this line item.
-  if (empty($rowwh)) $rowwh = 'None';
+  if (empty($rowwh)) $rowwh = xl('None');
 
   // If new warehouse or product...
   if ($warehouse_id != $last_warehouse_id || $product_id != $last_product_id) {
@@ -371,8 +371,8 @@ else {
 
    <?php xl('By','e'); ?>:
    <select name='form_by'>
-    <option value='p'>Product</option>
-    <option value='w'<?php if (!$product_first) echo ' selected'; ?>>Warehouse</option>
+    <option value='p'><?php xl('Product','e'); ?></option>
+    <option value='w'<?php if (!$product_first) echo ' selected'; ?>><?php xl('Warehouse','e'); ?></option>
    </select>
 
    &nbsp;
