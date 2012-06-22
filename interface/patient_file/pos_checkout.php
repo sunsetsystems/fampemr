@@ -32,6 +32,7 @@ require_once("$srcdir/acl.inc");
 require_once("$srcdir/patient.inc");
 require_once("$srcdir/billing.inc");
 require_once("$srcdir/formatting.inc.php");
+require_once("$srcdir/date_functions.php");
 require_once("$srcdir/formdata.inc.php");
 require_once("../../custom/code_types.inc.php");
 require_once("$srcdir/calendar_events.inc.php");
@@ -188,7 +189,7 @@ function generate_receipt($patient_id, $encounter=0) {
 <br>&nbsp;
 <br>
 <?php
-  echo xl("Receipt Generated") . date(' F j, Y');
+  echo xl("Receipt Generated") . ' ' . dateformat();
   if ($invoice_refno) echo " " . xl("for Invoice") . " $invoice_refno";
 ?>
 <br>&nbsp;
