@@ -57,6 +57,19 @@ else {
     color: #336699;
 }
 </style>
+
+<script language="JavaScript">
+
+function submitList(offset) {
+ var f = document.forms[0];
+ var i = parseInt(f.fstart.value) + offset;
+ if (i < 0) i = 0;
+ f.fstart.value = i;
+ f.submit();
+}
+
+</script>
+
 </head>
 <body class="body_top">
 <font class="title"><?php  xl('Logs Viewer','e'); ?></font>
@@ -87,11 +100,7 @@ if ($start_date && $end_date)
 }
 
 $form_user = formData('form_user','R');
-
-$res = sqlStatement("select distinct LEFT(date,10) as date from log order by date desc limit 30");
-for($iter = 0; $row = sqlFetchArray($res); $iter++) {
-  $ret[$iter] = $row;
-}
+$eventname = formData('eventname','G');
 
 // Get the users list.
 $sqlQuery = "SELECT username, fname, lname FROM users " .
@@ -104,6 +113,14 @@ $get_edate = $end_date ? $end_date : date("Y-m-d");
 $sortby = formData('sortby', 'G');
 
 if (!$_REQUEST['form_csvexport']) {
+  $count = getEventsCount(array('sdate' => $get_sdate, 'edate' => $get_edate,
+    'user' => $form_user, 'levent' => $eventname));
+  $fstart = formdata('fstart','R') + 0;
+  $pagesize = 500;
+  while ($fstart >= $count) $fstart -= $pagesize;
+  if ($fstart < 0) $fstart = 0;
+  $fend = $fstart + $pagesize;
+  if ($fend > $count) $fend = $count;
 ?>
 <br>
 <FORM METHOD="GET" name="theform" id="theform">
@@ -191,12 +208,26 @@ echo "</select>\n";
 </td>
 <td>
 <input type='submit' name='form_refresh' value="<?php xl('Refresh','e') ?>" />
-</td>
-<td>
-<!-- Not used -->
-</td>
-<td>
+&nbsp;
 <input type='submit' name='form_csvexport' value="<?php xl('Export to CSV','e') ?>" />
+</td>
+<td colspan='2'>
+
+<?php if ($start_date && $end_date) { ?>
+<?php if ($fstart) { ?>
+ <a href="javascript:submitList(-<?php echo $pagesize ?>)">
+  &lt;&lt;
+ </a>
+ &nbsp;&nbsp;
+<?php } ?>
+ <?php echo ($fstart + 1) . " - $fend " . xl('of') . " $count" ?>
+ &nbsp;&nbsp;
+ <a href="javascript:submitList(<?php echo $pagesize ?>)">
+  &gt;&gt;
+ </a>
+<?php } ?>
+ <input type='hidden' name='fstart' value='<?php echo $fstart ?>'>
+
 </td>
 </tr>
 </table>
@@ -232,9 +263,10 @@ if ($start_date && $end_date && $err_message != 1) {
 <?php
   } // end not export
 
-$eventname = formData('eventname','G');
-
-if ($ret = getEvents(array('sdate' => $get_sdate,'edate' => $get_edate, 'user' => $form_user, 'sortby' => $_GET['sortby'], 'levent' =>$eventname))) {
+if ($ret = getEvents(array('sdate' => $get_sdate,'edate' => $get_edate,
+  'user' => $form_user, 'sortby' => $_GET['sortby'], 'levent' => $eventname,
+  'limit' => ($_REQUEST['form_csvexport'] ? "" : ("LIMIT $fstart, " . ($fend - $fstart))))))
+{
   foreach ($ret as $iter) {
     //translate comments
     $patterns = array ('/^success/','/^failure/','/ encounter/');
