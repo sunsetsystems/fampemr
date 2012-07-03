@@ -115,12 +115,12 @@ function current_method_changed() {
 // we do want to save the default values that were set for them.
 function mysubmit() {
  var f = document.forms[0];
+ if (!validate(f)) return false;
  f.form_newmauser.disabled = false;
  f.form_pastmodern.disabled = false;
  f.form_newmethod.disabled = false;
  f.form_provider.disabled = false;
  f.form_mcreason.disabled = false;
- top.restoreSession();
  return true;
 }
 ";

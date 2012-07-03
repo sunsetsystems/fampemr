@@ -1258,6 +1258,7 @@ function generate_layout_validation($form_id) {
     $fldtitle  = $frow['title'];
     if (!$fldtitle) $fldtitle  = $frow['description'];
     $fldname   = "form_$field_id";
+    echo " if (!f.$fldname.disabled) {\n";
     switch($data_type) {
       case  1:
       case 11:
@@ -1266,36 +1267,37 @@ function generate_layout_validation($form_id) {
       case 14:
       case 26:
         echo
-        " if (f.$fldname.selectedIndex <= 0) {\n" .
-        "  alert('" . addslashes(xl('Please choose a value for','','',' ') .
+        "  if (f.$fldname.selectedIndex <= 0) {\n" .
+        "   alert('" . addslashes(xl('Please choose a value for','','',' ') .
         xl_layout_label($fldtitle)) . "');\n" .
-        "  if (f.$fldname.focus) f.$fldname.focus();\n" .
-        "  return false;\n" .
-        " }\n";
+        "   if (f.$fldname.focus) f.$fldname.focus();\n" .
+        "   return false;\n" .
+        "  }\n";
         break;
       case 27: // radio buttons
         echo
-        " var i = 0;\n" .
-        " for (; i < f.$fldname.length; ++i) if (f.$fldname[i].checked) break;\n" .
-        " if (i >= f.$fldname.length) {\n" .
-        "  alert('" . addslashes(xl('Please choose a value for','','',' ') .
+        "  var i = 0;\n" .
+        "  for (; i < f.$fldname.length; ++i) if (f.$fldname[i].checked) break;\n" .
+        "  if (i >= f.$fldname.length) {\n" .
+        "   alert('" . addslashes(xl('Please choose a value for','','',' ') .
         xl_layout_label($fldtitle)) . "');\n" .
-        "  return false;\n" .
-        " }\n";
+        "   return false;\n" .
+        "  }\n";
         break;
       case  2:
       case  3:
       case  4:
       case 15:
         echo
-        " if (trimlen(f.$fldname.value) == 0) {\n" .
-        "  alert('" . addslashes(xl('Please choose a value for','','',' ') .
+        "  if (trimlen(f.$fldname.value) == 0) {\n" .
+        "   alert('" . addslashes(xl('Please choose a value for','','',' ') .
         xl_layout_label($fldtitle)) . "');\n" .
-        "  if (f.$fldname.focus) f.$fldname.focus();\n" .
-        "  return false;\n" .
-        " }\n";
+        "   if (f.$fldname.focus) f.$fldname.focus();\n" .
+        "   return false;\n" .
+        "  }\n";
         break;
     }
+    echo " }\n";
   }
 }
 ?>

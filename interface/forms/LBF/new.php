@@ -199,6 +199,13 @@ function sel_related() {
  dlgopen('<?php echo $rootdir ?>/patient_file/encounter/find_code_popup.php', '_blank', 500, 400);
 }
 
+// Validation logic for form submission.
+function validate(f) {
+<?php generate_layout_validation($formname); ?>
+ top.restoreSession();
+ return true;
+}
+
 <?php if (function_exists($formname . '_javascript')) call_user_func($formname . '_javascript'); ?>
 
 </script>
@@ -206,7 +213,7 @@ function sel_related() {
 
 <body <?php echo $top_bg_line; ?> topmargin="0" rightmargin="0" leftmargin="2" bottommargin="0" marginwidth="2" marginheight="0">
 <form method="post" action="<?php echo $rootdir ?>/forms/LBF/new.php?formname=<?php echo $formname ?>&id=<?php echo $formid ?>"
- onsubmit="return top.restoreSession()">
+ onsubmit="return validate(this)">
 
 <p class='title' style='margin-top:8px;margin-bottom:8px;text-align:center'>
 <?php
