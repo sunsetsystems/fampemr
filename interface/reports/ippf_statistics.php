@@ -909,7 +909,7 @@ function process_ma_code($row, $code='', $quantity=1) {
   // One row for each referral source.
   //
   else if ($form_by === '103') {
-    $key = $row['referral_source'];
+    $key = getListTitle('refsource', $row['referral_source']);
   }
 
   // Just one row.
