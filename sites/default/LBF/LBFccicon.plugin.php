@@ -71,11 +71,14 @@ function LBFccicon_javascript() {
   $res = sqlStatement("SELECT option_id, option_value, mapping FROM list_options WHERE " .
     "list_id = 'contrameth' ORDER BY seq, title");
   while ($row = sqlFetchArray($res)) {
-    $mapping = '00000';
+    $mapping = '';
+    $i = strpos($row['mapping'], ':');
+    if ($i !== FALSE) $mapping = substr($row['mapping'], $i + 1);
     if ($row['option_value']) { // if modern method
-      $i = strpos($row['mapping'], ':');
-      if ($i === FALSE) continue;
-      $mapping = substr($row['mapping'], $i + 1);
+      $mapping = '1:' . $mapping;
+    }
+    else {                      // not a modern method
+      $mapping = '0:' . $mapping;
     }
     echo "contraMapping['" . $row['option_id'] . "'] = '$mapping';\n";
   }
@@ -85,24 +88,24 @@ var pastmodern_autoset = false;
 
 // Respond to selection of a current method.
 // If it is unassigned or not modern, ask if a modern method was used anywhere before.
-// Otherwise if new method != current then ask reason for method change.
+// If assigned and not No Method and new method != current then ask reason for method change.
 function current_method_changed() {
  var f = document.forms[0];
  f.form_pastmodern.disabled = true;
  f.form_mcreason.disabled = true;
- if (f.form_curmethod.selectedIndex <= 0 || contraMapping[f.form_curmethod.value] == '00000') {
+ if (f.form_curmethod.selectedIndex <= 0 || contraMapping[f.form_curmethod.value].substring(0, 1) == '0') {
   if (!pastmodern_autoset) {
    // Enable past use question iff no modern current method and only if the
    // global option is set to record all acceptors new to modern contraception.
    f.form_pastmodern.disabled = " . ($GLOBALS['gbl_new_acceptor_policy'] == '3' ? 'false' : 'true') . ";
   }
  }
- else {
-  // Here there is a current modern method.  Use its regex pattern to decide if
+ if (f.form_curmethod.selectedIndex > 0) {
+  // Here there is a selected current method.  Use its regex pattern to decide if
   // the new method is different.  If so, enable the reason for change selector.
-  // The pattern should not be missing, but we also enable in that case.
-  var pattern = contraMapping[f.form_curmethod.value];
-  if (!(pattern && f.form_newmethod.value.match('^' + pattern))) {
+  // A missing pattern indicates No Method and method change reason is disabled.
+  var pattern = contraMapping[f.form_curmethod.value].substring(2);
+  if (pattern && !f.form_newmethod.value.match('^' + pattern)) {
    f.form_mcreason.disabled = false;
   }
  }

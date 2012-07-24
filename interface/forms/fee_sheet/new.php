@@ -130,8 +130,7 @@ function checkForContraception($code_type, $code) {
 // of the service with highest CYP.
 //
 function checkForContraception($code_type, $code) {
-  global $code_types;
-  global $contraception_code, $contraception_cyp;
+  global $code_types, $contraception_code, $contraception_cyp;
 
   // This logic is only used for family planning clinics, and then only when
   // the option is chosen to auto-generate Contraception forms.
@@ -159,7 +158,9 @@ function checkForContraception($code_type, $code) {
         preg_match('/^12118[1-2].13/', $relcode) ||
         preg_match('/^121181999/'    , $relcode) ||
         preg_match('/^122182.13/'    , $relcode) ||
-        preg_match('/^122182999/'    , $relcode)
+        preg_match('/^122182999/'    , $relcode) ||
+        preg_match('/^145212.10/'    , $relcode) ||
+        preg_match('/^14521.999/'    , $relcode)
       ) {
         $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
           "code_type = '11' AND code = '$relcode' LIMIT 1");
