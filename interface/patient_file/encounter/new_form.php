@@ -51,7 +51,7 @@ include_once("$srcdir/registry.inc");
 
 function myGetRegistered($state="1", $limit="unlimited", $offset="0") {
   $sql = "SELECT category, nickname, name, state, directory, id, sql_run, " .
-    "unpackaged, date FROM registry WHERE " .
+    "unpackaged, date, priority FROM registry WHERE " .
     "state LIKE \"$state\" ORDER BY category, priority";
   if ($limit != "unlimited") $sql .= " limit $limit, $offset";
   $res = sqlStatement($sql);
@@ -66,45 +66,62 @@ function myGetRegistered($state="1", $limit="unlimited", $offset="0") {
   return $all;
 }
 
+// usort comparison function for $reg table.
+function cmp_forms($a, $b) {
+  if ($a['category'] == $b['category']) {
+    if ($a['priority'] == $b['priority']) {
+      $name1 = $a['nickname'] ? $a['nickname'] : $a['name'];
+      $name2 = $b['nickname'] ? $b['nickname'] : $b['name'];
+      if ($name1 == $name2) return 0;
+      return $name1 < $name2 ? -1 : 1;
+    }
+    return $a['priority'] < $b['priority'] ? -1 : 1;
+  }
+  return $a['category'] < $b['category'] ? -1 : 1;
+}
+
 $disabled = (empty($GLOBALS['gbl_rapid_workflow']) || $GLOBALS['gbl_rapid_workflow'] == 'fee_sheet') ? '' : 'disabled';
 
 $reg = myGetRegistered();
 $old_category = '';
 echo "<FORM METHOD=POST NAME='choose'>\n";
-if (!empty($reg)) {
-  foreach ($reg as $entry) {
-	  $new_category = trim($entry['category']);
-	  $new_nickname = trim($entry['nickname']);
-	  if ($new_category == '') {$new_category = 'miscellaneous';}
-	  if ($new_nickname != '') {$nickname = $new_nickname;}
-	  else {$nickname = $entry['name'];}
-	  if ($old_category != $new_category) {
-		  $new_category_ = $new_category;
-		  $new_category_ = str_replace(' ','_',$new_category_);
-		  if ($old_category != '') {echo "</select>\n";}
-		  echo "<select name=" . $new_category_ . " onchange='openNewForm(this)' $disabled>\n";
-		  echo " <option value=" . $new_category_ . ">" . $new_category . "</option>\n";
-		  $old_category = $new_category;
-	  }
-	  echo " <option value='" . $rootdir .
-		  '/patient_file/encounter/load_form.php?formname=' .
-		  urlencode($entry['directory']) . "'>" . xl_form_title($nickname) . "</option>\n";
-  }
-  echo "</select>\n";
-}
 
-// This shows Layout Based Form names just like the above.
+// Merge any LBF entries into the table of forms.
+// Note that the mapping value is used as the category name.
 //
 $lres = sqlStatement("SELECT * FROM list_options " .
-  "WHERE list_id = 'lbfnames' ORDER BY seq, title");
+  "WHERE list_id = 'lbfnames' ORDER BY mapping, seq, title");
 if (sqlNumRows($lres)) {
-  echo "<select name='lbfnames' onchange='openNewForm(this)' $disabled>\n";
-  echo "<option value='lbfnames'>" . xl('Layout Based') . "</option>\n";
   while ($lrow = sqlFetchArray($lres)) {
-    $option_id = $lrow['option_id']; // should start with LBF
-    $title = $lrow['title'];
-	  echo "<option value='$rootdir/patient_file/encounter/load_form.php?" .
-      "formname=$option_id'>$title</option>\n";
+    $rrow = array();
+    $rrow['category']  = $lrow['mapping'] ? $lrow['mapping'] : 'Layout Based';
+    $rrow['name']      = $lrow['title'];
+    $rrow['nickname']  = $lrow['title'];
+    $rrow['directory'] = $lrow['option_id']; // should start with LBF
+    $rrow['priority']  = $lrow['seq'];
+    $reg[] = $rrow;
+  }
+}
+
+// Sort by category.
+usort($reg, 'cmp_forms');
+
+if (!empty($reg)) {
+  foreach ($reg as $entry) {
+    $new_category = trim($entry['category']);
+    $new_nickname = trim($entry['nickname']);
+    if ($new_category == '') $new_category = 'miscellaneous';
+    $nickname = $new_nickname ? $new_nickname : $entry['name'];
+    if ($old_category != $new_category) {
+      $ns_category = str_replace(' ', '_', $new_category);
+      if ($old_category) echo "</select>\n";
+      echo "<select name=" . $ns_category . " onchange='openNewForm(this)' $disabled>\n";
+      echo " <option value=" . $ns_category . ">" . $new_category . "</option>\n";
+      $old_category = $new_category;
+    }
+    echo " <option value='" . $rootdir .
+      '/patient_file/encounter/load_form.php?formname=' .
+      urlencode($entry['directory']) . "'>" . xl_form_title($nickname) . "</option>\n";
   }
   echo "</select>\n";
 }
