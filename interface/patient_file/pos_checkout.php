@@ -547,8 +547,6 @@ if ($_POST['form_save']) {
     sqlStatement($query);
   }
 
-
-
   /*******************************************************************
   // Post payment.
   if ($_POST['form_amount']) {
@@ -578,8 +576,6 @@ if ($_POST['form_save']) {
       }
     }
   }
-
-
 
   // If applicable, set the invoice reference number.
   $invoice_refno = '';
@@ -644,17 +640,12 @@ while ($urow = sqlFetchArray($ures)) {
   $arr_users[$urow['id']] = '1';
 }
 
-
-
 // Now write a data entry form:
 // List unbilled billing items (cpt, hcpcs, copays) for the patient.
 // List unbilled product sales for the patient.
 // Present an editable dollar amount for each line item, a total
 // which is also the default value of the input payment amount,
 // and OK and Cancel buttons.
-
-
-
 ?>
 <html>
 <head>
@@ -739,8 +730,6 @@ while ($urow = sqlFetchArray($ures)) {
   return total - discount;
  }
 
-
-
  // This computes and returns the total of payments.
  function computePaymentTotal() {
   var f = document.forms[0];
@@ -759,8 +748,6 @@ while ($urow = sqlFetchArray($ures)) {
   }
   return total;
  }
-
-
 
  // Recompute default payment amount with any discount applied, but
  // not if there is more than one input payment line.
@@ -788,8 +775,6 @@ while ($urow = sqlFetchArray($ures)) {
   return true;
  }
 
-
-
  // Set Total Payments, Difference and Balance Due when any amount changes.
  function setComputedValues() {
   var f = document.forms[0];
@@ -810,8 +795,6 @@ while ($urow = sqlFetchArray($ures)) {
   return true;
  }
 
-
-
  // This is called when [Compute] is clicked by the user.
  // Computes and sets the discount value from total charges less payment.
  // This also calls setComputedValues() so the balance due will be correct.
@@ -830,8 +813,6 @@ while ($urow = sqlFetchArray($ures)) {
   setComputedValues();
   return false;
  }
-
-
 
  // Add a line for entering a payment.
  var paylino = 0;
@@ -855,8 +836,6 @@ foreach ($aCellHTML as $ix => $html) {
   }
   return false;
  }
-
-
 
 </script>
 </head>
@@ -891,14 +870,10 @@ $inv_payer     = 0;
 $gcac_related_visit = false;
 $gcac_service_provided = false;
 
-
-
 // This to save copays from the billing table.
 $aCopays = array();
 
 $lino = 0;
-
-
 
 // Process billing table items.  Note this includes co-pays.
 // Items that are not allowed to have a fee are skipped.
@@ -910,15 +885,11 @@ while ($brow = sqlFetchArray($bres)) {
   $thisdate = substr($brow['date'], 0, 10);
   $code_type = $brow['code_type'];
 
-
-
   // Co-pays are saved for later.
   if ($code_type == 'COPAY') {
     $aCopays[] = $brow;
     continue;
   }
-
-
 
   // Collect tax rates, related code and provider ID.
   $taxrates = '';
@@ -993,8 +964,6 @@ foreach ($taxes as $key => $value) {
   }
 }
 
-
-
 // Line for total charges.
 $totalchg = sprintf("%01.2f", $totalchg);
 echo " <tr>\n";
@@ -1004,8 +973,6 @@ echo "  <td align='right'><input type='text' name='totalchg' " .
      "style='text-align:right;background-color:transparent' readonly";
 echo "></td>\n";
 echo " </tr>\n";
-
-
 
 // Start new section for payments.
 echo "  <tr>\n";
@@ -1051,8 +1018,6 @@ while ($arow = sqlFetchArray($ares)) {
   }
 }
 
-
-
 // Line for total payments.
 echo " <tr id='totalpay'>\n";
 echo "  <td><a href='#' onclick='return addPayLine()'>[" . xl('Add Row') . "]</a></td>\n";
@@ -1062,8 +1027,6 @@ echo "  <td align='right'><input type='text' name='form_totalpay' " .
      "style='text-align:right;background-color:transparent' readonly";
 echo "></td>\n";
 echo " </tr>\n";
-
-
 
 // Line for Difference.
 echo "  <tr>\n";
@@ -1077,16 +1040,12 @@ echo "  <td align='right'><input type='text' name='form_difference' " .
 echo "></td>\n";
 echo " </tr>\n";
 
-
-
 if ($inv_encounter) {
   $erow = sqlQuery("SELECT provider_id FROM form_encounter WHERE " .
     "pid = '$patient_id' AND encounter = '$inv_encounter' " .
     "ORDER BY id DESC LIMIT 1");
   $inv_provider = $erow['provider_id'] + 0;
 }
-
-
 
 // Line for Discount.
 echo " <tr>\n";
@@ -1107,12 +1066,7 @@ echo "  <td align='right'><input type='text' name='form_balancedue' " .
      "style='text-align:right;background-color:transparent' readonly";
 echo "></td>\n";
 echo " </tr>\n";
-
-
-
 ?>
-
-
 
 <!--
 
@@ -1162,8 +1116,6 @@ echo " </tr>\n";
  </tr>
 
 -->
-
-
 
  <tr>
   <td colspan='3' align='right'>
@@ -1259,6 +1211,37 @@ if ($gcac_related_visit && !$gcac_service_provided) {
     }
   }
 } // end if ($gcac_related_visit)
+
+if ($GLOBALS['ippf_specific']) {
+  // More validation:
+  // o If there is an initial contraceptive consult, make sure a LBFccicon form exists with that method on it.
+  // o If a LBFccicon form exists with a new method on it, make sure the TS initial consult exists.
+
+  require_once("$srcdir/contraception_billing_scan.inc.php");
+  contraception_billing_scan($patient_id, $inv_encounter);
+
+  $csrow = sqlQuery("SELECT f.form_id, ld.field_value FROM forms AS f " .
+    "LEFT JOIN lbf_data AS ld ON ld.form_id = f.form_id AND ld.field_id = 'newmethod' " .
+    "WHERE " .
+    "f.pid = '$patient_id' AND f.encounter = '$inv_encounter' AND " .
+    "f.formdir = 'LBFccicon' AND f.deleted = 0 " .
+    "ORDER BY f.form_id DESC LIMIT 1");
+  $csmethod = empty($csrow['field_value']) ? '' : $csrow['field_value'];
+
+  if (($csmethod || $contraception_billing_code) && $csmethod != $contraception_billing_code) {
+    echo " alert('" . xl('Warning') . ': ';
+    if (!$csmethod) {
+      echo xl('there is a contraception service but no contraception form new method');
+    }
+    else if (!$contraception_billing_code) {
+      echo xl('there is a contraception form new method but no contraception service');
+    }
+    else {
+      echo xl('new method in contraception form does not match the contraception service');
+    }
+    echo "');\n";
+  }
+}
 ?>
 </script>
 

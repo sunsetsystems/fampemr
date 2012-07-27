@@ -10,53 +10,7 @@
 // It is invoked by interface/forms/LBF/new.php.
 
 require_once("../../../custom/code_types.inc.php");
-
-// These variables are used to compute the service with highest CYP.
-//
-$contraception_code = '';
-$contraception_cyp  = -1;
-$contraception_prov = 0;
-
-// This is called for each service in the visit to determine the IPPF code
-// of the service with highest CYP.
-//
-function _LBFccicon_contraception_scan($code_type, $code, $provider) {
-  global $code_types;
-  global $contraception_code, $contraception_cyp, $contraception_prov;
-
-  $sql = "SELECT related_code FROM codes WHERE " .
-    "code_type = '" . $code_types[$code_type]['id'] .
-    "' AND code = '$code' LIMIT 1";
-  $codesrow = sqlQuery($sql);
-
-  if (!empty($codesrow['related_code']) && $code_type == 'MA') {
-    $relcodes = explode(';', $codesrow['related_code']);
-    foreach ($relcodes as $relstring) {
-      if ($relstring === '') continue;
-      list($reltype, $relcode) = explode(':', $relstring);
-      if ($reltype !== 'IPPF') continue;
-      if (
-        preg_match('/^11....110/'    , $relcode) ||
-        preg_match('/^11...[1-5]999/', $relcode) ||
-        preg_match('/^112152010/'    , $relcode) ||
-        preg_match('/^11317[1-2]111/', $relcode) ||
-        preg_match('/^12118[1-2].13/', $relcode) ||
-        preg_match('/^121181999/'    , $relcode) ||
-        preg_match('/^122182.13/'    , $relcode) ||
-        preg_match('/^122182999/'    , $relcode)
-      ) {
-        $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
-          "code_type = '11' AND code = '$relcode' LIMIT 1");
-        $cyp = 0 + $tmprow['cyp_factor'];
-        if ($cyp > $contraception_cyp) {
-          $contraception_cyp  = $cyp;
-          $contraception_code = $relcode;
-          $contraception_prov = $provider;
-        }
-      }
-    }
-  }
-}
+require_once("../../../library/contraception_billing_scan.inc.php");
 
 // The purpose of this function is to create JavaScript for the <head>
 // section of the page.  This defines desired javaScript functions.
@@ -66,7 +20,6 @@ function LBFccicon_javascript() {
 
   // Create an associative array of contrameth mapping values.  These are regex
   // patterns used to match ippfconmeth list items with contrameth list items.
-  // Also use a pattern of 00000 to indicate not a modern method.
   echo "var contraMapping = new Object();\n";
   $res = sqlStatement("SELECT option_id, option_value, mapping FROM list_options WHERE " .
     "list_id = 'contrameth' ORDER BY seq, title");
@@ -134,41 +87,19 @@ function mysubmit() {
 //
 function LBFccicon_javascript_onload() {
   global $formid, $pid, $encounter;
-  global $contraception_code, $contraception_cyp, $contraception_prov;
+  global $contraception_billing_code, $contraception_billing_prov;
 
   $encrow = sqlQuery("SELECT date, provider_id FROM form_encounter " .
     "WHERE pid = '$pid' AND encounter = '$encounter' " .
     "ORDER BY id DESC LIMIT 1");
   $encdate = $encrow['date'];
 
-  $billresult = getBillingByEncounter($pid, $encounter, "*");
-  foreach ($billresult as $iter) {
-    _LBFccicon_contraception_scan($iter["code_type"], trim($iter["code"]), $iter['provider_id']);
-  }
-
-  // If no provider at the line level, use the encounter's default provider.
-  if (empty($contraception_prov)) {
-    $contraception_prov = 0 + $encrow['provider_id'];
-  }
-
-  // Normalize the IPPF service code to what we use in our list of methods.
-
-  $newdisabled = 'false';
-  if (!empty($contraception_code)) {
-    // A contraception service exists, so will not ask for it or the provider here.
-    $newdisabled = 'true';
-    if (preg_match('/^12/', $contraception_code)) { // surgical methods
-      // Identify the method with the IPPF code for the corresponding surgical procedure.
-      $contraception_code = substr($contraception_code, 0, 7) . '13';
-    }
-    else { // nonsurgical methods
-      // Identify the method with its IPPF code for Initial Consultation.
-      $contraception_code = substr($contraception_code, 0, 6) . '110';
-      // Xavier confirms that the codes for Cervical Cap (112152010 and 112152011) are
-      // an unintended change in pattern, but at this point we have to live with it.
-      if ($contraception_code == '112152110') $contraception_code = '112152010';
-    }
-  }
+  // Get the normalized contraception code "$contraception_billing_code",
+  // if any, indicated by the services in the visit.  This call returns
+  // TRUE if there is one, otherwise FALSE.  Also set is the provider
+  // of that service, $contraception_billing_prov.
+  //
+  $newdisabled = contraception_billing_scan($pid, $encounter, $encrow['provider_id']);
 
   /*******************************************************************
   // Get details of the last previous instance of this form, if any.
@@ -261,7 +192,7 @@ current_method_changed();
 sel = f.form_newmethod;
 sel.disabled = $newdisabled;
 for (var i = 0; i < sel.options.length; ++i) {
- if (sel.options[i].value == '$contraception_code') {
+ if (sel.options[i].value == '$contraception_billing_code') {
   sel.selectedIndex = i;
   break;
  }
@@ -270,7 +201,7 @@ for (var i = 0; i < sel.options.length; ++i) {
 sel = f.form_provider;
 sel.disabled = $newdisabled;
 for (var i = 0; i < sel.options.length; ++i) {
- if (sel.options[i].value == '$contraception_prov') {
+ if (sel.options[i].value == '$contraception_billing_prov') {
   sel.selectedIndex = i;
   break;
  }
@@ -284,7 +215,7 @@ f.onsubmit = function () { return mysubmit(); };
 // Generate alert if method from services is different from a non-empty method in this form.
   $csrow = sqlQuery("SELECT field_value FROM lbf_data WHERE " .
     "form_id = '$formid' AND field_id = 'newmethod'");
-  if (!empty($csrow['field_value']) && $csrow['field_value'] != $contraception_code) {
+  if (!empty($csrow['field_value']) && $csrow['field_value'] != $contraception_billing_code) {
     echo "
 alert('" . xl('Method has changed, please save this form to record the new method.') . "');
 ";

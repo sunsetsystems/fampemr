@@ -154,7 +154,7 @@ function checkForContraception($code_type, $code) {
         preg_match('/^11....110/'    , $relcode) ||
         preg_match('/^11...[1-5]999/', $relcode) ||
         preg_match('/^112152010/'    , $relcode) ||
-        preg_match('/^11317[1-2]111/', $relcode) ||
+        // preg_match('/^11317[1-2]111/', $relcode) ||
         preg_match('/^12118[1-2].13/', $relcode) ||
         preg_match('/^121181999/'    , $relcode) ||
         preg_match('/^122182.13/'    , $relcode) ||
