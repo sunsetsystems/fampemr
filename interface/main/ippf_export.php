@@ -616,7 +616,8 @@ if (!empty($form_submit)) {
 
       $methodid = '';
       if (!empty($contrameth_row['contrameth'])) {
-        $methodid = mappedOption('ippfconmeth', $contrameth_row['contrameth']);
+        // $methodid = mappedOption('ippfconmeth', $contrameth_row['contrameth']);
+        $methodid = $contrameth_row['contrameth'];
       }
       Add('CurrentMethod', $methodid);
     }

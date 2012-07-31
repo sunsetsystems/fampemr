@@ -92,6 +92,8 @@ function contraception_billing_scan($patient_id, $encounter_id, $provider_id=0) 
     // A contraception service exists, so will not ask for it or the provider here.
     if (preg_match('/^12/', $contraception_billing_code)) { // surgical methods
       // Identify the method with the IPPF code for the corresponding surgical procedure.
+      if ($contraception_billing_code == '121181999') $contraception_billing_code = '121181213';
+      if ($contraception_billing_code == '122182999') $contraception_billing_code = '122182213';
       $contraception_billing_code = substr($contraception_billing_code, 0, 7) . '13';
     }
     else { // nonsurgical methods

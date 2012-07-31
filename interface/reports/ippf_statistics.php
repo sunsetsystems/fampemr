@@ -304,7 +304,10 @@ function getContraceptiveMethod($code) {
     if ($code == '112152110') $code = '112152010';
   }
   else if (preg_match('/^12/', $code)) {
-    $code = substr($code, 0, 7) . '13';
+    if (preg_match('/999$/', $code))
+      $code = substr($code, 0, 6) . '213';
+    else
+      $code = substr($code, 0, 7) . '13';
   }
   $row = sqlQuery("SELECT title, mapping FROM list_options WHERE " .
     "list_id = 'ippfconmeth' AND option_id = '$code'");
