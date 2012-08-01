@@ -257,7 +257,8 @@ function submitEdit(id) {
  f.submit();
 }
 
-function submitDelete(id) {
+function submitDelete(id, code) {
+ if (!confirm('<?php echo xl('Really delete code') ?> "' + code + '"?')) return;
  var f = document.forms[0];
  f.mode.value = 'delete';
  f.code_id.value = id;
@@ -527,7 +528,8 @@ if (!empty($all)) {
       echo "<td class='text' align='right'>" . bucks($prow['pr_price']) . "</td>\n";
     }
 
-    echo "  <td align='right'><a class='link' href='javascript:submitDelete(" . $iter['id'] . ")'>[" . xl('Delete') . "]</a></td>\n";
+    echo "  <td align='right'><a class='link' href='javascript:submitDelete(" . $iter['id'] .
+         ", \"" . addslashes($iter['code']) . "\")'>[" . xl('Delete') . "]</a></td>\n";
     echo "  <td align='right'><a class='link' href='javascript:submitEdit("   . $iter['id'] . ")'>[" . xl('Edit') . "]</a></td>\n";
     echo " </tr>\n";
 
