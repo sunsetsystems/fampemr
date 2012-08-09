@@ -16,6 +16,9 @@ include_once("../../globals.php");
 <dd><a class="text" href="<?php echo $GLOBALS['webroot']?>/controller.php?prescription&edit&id=&pid=<?php echo $pid?>"
  target="RxRight" onclick="top.restoreSession()">
 <?php xl('Add Prescription','e'); ?></a></dd>
+<dd><a class="text" href="<?php echo $GLOBALS['webroot']?>/controller.php?prescription&edit_multiple&id=&pid=<?php echo $pid?>"
+ target="RxRight" onclick="top.restoreSession()">
+<?php xl('Add Multiple','e'); ?></a></dd>
 </dl>
 
 </body>

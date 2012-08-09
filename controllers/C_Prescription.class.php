@@ -10,6 +10,7 @@ require_once($GLOBALS['fileroot'] . "/library/classes/Provider.class.php");
 require_once($GLOBALS['fileroot'] . "/library/classes/RXList.class.php");
 require_once($GLOBALS['fileroot'] . "/library/registry.inc");
 require_once($GLOBALS['fileroot'] . "/library/formatting.inc.php");
+require_once($GLOBALS['fileroot'] . "/library/formdata.inc.php");
 
 class C_Prescription extends Controller {
 
@@ -18,6 +19,7 @@ class C_Prescription extends Controller {
 	var $providerid = 0;
 	var $is_faxing = false;
 	var $is_print_to_fax = false;
+  var $checkarray = array();
 
 	function C_Prescription($template_mod = "general") {
 		parent::Controller();
@@ -98,6 +100,27 @@ class C_Prescription extends Controller {
 		$this->default_action();
 	}
 
+  // Added by Rod for entry of multiple prescriptions on the same form.
+  //
+  function edit_multiple_action($id = "",$patient_id="",$p_obj = null) {
+    if ($p_obj != null && get_class($p_obj) == "prescription") {
+      $this->prescriptions[0] = $p_obj;
+    }
+    elseif (get_class($this->prescriptions[0]) != "prescription" ) {
+      $this->prescriptions[0] = new Prescription($id);
+    }
+    if (!empty($patient_id)) {
+      $this->prescriptions[0]->set_patient_id($patient_id);
+    }
+    // If quantity to dispense is not already set from a POST, set its
+    // default value.
+    if (! $this->get_template_vars('DISP_QUANTITY')) {
+      $this->assign('DISP_QUANTITY', $this->prescriptions[0]->quantity);
+    }
+    $this->assign("prescription",$this->prescriptions[0]);
+    $this->display($GLOBALS['template_dir'] . "prescription/" . $this->template_mod . "_edit_multiple.html");
+  }
+
 	function list_action($id,$sort = "") {
 		if (empty($id)) {
 		 	$this->function_argument_error();
@@ -109,6 +132,9 @@ class C_Prescription extends Controller {
 		else {
 			$this->assign("prescriptions", Prescription::prescriptions_factory($id));
 		}
+
+    // TBD: pass rx IDs to pre-check in the list
+    $this->assign("checkarray", $this->checkarray);
                 
                 // flag to indicate the CAMOS form is regsitered and active
                 $this->assign("CAMOS_FORM", isRegistered("CAMOS"));
@@ -169,6 +195,61 @@ class C_Prescription extends Controller {
     $this->list_action($this->prescriptions[0]->get_patient_id());
     exit;
 	}
+
+  function _set_rx_value($varname, $funcname, $default='') {
+    $value = $default;
+    if (isset($_POST[$varname])) {
+      $value = strip_escape_custom($_POST[$varname]);
+    }
+    call_user_func(array($this->prescriptions[0], $funcname), $value);
+  }
+
+  function _set_rx_lineitem($lino, $varname, $funcname, $default='') {
+    $value = $default;
+    if (isset($_POST[$varname][$lino])) {
+      $value = strip_escape_custom($_POST[$varname][$lino]);
+    }
+    call_user_func(array($this->prescriptions[0], $funcname), $value);
+  }
+
+  function edit_multiple_action_process() {
+    // print_r($_POST); // debugging
+
+    if ($_POST['process'] != "true") return;
+    $patient_id = formData('patient_id');
+
+    for ($lino = 0; !empty($_POST['drugname'][$lino]); ++$lino) {
+      $this->prescriptions[0] = new Prescription();
+
+      $this->prescriptions[0]->set_patient_id($patient_id);
+      $this->_set_rx_value('start_date_m', 'set_start_date_m');
+      $this->_set_rx_value('start_date_d', 'set_start_date_d');
+      $this->_set_rx_value('start_date_y', 'set_start_date_y');
+      $this->_set_rx_value('provider_id' , 'set_provider_id' );
+      $this->_set_rx_value('note'        , 'set_note'        );
+      $this->prescriptions[0]->set_medication(empty($_POST['medication']) ? 0 : 1);
+
+      $this->_set_rx_lineitem($lino, 'drugname'  , 'set_drug'      );
+      $this->_set_rx_lineitem($lino, 'drugid'    , 'set_drug_id'   );
+      $this->_set_rx_lineitem($lino, 'quantity'  , 'set_quantity'  );
+      $this->_set_rx_lineitem($lino, 'size'      , 'set_size'      );
+      $this->_set_rx_lineitem($lino, 'dosage'    , 'set_dosage'    );
+      $this->_set_rx_lineitem($lino, 'unit'      , 'set_unit'      );
+      $this->_set_rx_lineitem($lino, 'form'      , 'set_form'      );
+      $this->_set_rx_lineitem($lino, 'route'     , 'set_route'     );
+      $this->_set_rx_lineitem($lino, 'interval'  , 'set_interval'  );
+      $this->_set_rx_lineitem($lino, 'refills'   , 'set_refills'   );
+      $this->_set_rx_lineitem($lino, 'per_refill', 'set_per_refill');
+      $this->prescriptions[0]->set_substitute(empty($_POST['substitute'][$lino]) ? 0 : 1);
+
+      $this->prescriptions[0]->persist();
+      $this->checkarray[$this->prescriptions[0]->get_id()] = 1;
+    }
+
+    $_POST['process'] = '';
+    $this->list_action($patient_id);
+    exit;
+  }
 
 	function send_action($id) {
 		$_POST['process'] = "true";
