@@ -67,8 +67,8 @@ function print_as_money($money) {
  }
 
  // Process click on Print link.
- function printme() {
-  dlgopen('demographics_print.php?patientid=<?php echo $pid ?>', '_blank', 600, 500);
+ function printme(isform) {
+  dlgopen('demographics_print.php?patientid=<?php echo $pid ?>&isform=' + (isform ? 1 : 0), '_blank', 600, 500);
   return false;
  }
 
@@ -168,11 +168,13 @@ function newencounter() {
   echo " onclick='top.restoreSession()'><span class='title'>" .
    xl('Demographics') . "</span>" .
    " <span class='more'>$tmore</span></a>";
-   echo "&nbsp;&nbsp;<a href='' onclick='return printme()'>" .
-    "<span class='more'>(" . xl('Print') . ")</span></a>";
+   echo "&nbsp;&nbsp;<a href='' onclick='return printme(false)'>" .
+    "<span class='more'>[" . xl('Print Record') . "]</span></a>";
+   echo "&nbsp;&nbsp;<a href='' onclick='return printme(true)'>" .
+    "<span class='more'>[" . xl('Print Record (All Values)') . "]</span></a>";
   if (acl_check('admin', 'super')) {
    echo "&nbsp;&nbsp;<a href='' onclick='return deleteme()'>" .
-    "<span class='more' style='color:red'>(".xl('Delete').")</span></a>";
+    "<span class='more' style='color:red'>[".xl('Delete')."]</span></a>";
   }
   echo "</p></td><td align=right><div id=DEM><table cellspacing=0 cellpadding=0 width=100%><tr><td class='label'>";
   if ($GLOBALS['advance_directives_warning'])

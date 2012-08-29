@@ -29,6 +29,9 @@ $CPR = 4; // cells per row
 $patientid = empty($_REQUEST['patientid']) ? 0 : 0 + $_REQUEST['patientid'];
 if ($patientid < 0) $patientid = 0 + $pid; // -1 means current pid
 
+// True if to display as a form to complete, false to display as information.
+$isform = empty($_REQUEST['isform']) ? 0 : 1;
+
 $prow = array();
 $erow = array();
 $irow = array();
@@ -208,7 +211,13 @@ while ($frow = sqlFetchArray($fres)) {
   }
 
   ++$item_count;
-  generate_print_field($frow, $currvalue);
+
+  if ($isform) {
+    generate_print_field($frow, $currvalue);
+  }
+  else {
+    echo generate_display_field($frow, $currvalue);
+  }
 }
 
 end_group();
