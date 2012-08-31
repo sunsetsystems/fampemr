@@ -59,7 +59,7 @@ if ($report_type == 'm') {
     2 => xl('Unique Clients'),
     4 => xl('Unique New Clients'),
     6 => xl('Acceptors New to Modern Contraception'), // new on 2/2012
-    5 => xl('Contraceptive Products'),                // reactivated 2/2012
+    5 => xl('Contraceptive Items Provided'),          // reactivated 2/2012
     // 7 => xl('Administrative Services'),            // TBD: remove this
   );
   $arr_report = array(
@@ -109,7 +109,7 @@ else {
   $arr_content = array(
     1 => xl('Services'),
     3 => xl('New Acceptors'),
-    5 => xl('Contraceptive Products'),
+    5 => xl('Contraceptive Items Provided'),
   );
   $arr_report = array(
   );
@@ -807,7 +807,7 @@ function process_ippf_code($row, $code, $quantity=1) {
   else if ($form_by === '5') {
     $key = getAbortionMethod($code);
     if (empty($key)) {
-      // If not an abortion service then skip unless counting contraceptive products.
+      // If not an abortion service then skip unless counting Contraceptive Items Provided.
       if ($form_content != 5) return;
       $key = 'Unspecified';
     }
@@ -818,7 +818,7 @@ function process_ippf_code($row, $code, $quantity=1) {
   else if ($form_by === '6') {
     $key = getContraceptiveMethod($code);
     if (empty($key)) {
-      // If not a contraceptive service then skip unless counting contraceptive products.
+      // If not a contraceptive service then skip unless counting Contraceptive Items Provided.
       if ($form_content != 5) return;
       $key = 'Unspecified';
     }
@@ -1478,17 +1478,15 @@ if ($_POST['form_submit']) {
     else if ($form_sexes == '3') $sexcond = "AND pd.sex NOT LIKE 'Male' AND pd.sex NOT LIKE 'Female' ";
 
     if ($form_by == '105' && $form_content != 5 && $form_content != 3 && $form_content != 6) {
-      $alertmsg = xl("Contraceptive Products report requires Contraceptive Products or New Acceptors content type.");
+      $alertmsg = xl("Contraceptive Products report requires Contraceptive Items Provided or New Acceptors content type.");
     }
 
-    // In the case where content is contraceptive product sales, we
+    // In the case where content is contraceptive item sales, we
     // scan product sales at the top level because it is important to
-    // account for each of them only once.  For each sale we determine
-    // the one and only IPPF code representing the primary related
-    // contraceptive service, and that might be either a service in
-    // the Tally Sheet or the IPPF code attached to the product.
+    // account for each of them only once.  For each sale we use
+    // the IPPF code attached to the product.
     //
-    if ($form_content == 5) { // sales of contraceptive products
+    if ($form_content == 5) { // sales of contraceptive items
       $query = "SELECT " .
         "ds.pid, ds.encounter, ds.sale_date, ds.quantity, " .
         "d.name, d.cyp_factor, d.related_code, " . 
@@ -1523,8 +1521,8 @@ if ($_POST['form_submit']) {
         }
         if (!$desired) continue; // skip if not a contraceptive product
 
-        // If there is a visit and it has a contraceptive service use that, else $prodcode.
-        if (!empty($row['encounter'])) {
+        // Handle MA report types.
+        if ($report_type == 'm' && !empty($row['encounter'])) {
           $query = "SELECT " .
             "b.code_type, b.code, c.related_code " .
             "FROM billing AS b " .
@@ -1538,7 +1536,7 @@ if ($_POST['form_submit']) {
           while ($brow = sqlFetchArray($bres)) {
             $tmp = getRelatedContraceptiveCode($brow);
             if (!empty($tmp)) {
-              $prodcode = $tmp;
+              // $prodcode = $tmp;
               process_ma_code($row, $brow['code'], $row['quantity']);
               break;
             }
