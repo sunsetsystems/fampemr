@@ -278,6 +278,65 @@ class C_Prescription extends Controller {
 		return $this->multiprint_header( $pdf, $p );
 	}
 
+  // Internal function to get parameters, most notably the fee, to print for
+  // prescriptions printed in tabular format.
+  //
+  function _get_rx_printables(&$p, &$parms) {
+    $parms['code' ] = '';
+    $parms['name' ] = $p->get_drug();
+    $parms['qty'  ] = $p->get_quantity();
+    $parms['price'] = 0;
+    $parms['fee'  ] = 0;
+
+    $drug_id = $p->get_drug_id();
+
+    // If this is not a drug we know about, nothing else we can do.
+    if (!$drug_id) return;
+
+    $id         = $p->get_id();
+    $patient_id = $p->get_patient_id();
+    $dosage     = $p->get_dosage();
+    $interval   = $p->get_interval();
+    $quantity   = $p->get_quantity();
+    $fee        = 0;
+
+    // Get drug selector by matching on dosage and period.
+    $trow = sqlQuery("SELECT t.selector " .
+      "FROM drug_templates AS t " .
+      "WHERE t.drug_id = '$drug_id' " .
+      "ORDER BY ((t.dosage = '$dosage') + (t.period = '$interval')) DESC LIMIT 1");
+    $selector = $trow['selector'];
+    $parms['code'] = $selector;
+
+    // Get fee from sales transaction if any, otherwise from the item's default price
+    // for this patient's price level.
+    $srow = sqlQuery("SELECT s.quantity, s.fee " .
+      "FROM drug_sales AS s " .
+      "WHERE " .
+      "s.pid = '$patient_id' AND s.drug_id = '$drug_id' AND s.prescription_id = '$id' " .
+      "ORDER BY s.sale_id DESC");
+    if (!empty($srow)) {
+      $quantity = $srow['quantity'];
+      $fee = $srow['fee'];
+    }
+    else {
+      $prow = sqlQuery("SELECT p.pr_price " .
+        "FROM patient_data AS pd, prices AS p " .
+        "WHERE pd.pid = '$patient_id' AND " .
+        "p.pr_id = '$drug_id' AND " .
+        "p.pr_selector = '$selector' AND " .
+        "p.pr_level = pd.pricelevel");
+      if (empty($quantity)) $quantity = 1;
+      $fee = $prow['pr_price'] * $quantity;
+    }
+
+    if (empty($quantity)) $quantity = 1;
+    $parms['qty'  ] = $quantity;
+    $parms['price'] = $fee / $quantity;
+    $parms['fee'  ] = $fee;
+    return;
+  }
+
 	function multiprint_header(& $pdf, $p) {
 		$this->providerid = $p->provider->id;
 		//print header
@@ -598,32 +657,27 @@ class C_Prescription extends Controller {
     // are just listed in table format.
     if ($GLOBALS['gbl_rx_print_style'] == '0') {
       $table = array();
+      $grandtotal = 0.00;
       foreach ($ids as $id) {
         $p = new Prescription($id);
-        $drug_id    = $p->get_drug_id();
-        $patient_id = $p->get_patient_id();
-
-        $dosage     = $p->get_dosage();
-        $interval   = $p->get_interval();
-        $srow = sqlQuery("SELECT s.quantity, s.fee, t.selector " .
-          "FROM drug_sales AS s " .
-          "LEFT JOIN drug_templates AS t ON t.drug_id = s.drug_id " .
-          "WHERE " .
-          "s.pid = '$patient_id' AND s.drug_id = '$drug_id' AND s.prescription_id = '$id' " .
-          "ORDER BY s.sale_id DESC, " .
-          // Here we guess the selector via "best match" on dosage and period.
-          "((t.dosage = '$dosage') + (t.period = '$interval')) DESC LIMIT 1");
-        $selector = $srow['selector'];
-        $quantity = $srow['quantity'];
-        if (empty($quantity)) $quantity = 1;
+        $parms = array();
+        $this->_get_rx_printables(&$p, &$parms);
         $table[] = array(
-          xl('Code')        => $selector,
-          xl('Description') => $p->get_drug(),
-          xl('Quantity')    => $quantity,
-          xl('Unit Price')  => oeFormatMoney($srow['fee'] / $quantity),
-          xl('Total')       => oeFormatMoney($srow['fee']),
+          xl('Code')        => $parms['code'],
+          xl('Description') => $parms['name'],
+          xl('Quantity')    => $parms['qty'],
+          xl('Unit Price')  => oeFormatMoney($parms['price']),
+          xl('Total')       => oeFormatMoney($parms['fee']),
         );
+        $grandtotal += $parms['fee'];
       }
+      $table[] = array(
+        xl('Code')        => '',
+        xl('Description') => xl('Grand Total'),
+        xl('Quantity')    => '',
+        xl('Unit Price')  => '',
+        xl('Total')       => oeFormatMoney($grandtotal),
+      );
       $this->multiprint_header($pdf, $p);
       $pdf->ez['leftMargin'] += $pdf->ez['leftMargin'];
       $pdf->ez['rightMargin'] += $pdf->ez['rightMargin'];
@@ -696,31 +750,29 @@ class C_Prescription extends Controller {
       echo "   <th align='right'>" . xl('Unit Price') . "</th>\n";
       echo "   <th align='right'>" . xl('Total') . "</th>\n";
       echo "  </tr>\n";
+      $grandtotal = 0.00;
       foreach ($ids as $id) {
         $p = new Prescription($id);
-        $drug_id    = $p->get_drug_id();
-        $patient_id = $p->get_patient_id();
-        $dosage     = $p->get_dosage();
-        $interval   = $p->get_interval();
-        $srow = sqlQuery("SELECT s.quantity, s.fee, t.selector " .
-          "FROM drug_sales AS s " .
-          "LEFT JOIN drug_templates AS t ON t.drug_id = s.drug_id " .
-          "WHERE " .
-          "s.pid = '$patient_id' AND s.drug_id = '$drug_id' AND s.prescription_id = '$id' " .
-          "ORDER BY s.sale_id DESC, " .
-          // Here we guess the selector via "best match" on dosage and period.
-          "((t.dosage = '$dosage') + (t.period = '$interval')) DESC LIMIT 1");
-        $selector = $srow['selector'];
-        $quantity = $srow['quantity'];
-        if (empty($quantity)) $quantity = 1;
+        $parms = array();
+        $this->_get_rx_printables(&$p, &$parms);
         echo "  <tr>\n";
-        echo "   <td>" . $selector . "</td>\n";
-        echo "   <td>" . $p->get_drug() . "</td>\n";
-        echo "   <td align='right'>" . $quantity . "</td>\n";
-        echo "   <td align='right'>" . oeFormatMoney($srow['fee'] / $quantity) . "</td>\n";
-        echo "   <td align='right'>" . oeFormatMoney($srow['fee']) . "</td>\n";
+        echo "   <td>" . $parms['code'] . "</td>\n";
+        echo "   <td>" . $parms['name'] . "</td>\n";
+        echo "   <td align='right'>" . $parms['qty'] . "</td>\n";
+        echo "   <td align='right'>" . oeFormatMoney($parms['price']) . "</td>\n";
+        echo "   <td align='right'>" . oeFormatMoney($parms['fee']) . "</td>\n";
         echo "  </tr>\n";
+        $grandtotal += $parms['fee'];
       }
+
+      echo "  <tr>\n";
+      echo "   <td></td>\n";
+      echo "   <td>" . xl('Grand Total') . "</td>\n";
+      echo "   <td align='right'></td>\n";
+      echo "   <td align='right'></td>\n";
+      echo "   <td align='right'>" . oeFormatMoney($grandtotal) . "</td>\n";
+      echo "  </tr>\n";
+
       echo " </table>\n";
       echo "</div>\n";
       $this->multiprintcss_footer();
