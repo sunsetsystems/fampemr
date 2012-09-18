@@ -212,7 +212,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
 
     // Show provider for this line.
     echo "  <td class='billcell' align='center'>";
-    genProviderSelect('', '-- Default --', $provider_id, true);
+    genProviderSelect('', '-- ' . xl('Default') . ' --', $provider_id, true);
     echo "</td>\n";
     echo "  <td class='billcell' align='center'$usbillstyle><input type='checkbox'" .
       ($auth ? " checked" : "") . " disabled /></td>\n";
@@ -267,7 +267,7 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
 
     // Provider drop-list for this line.
     echo "  <td class='billcell' align='center'>";
-    genProviderSelect("bill[$lino][provid]", '-- Default --', $provider_id);
+    genProviderSelect("bill[$lino][provid]", '-- ' . xl('Default') . ' --', $provider_id);
     echo "</td>\n";
     echo "  <td class='billcell' align='center'$usbillstyle><input type='checkbox' name='bill[$lino][auth]' " .
       "value='1'" . ($auth ? " checked" : "") . " /></td>\n";
@@ -1100,7 +1100,7 @@ echo "   <select name='Search Results' style='width:98%' " .
   "onchange='codeselect(this)'";
 if (! $numrows) echo ' disabled';
 echo ">\n";
-echo "    <option value=''> Search Results ($numrows items)\n";
+echo "    <option value=''> " . xl('Search Results') . " ($numrows " . xl('items') . ")\n";
 
 if ($numrows) {
   while ($row = sqlFetchArray($res)) {
@@ -1355,11 +1355,11 @@ echo "<span class='billcell'><b>\n";
 echo xl('Providers') . ": &nbsp;";
 
 echo "&nbsp;&nbsp;" . xl('Rendering') . "\n";
-genProviderSelect('ProviderID', '-- Please Select --', $encounter_provid, $isBilled);
+genProviderSelect('ProviderID', '-- ' . xl('Please Select') . ' --', $encounter_provid, $isBilled);
 
 if (!$GLOBALS['ippf_specific']) {
   echo "&nbsp;&nbsp;" . xl('Supervising') . "\n";
-  genProviderSelect('SupervisorID', '-- N/A --', $encounter_supid, $isBilled);
+  genProviderSelect('SupervisorID', '-- ' . xl('N/A') . ' --', $encounter_supid, $isBilled);
 }
 
 echo "<input type='button' value='" . xl('New Appointment') . "' onclick='newEvt()' />\n";

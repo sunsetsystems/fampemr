@@ -126,7 +126,7 @@ $ires = sqlStatement("SELECT id, type, title, begdate FROM lists WHERE " .
   "FROM openemr_postcalendar_categories ORDER BY pc_catname");
  while ($crow = sqlFetchArray($cres)) {
   $catid = $crow['pc_catid'];
-  if ($catid < 9 && $catid != 5) continue;
+  if (($catid < 9 && $catid != 5) || $catid == 11) continue;
   echo "       <option value='$catid'";
   if ($viewmode && $crow['pc_catid'] == $result['pc_catid']) echo " selected";
   echo ">" . xl_appt_category($crow['pc_catname']) . "</option>\n";

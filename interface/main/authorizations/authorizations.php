@@ -218,7 +218,7 @@ if ($res = sqlStatement("select * from forms where authorized = 0 and " .
   if ($result4) {
     foreach ($result4 as $iter) {
       $authorize{$iter{"pid"}}{"forms"} .= "<span class=text>" .
-        $iter{"form_name"} . " " . date("n/j/Y",strtotime($iter{"date"})) .
+        xl($iter{"form_name"}) . " " . date("n/j/Y",strtotime($iter{"date"})) .
         "</span><br>\n";
     }
     //$authorize[$iter{"pid"}]{"forms"} = substr($authorize[$iter{"pid"}]{"forms"},0,strlen($authorize[$iter{"pid"}]{"forms"}));
