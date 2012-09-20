@@ -325,7 +325,7 @@ function doinvopen(ptid,encid) {
       $query = "SELECT s.sale_date, s.fee, s.quantity, s.pid, s.encounter, " .
         "d.name, fe.date, fe.facility_id, fe.invoice_refno " .
         "FROM drug_sales AS s " .
-        "JOIN drugs AS d ON d.drug_id = s.drug_id " .
+        "LEFT JOIN drugs AS d ON d.drug_id = s.drug_id " .
         "JOIN form_encounter AS fe ON " .
         "fe.pid = s.pid AND fe.encounter = s.encounter AND " .
         "fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59' " .
