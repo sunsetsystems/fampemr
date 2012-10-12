@@ -531,6 +531,8 @@ function calctotal() {
  </tr>
 
 <?php
+  $omitenc = empty($_GET['omitenc']) ? -1 : intval($_GET['omitenc']);
+
   $query = "SELECT f.id, f.pid, f.encounter, f.date, " .
     "f.last_level_billed, f.last_level_closed, f.stmt_count, " .
     "p.fname, p.mname, p.lname, p.pubpid, p.genericname2, p.genericval2, " .
@@ -555,7 +557,7 @@ function calctotal() {
     "a.pid = f.pid AND a.encounter = f.encounter ) AS adjustments " .
     "FROM form_encounter AS f " .
     "JOIN patient_data AS p ON p.pid = f.pid " .
-    "WHERE f.pid = '$pid' " .
+    "WHERE f.pid = '$pid' AND f.encounter != '$omitenc' " .
     "ORDER BY f.date, f.encounter";
 
   // Note that unlike the SQL-Ledger case, this query does not weed
@@ -594,10 +596,10 @@ function calctotal() {
       $ptpaid, $inspaid, $duept);
   }
 
-  // If no billing was entered yet for today, then generate a line for
-  // entering today's co-pay.
+  // If no billing was entered yet for today and we are not omitting anything,
+  // then generate a line for entering today's co-pay.
   //
-  if (! $gottoday) {
+  if (!$gottoday && !$omitenc) {
     echoLine(0, 0, xl('Today'), 0, 0, 0, getCopay($pid, $today));
   }
 

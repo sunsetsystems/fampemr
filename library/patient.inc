@@ -1560,15 +1560,15 @@ function DBToDate ($date)
     return $date;
 }
 
-function get_patient_balance($pid) {
+function get_patient_balance($pid, $excluded = -1) {
   if ($GLOBALS['oer_config']['ws_accounting']['enabled'] === 2) {
     $brow = sqlQuery("SELECT SUM(fee) AS amount FROM billing WHERE " .
-      "pid = '$pid' AND activity = 1");
+      "pid = '$pid' AND encounter != '$excluded' AND activity = 1");
     $srow = sqlQuery("SELECT SUM(fee) AS amount FROM drug_sales WHERE " .
-      "pid = '$pid'");
+      "pid = '$pid' AND encounter != '$excluded'");
     $drow = sqlQuery("SELECT SUM(pay_amount) AS payments, " .
       "SUM(adj_amount) AS adjustments FROM ar_activity WHERE " .
-      "pid = '$pid'");
+      "pid = '$pid' AND encounter != '$excluded'");
     return sprintf('%01.2f', $brow['amount'] + $srow['amount']
       - $drow['payments'] - $drow['adjustments']);
   }

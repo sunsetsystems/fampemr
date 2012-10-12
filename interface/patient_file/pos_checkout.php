@@ -341,12 +341,49 @@ function generate_receipt($patient_id, $encounter=0) {
 //
 //////////////////////////////////////////////////////////////////////
 
+// Function to write the heading lines for the data entry form.
+// This is deferred because we need to know which encounter was chosen.
+//
+$form_headers_written = false;
+function write_form_headers() {
+  global $form_headers_written, $patdata, $patient_id, $inv_encounter;
+
+  if ($form_headers_written) return;
+  $form_headers_written = true;
+?>
+ <tr>
+  <td colspan='4' align='center'>
+   <b><?php xl('Patient Checkout for ','e'); ?><?php echo $patdata['fname'] . " " .
+   $patdata['lname'] . " (" . $patdata['pubpid'] . ")" ?></b>
+   <br />
+<?php
+  $prvbal = get_patient_balance($patient_id, $inv_encounter);
+  echo xl('Previous Balance') . ' ' . oeFormatMoney($prvbal);
+  if ($prvbal > 0) {
+    echo "&nbsp;<input type='button' value='" . xl('Pay Previous Balance') .
+      "' onclick='payprevious()' />\n";
+  }
+?>
+   <br />&nbsp;
+  </td>
+ </tr>
+ <tr>
+  <td><b><?php xl('Date','e'); ?></b></td>
+  <td><b><?php xl('Description','e'); ?></b></td>
+  <td align='right'><b><?php xl('Quantity','e'); ?></b></td>
+  <td align='right'><b><?php xl('Charge Amount','e'); ?></b></td>
+ </tr>
+<?php
+}
+
 // Function to output a line item for the input form.
 //
 $totalchg = 0;
 function write_form_line($code_type, $code, $id, $date, $description,
   $amount, $units, $taxrates) {
   global $lino, $totalchg;
+  // Write heading rows if that is not already done.
+  write_form_headers();
   $amount = sprintf("%01.2f", $amount);
   if (empty($units)) $units = 1;
   $price = $amount / $units; // should be even cents, but ok here if not
@@ -376,12 +413,12 @@ function write_form_line($code_type, $code, $id, $date, $description,
   $totalchg += $amount;
 }
 
-
-
 // Function to output a past payment/adjustment line to the form.
 //
 function write_old_payment_line($pay_type, $date, $method, $reference, $amount) {
   global $lino;
+  // Write heading rows if that is not already done.
+  write_form_headers();
   $amount = sprintf("%01.2f", $amount);
   echo " <tr>\n";
   echo "  <td>" . htmlspecialchars($pay_type ) . "</td>\n";
@@ -404,8 +441,6 @@ $aCellHTML = array(
   "<input type='text' name='payment[%d][refno]' size='10' />",
   "<input type='text' name='payment[%d][amount]' size='6' style='text-align:right' onkeyup='setComputedValues()' />",
 );
-
-
 
 // Create the taxes array.  Key is tax id, value is
 // (description, rate, accumulated total).
@@ -836,7 +871,6 @@ foreach ($aCellHTML as $ix => $html) {
   }
   return false;
  }
-
 </script>
 </head>
 
@@ -849,19 +883,6 @@ foreach ($aCellHTML as $ix => $html) {
 
 <p>
 <table cellspacing='5' id='paytable'>
- <tr>
-  <td colspan='4' align='center'>
-   <b><?php xl('Patient Checkout for ','e'); ?><?php echo $patdata['fname'] . " " .
-    $patdata['lname'] . " (" . $patdata['pubpid'] . ")" ?></b>
-    <br />&nbsp;
-  </td>
- </tr>
- <tr>
-  <td><b><?php xl('Date','e'); ?></b></td>
-  <td><b><?php xl('Description','e'); ?></b></td>
-  <td align='right'><b><?php xl('Quantity','e'); ?></b></td>
-  <td align='right'><b><?php xl('Charge Amount','e'); ?></b></td>
- </tr>
 <?php
 $inv_encounter = '';
 $inv_date      = '';
@@ -884,6 +905,10 @@ while ($brow = sqlFetchArray($bres)) {
 
   $thisdate = substr($brow['date'], 0, 10);
   $code_type = $brow['code_type'];
+
+  if (!$inv_encounter) $inv_encounter = $brow['encounter'];
+  $inv_payer = $brow['payer_id'];
+  if (!$inv_date || $inv_date < $thisdate) $inv_date = $thisdate;
 
   // Co-pays are saved for later.
   if ($code_type == 'COPAY') {
@@ -913,9 +938,6 @@ while ($brow = sqlFetchArray($bres)) {
   write_form_line($code_type, $brow['code'], $brow['id'], $thisdate,
     ucfirst(strtolower($brow['code_text'])), $brow['fee'], $brow['units'],
     $taxrates);
-  if (!$inv_encounter) $inv_encounter = $brow['encounter'];
-  $inv_payer = $brow['payer_id'];
-  if (!$inv_date || $inv_date < $thisdate) $inv_date = $thisdate;
 
   // Custom logic for IPPF to determine if a GCAC issue applies.
   if ($GLOBALS['ippf_specific'] && $related_code) {
@@ -999,7 +1021,7 @@ $ares = sqlStatement("SELECT " .
   "s.session_id, s.reference, s.check_date " .
   "FROM ar_activity AS a " .
   "LEFT JOIN ar_session AS s ON s.session_id = a.session_id WHERE " .
-  "a.pid = '$patient_id' AND a.encounter = '$encounter' " .
+  "a.pid = '$patient_id' AND a.encounter = '$inv_encounter' " .
   "ORDER BY s.check_date, a.sequence_no");
 while ($arow = sqlFetchArray($ares)) {
   $memo = $arow['memo'];
@@ -1188,6 +1210,20 @@ else if (!empty($GLOBALS['gbl_mask_invoice_number'])) {
 </form>
 
 <script language='JavaScript'>
+
+ // Pop up the Payments window and close this one.
+ function payprevious() {
+  var width  = 750;
+  var height = 550;
+  var loc = '../patient_file/front_payment.php?omitenc=<?php echo $inv_encounter; ?>';
+<?php if (empty($_GET['framed'])) { ?>
+  opener.parent.left_nav.dlgopen(loc, '_blank', width, height);
+  window.close();
+<?php } else { ?>
+  parent.left_nav.dlgopen(loc, '_blank', width, height);
+<?php } ?>
+ }
+
  Calendar.setup({inputField:"form_date", ifFormat:"%Y-%m-%d", button:"img_date"});
  addPayLine();
  billingChanged();
