@@ -490,6 +490,13 @@ $GLOBALS_METADATA = array(
       xl('Discounts at checkout time are entered as money amounts, as opposed to percentage.')
     ),
 
+    'gbl_checkout_line_adjustments' => array(
+      xl('Checkout Adjustments at Line Level'),
+      'bool',                           // data type
+      '0',                              // default = false
+      xl('Discounts at checkout time may be entered per line item.')
+    ),
+
     'gbl_visit_referral_source' => array(
       xl('Referral Source for Encounters'),
       'bool',                           // data type
@@ -853,6 +860,13 @@ $GLOBALS_METADATA = array(
       'text',                           // data type
       'Patient ID card',                // default
       xl('Optional category name of a document to link to from the patient summary page. Lets you click on a patient name to see their ID card.')
+    ),
+
+    'gbl_checkout_receipt_note' => array(
+      xl('Checkout Receipt Note'),
+      'text',                           // data type
+      '',
+      xl('This note goes on the bottom of every checkout receipt.')
     ),
 
     'MedicareReferrerIsRenderer' => array(

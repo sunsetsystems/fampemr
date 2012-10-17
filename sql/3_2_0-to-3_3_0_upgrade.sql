@@ -483,3 +483,8 @@ ALTER TABLE drugs
   ADD dispensable tinyint(1) NOT NULL DEFAULT 1 COMMENT '0 = pharmacy elsewhere, 1 = dispensed here';
 #EndIf
 
+#IfMissingColumn ar_activity code_type
+ALTER TABLE ar_activity
+  ADD code_type varchar(15) NOT NULL DEFAULT '';
+#EndIf
+
