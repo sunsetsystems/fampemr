@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2009-2011 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2009-2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -23,6 +23,16 @@ if (!empty($GLOBALS['gbl_rapid_workflow']) &&
 require_once("$srcdir/acl.inc");
 require_once("$srcdir/options.inc.php");
 require_once("$srcdir/patient.inc");
+
+// $PDF_OUTPUT = empty($_POST['pdf']) ? false : true;
+$PDF_OUTPUT = true; // temporarily?
+
+if ($PDF_OUTPUT) {
+  require_once("$srcdir/html2pdf/html2pdf.class.php");
+  $pdf = new HTML2PDF('P', 'Letter', 'en');
+  $pdf->pdf->SetDisplayMode('real');
+  ob_start();
+}
 
 $CPR = 4; // cells per row
 
@@ -51,29 +61,61 @@ if ($patientid) {
 $fres = sqlStatement("SELECT * FROM layout_options " .
   "WHERE form_id = 'DEM' AND uor > 0 " .
   "ORDER BY group_name, seq");
+
 ?>
+<?php if (!$PDF_OUTPUT) { ?>
 <html>
 <head>
 <?php html_header_show();?>
+<?php } ?>
 
 <style>
+
+<?php if ($PDF_OUTPUT) { ?>
+td {
+ font-family: Arial;
+ font-weight: normal;
+ font-size: 9pt;
+}
+<?php } else { ?>
 body, td {
  font-family: Arial, Helvetica, sans-serif;
  font-weight: normal;
  font-size: 9pt;
 }
-
 body {
  padding: 5pt 5pt 5pt 5pt;
 }
+<?php } ?>
+
+p.grpheader {
+ font-family: Arial;
+ font-weight: bold;
+ font-size: 12pt;
+}
 
 div.section {
+ width: 98%;
  border-style: solid;
  border-width: 1px;
  border-color: #000000;
- margin: 0 0 0 10pt;
+ /* margin: 0 0 0 10pt; */
  padding: 5pt;
 }
+div.section table {
+ width: 100%;
+}
+div.section td.stuff {
+ vertical-align: bottom;
+ height: 16pt;
+}
+
+td.lcols1 { width: 20%; }
+td.lcols2 { width: 50%; }
+td.lcols3 { width: 70%; }
+td.dcols1 { width: 30%; }
+td.dcols2 { width: 50%; }
+td.dcols3 { width: 80%; }
 
 .mainhead {
  font-weight: bold;
@@ -92,25 +134,42 @@ div.section {
  margin: 0 0 8pt 0;
 }
 .ftitlecell1 {
+ width: 35%;
  vertical-align: top;
  text-align: left;
  font-size: 14pt;
  font-weight: bold;
 }
 .ftitlecell2 {
+ width: 35%;
  vertical-align: top;
  text-align: right;
  font-size: 9pt;
 }
+.ftitlecellm {
+ width: 30%;
+ vertical-align: top;
+ text-align: center;
+ font-size: 9pt;
+}
+
 </style>
 </head>
 
 <body bgcolor='#ffffff'>
 <form>
 
-<?php echo genFacilityTitle(xl('Registration Form'), -1); ?>
-
 <?php
+// Generate header with optional logo.
+$logo = '';
+$ma_logo_path = "sites/" . $_SESSION['site_id'] . "/images/ma_logo.png";
+if (is_file("$webserver_root/$ma_logo_path")) {
+  $logo = "<img src='$web_root/$ma_logo_path' />";
+}
+else {
+  $logo = "<!-- '$ma_logo_path' does not exist. -->";
+}
+echo genFacilityTitle(xl('Registration Form'), -1, $logo);
 
 function end_cell() {
   global $item_count, $cell_count;
@@ -137,6 +196,25 @@ function end_group() {
     echo " </table>\n";
     echo "</div>\n";
   }
+}
+
+function getContent() {
+  global $web_root, $webserver_root;
+  $content = ob_get_clean();
+  // Fix a nasty html2pdf bug - it ignores document root!
+  $i = 0;
+  $wrlen = strlen($web_root);
+  $wsrlen = strlen($webserver_root);
+  while (true) {
+    $i = stripos($content, " src='/", $i + 1);
+    if ($i === false) break;
+    if (substr($content, $i+6, $wrlen) === $web_root &&
+        substr($content, $i+6, $wsrlen) !== $webserver_root)
+    {
+      $content = substr($content, 0, $i + 6) . $webserver_root . substr($content, $i + 6 + $wrlen);
+    }
+  }
+  return $content;
 }
 
 $last_group = '';
@@ -166,8 +244,7 @@ while ($frow = sqlFetchArray($fres)) {
     if (strlen($last_group) > 0) echo "<br />\n";
     $group_name = substr($this_group, 1);
     $last_group = $this_group;
-    echo "<b>" . xl_layout_label($group_name) . "</b>\n";
-      
+    echo "<p class='grpheader'>" . xl_layout_label($group_name) . "</p>\n";
     echo "<div class='section'>\n";
     echo " <table border='0' cellpadding='0'>\n";
   }
@@ -175,7 +252,7 @@ while ($frow = sqlFetchArray($fres)) {
   // Handle starting of a new row.
   if (($titlecols > 0 && $cell_count >= $CPR) || $cell_count == 0) {
     end_row();
-    echo "  <tr style='height:30pt'>";
+    echo "  <tr>";
   }
 
   if ($item_count == 0 && $titlecols == 0) $titlecols = 1;
@@ -183,10 +260,10 @@ while ($frow = sqlFetchArray($fres)) {
   // Handle starting of a new label cell.
   if ($titlecols > 0) {
     end_cell();
-    echo "<td colspan='$titlecols' width='10%'";
-    echo ($frow['uor'] == 2) ? " class='required'" : " class='bold'";
+    echo "<td colspan='$titlecols' ";
+    echo "class='lcols$titlecols stuff " . (($frow['uor'] == 2) ? " required'" : " bold'");
     if ($cell_count == 2) echo " style='padding-left:10pt'";
-    echo ">";
+    echo " nowrap>";
     $cell_count += $titlecols;
   }
   ++$item_count;
@@ -200,11 +277,13 @@ while ($frow = sqlFetchArray($fres)) {
   // Handle starting of a new data cell.
   if ($datacols > 0) {
     end_cell();
-    echo "<td colspan='$datacols' width='40%'";
+    echo "<td colspan='$datacols' class='dcols$datacols stuff under'";
+    /*****************************************************************
     // Underline is wanted only for fill-in-the-blank data types.
     if ($data_type < 21 && $data_type != 1 && $data_type != 3) {
       echo " class='under'";
     }
+    *****************************************************************/
     if ($cell_count > 0) echo " style='padding-left:5pt;'";
     echo ">";
     $cell_count += $datacols;
@@ -225,10 +304,18 @@ end_group();
 
 </form>
 
+<?php
+if ($PDF_OUTPUT) {
+  $content = getContent();
+  // $pdf->setDefaultFont('Arial');
+  $pdf->writeHTML($content, false);
+  $pdf->Output('report.pdf', 'D'); // D = Download, I = Inline
+}
+else {
+?>
 <!-- This should really be in the onload handler but that seems to be unreliable and can crash Firefox 3. -->
 <script language='JavaScript'>
 window.print();
 </script>
-
 </body>
-</html>
+</html><?php } ?>
