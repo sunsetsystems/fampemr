@@ -399,6 +399,13 @@ $GLOBALS_METADATA = array(
       xl('Option to support inventory and sales of products')
     ),
 
+    'gbl_min_max_months' => array(
+      xl('Min/max Inventory as Months'),
+      'bool',                           // data type
+      '0',                              // default = false
+      xl('Min/max inventory is expressed as months of supply instead of units')
+    ),
+
     'disable_chart_tracker' => array(
       xl('Disable Chart Tracker'),
       'bool',                           // data type

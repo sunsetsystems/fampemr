@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2010-2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -12,7 +12,7 @@
 // Starting Inventory (detail lines: date)
 // Ending Inventory   (detail lines: invoice ID)
 // Sales
-// Distributions
+// Distributions (removed)
 // Purchases
 // Transfers
 
@@ -32,13 +32,16 @@ function display_desc($desc) {
 // Specify if product or warehouse is the first column.
 $product_first = (!empty($_POST['form_by']) && $_POST['form_by'] == 'w') ? 0 : 1;
 
+// The selected facility ID, if any.
+$form_facility = 0 + empty($_REQUEST['form_facility']) ? 0 : $_REQUEST['form_facility'];
+
 $last_warehouse_id = '~';
 $last_product_id = 0;
 
 // Get ending inventory for the report's end date.
 // Optionally restricts by product ID and/or warehouse ID.
 function getEndInventory($product_id = 0, $warehouse_id = '~') {
-  global $form_from_date, $form_to_date, $form_product;
+  global $form_from_date, $form_to_date, $form_product, $form_facility;
 
   $whidcond = '';
   if ($warehouse_id !== '~') {
@@ -53,26 +56,40 @@ function getEndInventory($product_id = 0, $warehouse_id = '~') {
     $prodcond = "AND di.drug_id = '$product_id'";
   }
 
+  $faccond = '';
+  if ($form_facility) {
+    $faccond = "AND lo.option_value IS NOT NULL AND lo.option_value = '$form_facility'";
+  }
+
   // Get sum of current inventory quantities + destructions done after the
   // report end date (which is effectively a type of transaction).
   $eirow = sqlQuery("SELECT sum(di.on_hand) AS on_hand " .
-    "FROM drug_inventory AS di WHERE " .
+    "FROM drug_inventory AS di " .
+    "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
+    "lo.option_id = di.warehouse_id " .
+    "WHERE " .
     "( di.destroy_date IS NULL OR di.destroy_date > '$form_to_date' ) " .
-    "$prodcond $whidcond");
+    "$prodcond $whidcond $faccond");
 
   // Get sum of sales/adjustments/purchases after the report end date.
   $sarow = sqlQuery("SELECT sum(ds.quantity) AS quantity " .
-    "FROM drug_sales AS ds, drug_inventory AS di WHERE " .
+    "FROM drug_sales AS ds, drug_inventory AS di " .
+    "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
+    "lo.option_id = di.warehouse_id " .
+    "WHERE " .
     "ds.sale_date > '$form_to_date' AND " .
     "di.inventory_id = ds.inventory_id " .
-    "$prodcond $whidcond");
+    "$prodcond $whidcond $faccond");
 
   // Get sum of transfers out after the report end date.
   $xfrow = sqlQuery("SELECT sum(ds.quantity) AS quantity " .
-    "FROM drug_sales AS ds, drug_inventory AS di WHERE " .
+    "FROM drug_sales AS ds, drug_inventory AS di " .
+    "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
+    "lo.option_id = di.warehouse_id " .
+    "WHERE " .
     "ds.sale_date > '$form_to_date' AND " .
     "di.inventory_id = ds.xfer_inventory_id " .
-    "$prodcond $whidcond");
+    "$prodcond $whidcond $faccond");
 
   return $eirow['on_hand'] + $sarow['quantity'] - $xfrow['quantity'];
 }
@@ -113,7 +130,7 @@ function thisLineItem($product_id, $warehouse_id, $patient_id, $encounter_id,
           }
           echo ',"' . ($secei - $secqtys[0] - $secqtys[1] - $secqtys[2] - $secqtys[3] - $secqtys[4]) . '"'; // start inventory
           echo ',"' . $secqtys[0] . '"'; // sales
-          echo ',"' . $secqtys[1] . '"'; // distributions
+          // echo ',"' . $secqtys[1] . '"'; // distributions
           echo ',"' . $secqtys[2] . '"'; // purchases
           echo ',"' . $secqtys[3] . '"'; // transfers
           echo ',"' . $secqtys[4] . '"'; // adjustments
@@ -146,9 +163,11 @@ function thisLineItem($product_id, $warehouse_id, $patient_id, $encounter_id,
   <td class="dehead" align="right">
    <?php echo $secqtys[0]; ?>
   </td>
+  <!--
   <td class="dehead" align="right">
    <?php echo $secqtys[1]; ?>
   </td>
+  -->
   <td class="dehead" align="right">
    <?php echo $secqtys[2]; ?>
   </td>
@@ -201,9 +220,11 @@ function thisLineItem($product_id, $warehouse_id, $patient_id, $encounter_id,
   <td class="dehead" align="right">
    <?php echo $priqtys[0]; ?>
   </td>
+  <!--
   <td class="dehead" align="right">
    <?php echo $priqtys[1]; ?>
   </td>
+  -->
   <td class="dehead" align="right">
    <?php echo $priqtys[2]; ?>
   </td>
@@ -243,7 +264,7 @@ function thisLineItem($product_id, $warehouse_id, $patient_id, $encounter_id,
       echo ',"' . oeFormatShortDate(display_desc($transdate)) . '"';
       echo ',"' . display_desc($invnumber) . '"';
       echo ',"' . $qtys[0]             . '"'; // sales
-      echo ',"' . $qtys[1]             . '"'; // distributions
+      // echo ',"' . $qtys[1]             . '"'; // distributions
       echo ',"' . $qtys[2]             . '"'; // purchases
       echo ',"' . $qtys[3]             . '"'; // transfers
       echo ',"' . $qtys[4]             . '"'; // adjustments
@@ -279,9 +300,11 @@ function thisLineItem($product_id, $warehouse_id, $patient_id, $encounter_id,
   <td class="dehead" align="right">
    <?php echo $qtys[0]; ?>
   </td>
+  <!--
   <td class="dehead" align="right">
    <?php echo $qtys[1]; ?>
   </td>
+  -->
   <td class="dehead" align="right">
    <?php echo $qtys[2]; ?>
   </td>
@@ -327,22 +350,22 @@ if ($_POST['form_csvexport']) {
     echo '"' . xl('Product'  ) . '",';
   }
   if ($_POST['form_details']) {
-    echo '"' . xl('Date'     ) . '",';
-    echo '"' . xl('Invoice'  ) . '",';
-    echo '"' . xl('Sales'    ) . '",';
-    echo '"' . xl('Distributions') . '",';
-    echo '"' . xl('Purchases') . '",';
-    echo '"' . xl('Transfers') . '",';
-    echo '"' . xl('Adjustments') . '"' . "\n";
+    echo '"' . xl('Date'        ) . '",';
+    echo '"' . xl('Invoice'     ) . '",';
+    echo '"' . xl('Issues/Sales') . '",';
+    // echo '"' . xl('Distributions') . '",';
+    echo '"' . xl('Receipts'    ) . '",';
+    echo '"' . xl('Transfers'   ) . '",';
+    echo '"' . xl('Adjustments' ) . '"' . "\n";
   }
   else {
-    echo '"' . xl('Start'    ) . '",';
-    echo '"' . xl('Sales'    ) . '",';
-    echo '"' . xl('Distributions') . '",';
-    echo '"' . xl('Purchases') . '",';
-    echo '"' . xl('Transfers') . '",';
-    echo '"' . xl('Adjustments') . '",';
-    echo '"' . xl('End'      ) . '"' . "\n";
+    echo '"' . xl('Opening Balance') . '",';
+    echo '"' . xl('Issues/Sales'   ) . '",';
+    // echo '"' . xl('Distributions'  ) . '",';
+    echo '"' . xl('Receipts'       ) . '",';
+    echo '"' . xl('Transfers'      ) . '",';
+    echo '"' . xl('Adjustments'    ) . '",';
+    echo '"' . xl('Closing Balance') . '"' . "\n";
   }
 } // end export
 else {
@@ -368,14 +391,28 @@ else {
 
  <tr>
   <td>
+<?php
+// Build a drop-down list of facilities.
+//
+$query = "SELECT id, name FROM facility ORDER BY name";
+$fres = sqlStatement($query);
+echo "   <select name='form_facility'>\n";
+echo "    <option value=''>-- " . xl('All Facilities') . " --\n";
+while ($frow = sqlFetchArray($fres)) {
+  $facid = $frow['id'];
+  echo "    <option value='$facid'";
+  if ($facid == $form_facility) echo " selected";
+  echo ">" . $frow['name'] . "\n";
+}
+echo "   </select>&nbsp;\n";
+?>
 
    <?php xl('By','e'); ?>:
    <select name='form_by'>
     <option value='p'><?php xl('Product','e'); ?></option>
     <option value='w'<?php if (!$product_first) echo ' selected'; ?>><?php xl('Warehouse','e'); ?></option>
-   </select>
+   </select>&nbsp;
 
-   &nbsp;
 <?php
 // Build a drop-down list of products.
 //
@@ -389,10 +426,18 @@ while ($prow = sqlFetchArray($pres)) {
   if ($drug_id == $form_product) echo " selected";
   echo ">" . $prow['name'] . "\n";
 }
-echo "   </select>\n";
+echo "   </select>&nbsp;\n";
 ?>
 
-   &nbsp;<?php xl('From','e'); ?>:
+   <input type='checkbox' name='form_details' value='1'<?php if ($_POST['form_details']) echo " checked"; ?> /><?php xl('Details','e') ?>
+
+  </td>
+ </tr>
+
+ <tr>
+  <td>
+
+   <?php xl('From','e'); ?>:
    <input type='text' name='form_from_date' id="form_from_date" size='10' value='<?php echo $form_from_date ?>'
     onkeyup='datekeyup(this,mypcc)' onblur='dateblur(this,mypcc)' title='yyyy-mm-dd'>
    <img src='../pic/show_calendar.gif' align='absbottom' width='24' height='22'
@@ -405,9 +450,6 @@ echo "   </select>\n";
    <img src='../pic/show_calendar.gif' align='absbottom' width='24' height='22'
     id='img_to_date' border='0' alt='[?]' style='cursor:pointer'
     title='<?php xl('Click here to choose a date','e'); ?>'>
-
-   &nbsp;
-   <input type='checkbox' name='form_details' value='1'<?php if ($_POST['form_details']) echo " checked"; ?>><?php xl('Details','e') ?>
 
    &nbsp;
    <input type='submit' name='form_refresh' value="<?php xl('Refresh','e') ?>">
@@ -450,16 +492,18 @@ echo "   </select>\n";
   </td>
 <?php } ?>
   <td class="dehead" align="right" width="8%">
-   <?php xl('Start','e'); ?>
+   <?php xl('Opening Balance','e'); ?>
   </td>
   <td class="dehead" align="right" width="8%">
-   <?php xl('Sales','e'); ?>
+   <?php xl('Issues/Sales','e'); ?>
   </td>
+  <!--
   <td class="dehead" align="right" width="8%">
    <?php xl('Distributions','e'); ?>
   </td>
+  -->
   <td class="dehead" align="right" width="8%">
-   <?php xl('Purchases','e'); ?>
+   <?php xl('Receipts','e'); ?>
   </td>
   <td class="dehead" align="right" width="8%">
    <?php xl('Transfers','e'); ?>
@@ -468,7 +512,7 @@ echo "   </select>\n";
    <?php xl('Adjustments','e'); ?>
   </td>
   <td class="dehead" align="right" width="8%">
-   <?php xl('End','e'); ?>
+   <?php xl('Closing Balance','e'); ?>
   </td>
  </tr>
 <?php
@@ -517,6 +561,11 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
     $query .= " AND di.drug_id = '$form_product'";
   }
 
+  // If a facility was specified.
+  if ($form_facility) {
+    $query .= " AND lo.option_value IS NOT NULL AND lo.option_value = '$form_facility'";
+  }
+
   if ($product_first) {
     $query .= " ORDER BY d.name, d.drug_id, lo.title, di.warehouse_id, " .
       "di.inventory_id, s.sale_date, s.sale_id";
@@ -553,8 +602,10 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
       }
       else if ($row['pid'])
         $qtys[0] = 0 - $row['quantity'];
+      /***************************************************************
       else if ($row['distributor_id'])
         $qtys[1] = 0 - $row['quantity'];
+      ***************************************************************/
       else if ($row['fee'] != 0)
         $qtys[2] = 0 - $row['quantity'];
       else // no pid, distributor, source lot or fee: must be an adjustment
@@ -583,9 +634,11 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
   <td class="dehead" align="right">
    <?php echo $grandqtys[0]; ?>
   </td>
+  <!--
   <td class="dehead" align="right">
    <?php echo $grandqtys[1]; ?>
   </td>
+  -->
   <td class="dehead" align="right">
    <?php echo $grandqtys[2]; ?>
   </td>

@@ -1,5 +1,5 @@
 <?php
- // Copyright (C) 2008-2010 Rod Roark <rod@sunsetsystems.com>
+ // Copyright (C) 2008-2012 Rod Roark <rod@sunsetsystems.com>
  //
  // This program is free software; you can redistribute it and/or
  // modify it under the terms of the GNU General Public License
@@ -28,13 +28,52 @@ else {
   $form_days = sprintf('%d', (strtotime(date('Y-m-d')) - strtotime(date('Y-01-01'))) / (60 * 60 * 24) + 1);
 }
 
-// get drugs
-$res = sqlStatement("SELECT d.*, SUM(di.on_hand) AS on_hand " .
-  "FROM drugs AS d " .
-  "LEFT JOIN drug_inventory AS di ON di.drug_id = d.drug_id " .
-  "AND di.on_hand != 0 AND di.destroy_date IS NULL " .
-  "WHERE d.active = 1 " .
-  "GROUP BY d.name, d.drug_id ORDER BY d.name, d.drug_id");
+$form_details = empty($_REQUEST['form_details']) ? 0 : 1;
+
+$form_facility = 0 + empty($_REQUEST['form_facility']) ? 0 : $_REQUEST['form_facility'];
+
+// Incoming form_warehouse, if not empty is in the form "warehouse/facility".
+// The facility part is an attribute used by JavaScript logic.
+$form_warehouse = empty($_REQUEST['form_warehouse']) ? '' : $_REQUEST['form_warehouse'];
+$tmp = explode('/', $form_warehouse);
+$form_warehouse = $tmp[0];
+
+$mmtype = $GLOBALS['gbl_min_max_months'] ? xl('Months') : xl('Units');
+
+// Compute WHERE condition for filtering on facility/warehouse.
+$fwcond = '';
+if ($form_facility) $fwcond .=
+  " AND lo.option_value IS NOT NULL AND lo.option_value = '$form_facility'";
+if ($form_warehouse) $fwcond .=
+  " AND di.warehouse_id IS NOT NULL AND di.warehouse_id = '$form_warehouse'";
+
+if ($form_details) {
+  // Query for the main loop if lot details are wanted.
+  $query = "SELECT d.*, di.on_hand, di.inventory_id, di.lot_number, " .
+    "di.expiration, lo.title, pw.pw_min_level, pw.pw_max_level " .
+    "FROM drugs AS d " .
+    "LEFT JOIN drug_inventory AS di ON di.drug_id = d.drug_id " .
+    "AND di.on_hand != 0 AND di.destroy_date IS NULL " .
+    "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
+    "lo.option_id = di.warehouse_id " .
+    "LEFT JOIN product_warehouse AS pw ON pw.pw_drug_id = d.drug_id AND " .
+    "pw.pw_warehouse = di.warehouse_id " .
+    "WHERE d.active = 1 $fwcond " .
+    "ORDER BY d.name, d.drug_id";
+}
+else {
+  // Query for the main loop if summary report.
+  $query = "SELECT d.*, SUM(di.on_hand) AS on_hand " .
+    "FROM drugs AS d " .
+    "LEFT JOIN drug_inventory AS di ON di.drug_id = d.drug_id " .
+    "AND di.on_hand != 0 AND di.destroy_date IS NULL " .
+    "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
+    "lo.option_id = di.warehouse_id " .
+    "WHERE d.active = 1 $fwcond " .
+    "GROUP BY d.name, d.drug_id ORDER BY d.name, d.drug_id";
+}
+
+$res = sqlStatement($query);
 ?>
 <html>
 
@@ -53,6 +92,20 @@ a, a:visited, a:hover { color:#0000cc; }
 <script type="text/javascript" src="../../library/dialog.js"></script>
 
 <script language="JavaScript">
+
+// Enable/disable warehouse options depending on current facility.
+function facchanged() {
+ var f = document.forms[0];
+ var facid = f.form_facility.value;
+ var theopts = f.form_warehouse.options;
+ for (var i = 1; i < theopts.length; ++i) {
+  var tmp = theopts[i].value.split('/');
+  var dis = facid && (tmp.length < 2 || tmp[1] != facid);
+  theopts[i].disabled = dis;
+  if (dis) theopts[i].selected = false;
+ }
+}
+
 </script>
 
 </head>
@@ -67,9 +120,40 @@ a, a:visited, a:hover { color:#0000cc; }
    <?php xl('Inventory List','e'); ?>
   </td>
   <td class='text' align='right'>
+<?php
+  // Build a drop-down list of facilities.
+  //
+  $query = "SELECT id, name FROM facility ORDER BY name";
+  $fres = sqlStatement($query);
+  echo "   <select name='form_facility' onchange='facchanged()'>\n";
+  echo "    <option value=''>-- " . xl('All Facilities') . " --\n";
+  while ($frow = sqlFetchArray($fres)) {
+    $facid = $frow['id'];
+    echo "    <option value='$facid'";
+    if ($facid == $form_facility) echo " selected";
+    echo ">" . $frow['name'] . "\n";
+  }
+  echo "   </select>&nbsp;\n";
+
+  echo "   <select name='form_warehouse'>\n";
+  echo "    <option value=''>" . xl('All Warehouses') . "</option>\n";
+  $lres = sqlStatement("SELECT * FROM list_options " .
+    "WHERE list_id = 'warehouse' ORDER BY seq, title");
+  while ($lrow = sqlFetchArray($lres)) {
+    echo "    <option value='" . $lrow['option_id'] . "/" . $lrow['option_value'] . "'";
+    echo " id='fac" . $lrow['option_value'] . "'";
+    if (strlen($form_warehouse)  > 0 && $lrow['option_id'] == $form_warehouse) {
+      echo " selected";
+    }
+    echo ">" . xl_list_label($lrow['title']) . "</option>\n";
+  }
+  echo "   </select>&nbsp;\n";
+?>
    <?php xl('For the past','e'); ?>
    <input type="input" name="form_days" size='3' value="<?php echo $form_days; ?>" />
    <?php xl('days','e'); ?>&nbsp;
+   <input type='checkbox' name='form_details' value='1'<?php if ($form_details) echo " checked"; ?>
+   /><?php xl('Details','e'); ?>&nbsp;
    <input type="submit" value="<?php xl('Refresh','e'); ?>" />&nbsp;
    <input type="button" value="<?php xl('Print','e'); ?>" onclick="window.print()" />
   </td>
@@ -82,9 +166,15 @@ a, a:visited, a:hover { color:#0000cc; }
   <tr class='head'>
    <th><?php  xl('Name','e'); ?></th>
    <th><?php  xl('NDC','e'); ?></th>
+   <th><?php  xl('Active','e'); ?></th>
    <th><?php  xl('Form','e'); ?></th>
-   <th align='right'><?php  xl('QOH','e'); ?></th>
    <th align='right'><?php  xl('Reorder','e'); ?></th>
+<?php if ($form_details) { ?>
+   <th><?php  xl('Warehouse','e'); ?></th>
+   <th align='right'><?php echo "$mmtype " . xl('Min'); ?></th>
+   <th align='right'><?php echo "$mmtype " . xl('Max'); ?></th>
+<?php } ?>
+   <th align='right'><?php  xl('QOH','e'); ?></th>
    <th align='right'><?php  xl('Avg Monthly','e'); ?></th>
    <th align='right'><?php  xl('Stock Months','e'); ?></th>
    <th><?php xl('Warnings','e'); ?></th>
@@ -93,22 +183,41 @@ a, a:visited, a:hover { color:#0000cc; }
  <tbody>
 <?php 
 $encount = 0;
+$last_drug_id = '';
 while ($row = sqlFetchArray($res)) {
   $on_hand = 0 + $row['on_hand'];
   $drug_id = 0 + $row['drug_id'];
+  $inventory_id = 0 + empty($row['inventory_id']) ? 0 : $row['inventory_id'];
   $warnings = '';
 
-  $srow = sqlQuery("SELECT " .
-    "SUM(quantity) AS sale_quantity " .
-    "FROM drug_sales WHERE " .
-    "drug_id = '$drug_id' AND " .
-    "sale_date > DATE_SUB(NOW(), INTERVAL $form_days DAY) " .
-    "AND pid != 0");
+  // Get sales in the date range for this lot (if details) or drug.
+  if ($form_details) {
+    $srow = sqlQuery("SELECT " .
+      "SUM(s.quantity) AS sale_quantity " .
+      "FROM drug_sales AS s " .
+      "WHERE " .
+      "s.drug_id = '$drug_id' AND " .
+      "s.inventory_id = '$inventory_id' AND " .
+      "s.sale_date > DATE_SUB(NOW(), INTERVAL $form_days DAY) " .
+      "AND s.pid != 0");
+  }
+  else {
+    $srow = sqlQuery("SELECT " .
+      "SUM(s.quantity) AS sale_quantity " .
+      "FROM drug_sales AS s " .
+      "LEFT JOIN drug_inventory AS di ON di.drug_id = s.drug_id " .
+      "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
+      "lo.option_id = di.warehouse_id " .
+      "WHERE " .
+      "s.drug_id = '$drug_id' AND " .
+      "s.sale_date > DATE_SUB(NOW(), INTERVAL $form_days DAY) " .
+      "AND s.pid != 0 $fwcond");
+  }
+  $sale_quantity = $srow['sale_quantity'];
 
-  ++$encount;
+  if ($drug_id != $last_drug_id) ++$encount;
   $bgcolor = "#" . (($encount & 1) ? "ddddff" : "ffdddd");
 
-  $sale_quantity = $srow['sale_quantity'];
   $months = $form_days / 30.5;
 
   $monthly = ($months && $sale_quantity) ?
@@ -127,39 +236,28 @@ while ($row = sqlFetchArray($res)) {
     addWarning(xl('Reorder point has been reached'));
   }
 
-  // Compute the smallest quantity that might be taken from a lot based on the
-  // past 30 days of sales.  If lot combining is allowed this is always 1.
-  $min_sale = 1;
-  if (!$row['allow_combining']) {
-    $sminrow = sqlQuery("SELECT " .
-      "MIN(quantity) AS min_sale " .
-      "FROM drug_sales WHERE " .
-      "drug_id = '$drug_id' AND " .
-      "sale_date > DATE_SUB(NOW(), INTERVAL $form_days DAY) " .
-      "AND pid != 0 " .
-      "AND quantity > 0");
-    $min_sale = 0 + $sminrow['min_sale'];
-  }
-
-  // Get all lots that we want to issue warnings about.  These are lots
-  // expired, soon to expire, or with insufficient quantity for selling.
-  $ires = sqlStatement("SELECT * " .
-    "FROM drug_inventory WHERE " .
-    "drug_id = '$drug_id' AND " .
-    "on_hand > 0 AND " .
-    "destroy_date IS NULL AND ( " .
-    "on_hand < '$min_sale' OR " .
-    "expiration IS NOT NULL AND expiration < DATE_ADD(NOW(), INTERVAL 30 DAY) " .
-    ") ORDER BY lot_number");
-
-  // Generate warnings associated with individual lots.
-  while ($irow = sqlFetchArray($ires)) {
-    $lotno = $irow['lot_number'];
-    if ($irow['on_hand'] < $min_sale) {
+  if ($form_details) {
+    // Compute the smallest quantity that might be taken from a lot based on the
+    // past 30 days of sales.  If lot combining is allowed this is always 1.
+    $min_sale = 1;
+    if (!$row['allow_combining']) {
+      $sminrow = sqlQuery("SELECT " .
+        "MIN(s.quantity) AS min_sale " .
+        "FROM drug_sales AS s " .
+        "WHERE " .
+        "s.drug_id = '$drug_id' AND " .
+        "s.inventory_id = '$inventory_id' AND " .
+        "s.sale_date > DATE_SUB(NOW(), INTERVAL $form_days DAY) " .
+        "AND s.pid != 0 " .
+        "AND s.quantity > 0");
+      $min_sale = 0 + $sminrow['min_sale'];
+    }
+    $lotno = $row['lot_number'];
+    if ($row['on_hand'] < $min_sale) {
       addWarning(xl('Lot') . " '$lotno' " . xl('quantity seems unusable'));
     }
-    if (!empty($irow['expiration'])) {
-      $expdays = (int) ((strtotime($irow['expiration']) - time()) / (60 * 60 * 24));
+    if (!empty($row['expiration'])) {
+      $expdays = (int) ((strtotime($row['expiration']) - time()) / (60 * 60 * 24));
       if ($expdays <= 0) {
         addWarning(xl('Lot') . " '$lotno' " . xl('has expired'));
       }
@@ -168,24 +266,91 @@ while ($row = sqlFetchArray($res)) {
       }
     }
   }
+  else {
+    // Compute the smallest quantity that might be taken from a lot based on the
+    // past 30 days of sales.  If lot combining is allowed this is always 1.
+    $min_sale = 1;
+    if (!$row['allow_combining']) {
+      $sminrow = sqlQuery("SELECT " .
+        "MIN(s.quantity) AS min_sale " .
+        "FROM drug_sales AS s " .
+        "LEFT JOIN drug_inventory AS di ON di.drug_id = s.drug_id " .
+        "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
+        "lo.option_id = di.warehouse_id " .
+        "WHERE " .
+        "s.drug_id = '$drug_id' AND " .
+        "s.sale_date > DATE_SUB(NOW(), INTERVAL $form_days DAY) " .
+        "AND s.pid != 0 " .
+        "AND s.quantity > 0 $fwcond");
+      $min_sale = 0 + $sminrow['min_sale'];
+    }
+    // Get all lots that we want to issue warnings about.  These are lots
+    // expired, soon to expire, or with insufficient quantity for selling.
+    $ires = sqlStatement("SELECT di.* " .
+      "FROM drug_inventory AS di " .
+      "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
+      "lo.option_id = di.warehouse_id " .
+      "WHERE " .
+      "di.drug_id = '$drug_id' AND " .
+      "di.on_hand > 0 AND " .
+      "di.destroy_date IS NULL AND ( " .
+      "di.on_hand < '$min_sale' OR " .
+      "di.expiration IS NOT NULL AND di.expiration < DATE_ADD(NOW(), INTERVAL 30 DAY) " .
+      ") $fwcond ORDER BY di.lot_number");
+    // Generate warnings associated with individual lots.
+    while ($irow = sqlFetchArray($ires)) {
+      $lotno = $irow['lot_number'];
+      if ($irow['on_hand'] < $min_sale) {
+        addWarning(xl('Lot') . " '$lotno' " . xl('quantity seems unusable'));
+      }
+      if (!empty($irow['expiration'])) {
+        $expdays = (int) ((strtotime($irow['expiration']) - time()) / (60 * 60 * 24));
+        if ($expdays <= 0) {
+          addWarning(xl('Lot') . " '$lotno' " . xl('has expired'));
+        }
+        else if ($expdays <= 30) {
+          addWarning(xl('Lot') . " '$lotno' " . xl('expires in') . " $expdays " . xl('days'));
+        }
+      }
+    }
+  } // end not details
 
   echo " <tr class='detail' bgcolor='$bgcolor'>\n";
-  echo "  <td>" . htmlentities($row['name']) . "</td>\n";
-  echo "  <td>" . htmlentities($row['ndc_number']) . "</td>\n";
-  echo "  <td>" .
-       generate_display_field(array('data_type'=>'1','list_id'=>'drug_form'), $row['form']) .
-       "</td>\n";
+
+  if ($drug_id == $last_drug_id) {
+    echo "  <td colspan='5'>&nbsp;</td>\n";
+  }
+  else {
+    echo "  <td>" . htmlentities($row['name']) . "</td>\n";
+    echo "  <td>" . htmlentities($row['ndc_number']) . "</td>\n";
+    echo "  <td>" . ($row['active'] ? xl('Yes') : xl('No')) . "</td>\n";
+    echo "  <td>" .
+         generate_display_field(array('data_type'=>'1','list_id'=>'drug_form'), $row['form']) .
+         "</td>\n";
+    echo "  <td align='right'>" . $row['reorder_point'] . "</td>\n";
+  }
+  if ($form_details) {
+    echo "  <td>" . htmlentities($row['title']) . "</td>\n";
+    echo "  <td align='right'>" . htmlentities($row['pw_min_level']) . "</td>\n";
+    echo "  <td align='right'>" . htmlentities($row['pw_max_level']) . "</td>\n";
+  }
   echo "  <td align='right'>" . $row['on_hand'] . "</td>\n";
-  echo "  <td align='right'>" . $row['reorder_point'] . "</td>\n";
   echo "  <td align='right'>$monthly</td>\n";
   echo "  <td align='right'>$stock_months</td>\n";
   echo "  <td style='color:red'>$warnings</td>\n";
   echo " </tr>\n";
- }
+
+  $last_drug_id = $drug_id;
+}
 ?>
  </tbody>
 </table>
 
 </center>
+
+<script language="JavaScript">
+facchanged();
+</script>
+
 </body>
 </html>

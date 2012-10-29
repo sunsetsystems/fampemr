@@ -195,7 +195,7 @@ function writeOptionLine($option_id, $title, $seq, $default, $value, $mapping=''
     "onclick='defClicked($opt_line_no)' class='optin'$checked />";
   echo "</td>\n";
 
-  // Tax rates, form names and contraceptive methods have an additional attribute.
+  // Tax rates, form names, contraceptive methods and facilities have an additional attribute.
   //
   if ($list_id == 'taxrate' || $list_id == 'lbfnames') {
     echo "  <td align='center' class='optcell'>";
@@ -208,6 +208,22 @@ function writeOptionLine($option_id, $title, $seq, $default, $value, $mapping=''
     echo "  <td align='center' class='optcell'>";
     echo "<input type='checkbox' name='opt[$opt_line_no][value]' value='1' class='optin'$tmp />";
     echo "</td>\n";
+  }
+  else if ($list_id == 'warehouse') {
+    echo "  <td align='center' class='optcell'>\n";
+    // Build a drop-down list of facilities.
+    $query = "SELECT id, name FROM facility ORDER BY name";
+    $fres = sqlStatement($query);
+    echo "   <select name='opt[$opt_line_no][value]'>\n";
+    echo "    <option value='0'>-- " . xl('Unassigned') . " --\n";
+    while ($frow = sqlFetchArray($fres)) {
+    $facid = $frow['id'];
+    echo "    <option value='$facid'";
+    if ($facid == $value) echo " selected";
+      echo ">" . $frow['name'] . "\n";
+    }
+    echo "   </select>\n";
+    echo "  </td>\n";
   }
 
   // IPPF includes the ability to map each list item to a "master" identifier.
@@ -580,6 +596,8 @@ while ($row = sqlFetchArray($res)) {
   <td><b><?php xl('Rate'   ,'e'); ?></b></td>
 <?php } else if ($list_id == 'contrameth') { ?>
   <td><b><?php xl('Modern','e'); ?></b></td>
+<?php } else if ($list_id == 'warehouse') { ?>
+  <td><b><?php xl('Facility','e'); ?></b></td>
 <?php } else if ($list_id == 'lbfnames') { ?>
   <td title='<?php xl('Number of past history columns','e'); ?>'><b><?php xl('Repeats','e'); ?></b></td>
 <?php } ?>

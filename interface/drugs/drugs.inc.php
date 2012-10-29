@@ -35,7 +35,8 @@ function send_drug_email($subject, $body) {
 }
 
 function sellDrug($drug_id, $quantity, $fee, $patient_id=0, $encounter_id=0,
-  $prescription_id=0, $sale_date='', $user='', $default_warehouse='') {
+  $prescription_id=0, $sale_date='', $user='', $default_warehouse='',
+  $testonly=false) {
 
   if (empty($patient_id))   $patient_id   = $GLOBALS['pid'];
   if (empty($sale_date))    $sale_date    = date('Y-m-d');
@@ -57,6 +58,7 @@ function sellDrug($drug_id, $quantity, $fee, $patient_id=0, $encounter_id=0,
 
   if (!$dispensable) {
     // Non-dispensable is a much simpler case and does not touch inventory.
+    if ($testonly) return true;
     $sale_id = sqlInsert("INSERT INTO drug_sales ( " .
       "drug_id, inventory_id, prescription_id, pid, encounter, user, " .
       "sale_date, quantity, fee ) VALUES ( " .
@@ -118,6 +120,11 @@ function sellDrug($drug_id, $quantity, $fee, $patient_id=0, $encounter_id=0,
       $rows[] = $row;
       $qty_left -= $on_hand;
     }
+  }
+
+  if ($testonly) {
+    // Just testing inventory, so return true if OK, false if insufficient.
+    return $qty_left <= 0;
   }
 
   if ($bad_lot_list) {

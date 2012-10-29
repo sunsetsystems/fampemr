@@ -92,6 +92,7 @@ p.grpheader {
  font-family: Arial;
  font-weight: bold;
  font-size: 12pt;
+ margin-bottom: 4pt;
 }
 
 div.section {
@@ -99,7 +100,6 @@ div.section {
  border-style: solid;
  border-width: 1px;
  border-color: #000000;
- /* margin: 0 0 0 10pt; */
  padding: 5pt;
 }
 div.section table {

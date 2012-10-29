@@ -25,6 +25,8 @@ $justifystyle = justify_is_used() ? "" : " style='display:none'";
 // This flag comes from the LBFmsivd form and perhaps later others.
 $rapid_data_entry = empty($_GET['rde']) ? 0 : 1;
 
+$alertmsg = '';
+
 function alphaCodeType($id) {
   global $code_types;
   foreach ($code_types as $key => $value) {
@@ -483,10 +485,48 @@ $visit_row = sqlQuery("SELECT fe.date, opc.pc_catname " .
   "WHERE fe.pid = '$pid' AND fe.encounter = '$encounter' LIMIT 1");
 $visit_date = substr($visit_row['date'], 0, 10);
 
+if ($_POST['bn_save'] || $_POST['bn_save_close']) {
+  // Check for insufficient product inventory levels.
+  $prod = $_POST['prod'];
+  $insufficient = 0;
+  for ($lino = 1; $prod["$lino"]['drug_id']; ++$lino) {
+    $iter = $prod["$lino"];
+    if (!empty($iter['billed'])) continue;
+    $drug_id   = $iter['drug_id'];
+    $sale_id   = $iter['sale_id']; // present only if already saved
+    $units     = max(1, intval(trim($iter['units'])));
+    $del       = $iter['del'];
+    // Deleting always works.
+    if ($del) continue;
+    // If the item is already in the database...
+    if ($sale_id) {
+      $query = "SELECT (di.on_hand + ds.quantity - $units) AS new_on_hand " .
+        "FROM drug_sales AS ds, drug_inventory AS di WHERE " .
+        "ds.sale_id = '$sale_id' AND di.inventory_id = ds.inventory_id";
+      $dirow = sqlQuery($query);
+      if ($dirow['new_on_hand'] < 0) {
+        $insufficient = $drug_id;
+      }
+    }
+    // Otherwise it's a new item...
+    else {
+      // This only checks for sufficient inventory, nothing is updated.
+      if (!sellDrug($drug_id, $units, 0, $pid, $encounter, 0,
+        $visit_date, '', $default_warehouse, true)) {
+        $insufficient = $drug_id;
+      }
+    }
+  } // end for
+  if ($insufficient) {
+    $drow = sqlQuery("SELECT name FROM drugs WHERE drug_id = '$insufficient'");
+    $alertmsg = xl('Insufficient inventory for product') . ' "' . $drow['name'] . '"';
+  }
+}
+
 // If Save or Save-and-Close was clicked, save the new and modified billing
 // lines; then if no error, redirect to $returnurl.
 //
-if ($_POST['bn_save'] || $_POST['bn_save_close']) {
+if (!$alertmsg && ($_POST['bn_save'] || $_POST['bn_save_close'])) {
   $main_provid = 0 + $_POST['ProviderID'];
   $main_supid  = 0 + $_POST['SupervisorID'];
   if ($main_supid == $main_provid) $main_supid = 0;
@@ -976,6 +1016,15 @@ function newEvt() {
  return false;
 }
 
+function warehouse_changed(sel) {
+ if (!confirm('<?php echo xl('Do you really want to change Warehouse?'); ?>')) {
+  // They clicked Cancel so reset selection to its default state.
+  for (var i = 0; i < sel.options.length; ++i) {
+   sel.options[i].selected = sel.options[i].defaultSelected;
+  }
+ }
+}
+
 </script>
 </head>
 
@@ -1433,7 +1482,7 @@ if ($prod_lino > 0) { // if any products are in this form
       $_SESSION['authUser'] . "'");
     echo "   <span class='billcell'><b>" . xl('Warehouse') . ":</b></span>\n";
     echo generate_select_list('default_warehouse', 'warehouse',
-      $trow['default_warehouse'], '');
+      $trow['default_warehouse'], '', ' ', '', 'warehouse_changed(this);');
     echo "&nbsp; &nbsp; &nbsp;\n";
   }
 }
@@ -1495,14 +1544,17 @@ if (true) {
 
 </form>
 
-<?php
-// TBD: If $alertmsg, display it with a JavaScript alert().
-?>
-
 <script language='JavaScript'>
 var required_code_count = <?php echo $required_code_count; ?>;
 setSaveAndClose();
-<?php echo $justinit; ?>
+
+<?php
+echo $justinit;
+if ($alertmsg) {
+  echo "alert('" . addslashes($alertmsg) . "');\n";
+}
+?>
+
 </script>
 
 </body>

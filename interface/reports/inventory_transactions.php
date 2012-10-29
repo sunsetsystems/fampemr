@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2010-2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -13,6 +13,15 @@ require_once("$srcdir/patient.inc");
 require_once("$srcdir/acl.inc");
 require_once("$srcdir/formatting.inc.php");
 require_once("$srcdir/formdata.inc.php");
+
+// For each sorting option, specify the ORDER BY argument.
+//
+$ORDERHASH = array(
+  'date' => 's.sale_date, s.sale_id',
+  'prod' => 'd.name, s.sale_date, s.sale_id',
+  'wh'   => 'warehouse, s.sale_date, s.sale_id',
+  'who'  => 'plname, pfname, pmname, s.sale_date, s.sale_id',
+);
 
 function bucks($amount) {
   if ($amount != 0) return oeFormatMoney($amount);
@@ -39,6 +48,7 @@ function thisLineItem($row, $xfer=false) {
     $invnumber = empty($row['invoice_refno']) ?
       "{$row['pid']}.{$row['encounter']}" : $row['invoice_refno'];
   }
+  /*******************************************************************
   else if (!empty($row['distributor_id'])) {
     $ttype = xl('Distribution');
     if (!empty($row['organization'])) {
@@ -52,6 +62,7 @@ function thisLineItem($row, $xfer=false) {
       }
     }
   }
+  *******************************************************************/
   else if (!empty($row['xfer_inventory_id']) || $xfer) {
     $ttype = xl('Transfer');
   }
@@ -142,7 +153,11 @@ $form_to_date   = fixDate($_POST['form_to_date']  , date('Y-m-d'));
 
 $form_trans_type = isset($_POST['form_trans_type']) ? formData('form_trans_type') : '0';
 
-// $form_facility  = $_POST['form_facility'];
+// The selected facility ID, if any.
+$form_facility = 0 + empty($_POST['form_facility']) ? 0 : $_POST['form_facility'];
+
+$form_orderby = $ORDERHASH[$_REQUEST['form_orderby']] ? $_REQUEST['form_orderby'] : 'date';
+$orderby = $ORDERHASH[$form_orderby];
 
 $encount = 0;
 
@@ -171,12 +186,27 @@ else {
 <html>
 <head>
 <?php html_header_show();?>
+<link rel="stylesheet" href='<?php  echo $css_header ?>' type='text/css'>
 <title><?php xl('Inventory Transactions','e') ?></title>
 <style type="text/css">
  body       { font-family:sans-serif; font-size:10pt; font-weight:normal }
  .dehead    { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:bold }
  .detail    { color:#000000; font-family:sans-serif; font-size:10pt; font-weight:normal }
+ a, a:visited, a:hover { color:#0000cc; }
 </style>
+
+<script language="JavaScript">
+
+function dosort(orderby) {
+ var f = document.forms[0];
+ f.form_orderby.value = orderby;
+ opener.top.restoreSession();
+ f.submit();
+ return false;
+}
+
+</script>
+
 </head>
 
 <body leftmargin='0' topmargin='0' marginwidth='0' marginheight='0'>
@@ -187,11 +217,9 @@ else {
 <form method='post' action='inventory_transactions.php'>
 
 <table border='0' cellpadding='3'>
-
  <tr>
-  <td>
+  <td align='center'>
 <?php
-  /*******************************************************************
   // Build a drop-down list of facilities.
   //
   $query = "SELECT id, name FROM facility ORDER BY name";
@@ -205,7 +233,6 @@ else {
     echo ">" . $frow['name'] . "\n";
   }
   echo "   </select>\n&nbsp;";
-  *******************************************************************/
 ?>
    <?php xl('Type','e'); ?>:
    <select name='form_trans_type' onchange='trans_type_changed()'>
@@ -214,7 +241,7 @@ foreach (array(
   '0' => xl('All'),
   '2' => xl('Purchase/Return'),
   '1' => xl('Sale'),
-  '6' => xl('Distribution'),
+  // '6' => xl('Distribution'),
   '4' => xl('Transfer'),
   '5' => xl('Adjustment'),
 ) as $key => $value)
@@ -225,6 +252,11 @@ foreach (array(
 }
 ?>
    </select>
+  </td>
+ </tr>
+
+ <tr>
+  <td align='center'>
    <?php xl('From','e'); ?>:
    <input type='text' name='form_from_date' id="form_from_date" size='10' value='<?php echo $form_from_date ?>'
     onkeyup='datekeyup(this,mypcc)' onblur='dateblur(this,mypcc)' title='yyyy-mm-dd'>
@@ -256,13 +288,17 @@ foreach (array(
 <table border='0' cellpadding='1' cellspacing='2' width='98%'>
  <tr bgcolor="#dddddd">
   <td class="dehead">
-   <?php xl('Date','e'); ?>
+   <a href="#" onclick="return dosort('date')"
+   <?php if ($form_orderby == "date") echo " style=\"color:#00cc00\""; ?>>
+   <?php xl('Date','e'); ?> </a>
   </td>
   <td class="dehead">
    <?php xl('Transaction','e'); ?>
   </td>
   <td class="dehead">
-   <?php xl('Product','e'); ?>
+   <a href="#" onclick="return dosort('prod')"
+   <?php if ($form_orderby == "prod") echo " style=\"color:#00cc00\""; ?>>
+   <?php xl('Product','e'); ?> </a>
   </td>
   <td class="dehead">
    <?php xl('Lot','e'); ?>
@@ -273,10 +309,14 @@ foreach (array(
   </td>
   -->
   <td class="dehead">
-   <?php xl('Warehouse','e'); ?>
+   <a href="#" onclick="return dosort('wh')"
+   <?php if ($form_orderby == "wh") echo " style=\"color:#00cc00\""; ?>>
+   <?php xl('Warehouse','e'); ?> </a>
   </td>
   <td class="dehead">
-   <?php xl('Who','e'); ?>
+   <a href="#" onclick="return dosort('who')"
+   <?php if ($form_orderby == "who") echo " style=\"color:#00cc00\""; ?>>
+   <?php xl('Who','e'); ?> </a>
   </td>
   <td class="dehead" align="right">
    <?php xl('Qty','e'); ?>
@@ -294,7 +334,7 @@ foreach (array(
 <?php
 } // end not export
 
-if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
+if ($form_from_date) {
   $from_date = $form_from_date;
   $to_date   = $form_to_date;
 
@@ -328,11 +368,14 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
     $query .= "AND s.xfer_inventory_id != 0 ";
   }
   else if ($form_trans_type == 5) { // adjustment
-    $query .= "AND s.pid = 0 AND s.distributor_id = 0 AND s.xfer_inventory_id = 0 AND s.fee = 0 ";
+    // $query .= "AND s.pid = 0 AND s.distributor_id = 0 AND s.xfer_inventory_id = 0 AND s.fee = 0 ";
+    $query .= "AND s.pid = 0 AND s.xfer_inventory_id = 0 AND s.fee = 0 ";
   }
+  /*******************************************************************
   else if ($form_trans_type == 6) { // distribution
     $query .= "AND s.distributor_id != 0 ";
   }
+  *******************************************************************/
   else if ($form_trans_type == 1) { // sale
     $query .= "AND s.pid != 0 ";
   }
@@ -342,7 +385,14 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
     $query .= "AND fe.facility_id = '$form_facility' ";
   }
   *******************************************************************/
-  $query .= "ORDER BY s.sale_date, s.sale_id";
+
+  // If a facility was specified.
+  if ($form_facility) {
+    $query .= "AND ((lo1.option_value IS NOT NULL AND lo1.option_value = '$form_facility') " .
+      "OR (lo2.option_value IS NOT NULL AND lo2.option_value = '$form_facility')) ";
+  }
+
+  $query .= "ORDER BY $orderby";
   //
   $res = sqlStatement($query);
   while ($row = sqlFetchArray($res)) {
@@ -375,6 +425,9 @@ if (! $_POST['form_csvexport']) {
 ?>
 
 </table>
+
+<input type="hidden" name="form_orderby" value="<?php echo $form_orderby ?>" />
+
 </form>
 </center>
 </body>
@@ -393,4 +446,3 @@ if (! $_POST['form_csvexport']) {
 <?php
 } // End not csv export
 ?>
-

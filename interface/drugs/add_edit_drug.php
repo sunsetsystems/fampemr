@@ -364,7 +364,7 @@ else {
   <td>
    <table>
     <tr>
-     <td valign='top' nowrap>&nbsp;</td>
+     <td valign='top' nowrap><b><?php echo $GLOBALS['gbl_min_max_months'] ? xl('Months') : xl('Units'); ?></b></td>
      <td valign='top' nowrap><?php xl('Global','e'); ?></td>
 <?php
   // One column header per warehouse title.
