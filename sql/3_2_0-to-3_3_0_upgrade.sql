@@ -488,3 +488,12 @@ ALTER TABLE ar_activity
   ADD code_type varchar(15) NOT NULL DEFAULT '';
 #EndIf
 
+#IfMissingColumn drug_sales trans_type
+ALTER TABLE drug_sales
+  ADD trans_type tinyint NOT NULL DEFAULT 1 COMMENT '1=sale, 2=purchase, 3=return, 4=transfer, 5=adjustment';
+UPDATE drug_sales SET trans_type = 4 WHERE pid = 0 AND xfer_inventory_id != 0;
+UPDATE drug_sales SET trans_type = 5 WHERE trans_type = 1 AND pid = 0 AND fee = 0;
+UPDATE drug_sales SET trans_type = 2 WHERE trans_type = 1 AND pid = 0 AND quantity >= 0;
+UPDATE drug_sales SET trans_type = 3 WHERE trans_type = 1 AND pid = 0;
+#EndIf
+

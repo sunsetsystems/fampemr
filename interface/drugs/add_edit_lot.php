@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2006, 2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2006-2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -118,10 +118,12 @@ td { font-size:10pt; }
    alert('<?php xl('A lot number is required','e'); ?>');
    return false;
   }
+  /*******************************************************************
   if (f.form_trans_type.value == '6' && f.form_distributor_id.value == '') {
    alert('<?php xl('A distributor is required','e'); ?>');
    return false;
   }
+  *******************************************************************/
   return true;
  }
 
@@ -141,10 +143,12 @@ td { font-size:10pt; }
   else if (type == '3') { // return
     showSourceLot = false;
   }
+  /*******************************************************************
   else if (type == '6') { // distribution
     showSourceLot = false;
     showDistributor = true;
   }
+  *******************************************************************/
   else if (type == '4') { // transfer
     showCost = false;
   }
@@ -164,7 +168,7 @@ td { font-size:10pt; }
   document.getElementById('row_cost'      ).style.display = showCost      ? '' : 'none';
   document.getElementById('row_source_lot').style.display = showSourceLot ? '' : 'none';
   document.getElementById('row_notes'     ).style.display = showNotes     ? '' : 'none';
-  document.getElementById('row_distributor').style.display = showDistributor ? '' : 'none';
+  // document.getElementById('row_distributor').style.display = showDistributor ? '' : 'none';
  }
 
 </script>
@@ -265,13 +269,13 @@ if ($_POST['form_save'] || $_POST['form_delete']) {
     }
 
     // Create the corresponding drug_sales transaction.
-    if ($_POST['form_save'] && $form_quantity) {
+    if ($_POST['form_save'] && $form_quantity && $form_trans_type) {
       $form_notes = formData('form_notes');
       $form_sale_date = formData('form_sale_date');
       if (empty($form_sale_date)) $form_sale_date = date('Y-m-d');
       sqlInsert("INSERT INTO drug_sales ( " .
-        "drug_id, inventory_id, prescription_id, pid, encounter, user, " .
-        "sale_date, quantity, fee, xfer_inventory_id, distributor_id, notes " .
+        "drug_id, inventory_id, prescription_id, pid, encounter, user, sale_date, " .
+        "quantity, fee, xfer_inventory_id, distributor_id, notes, trans_type " .
         ") VALUES ( " .
         "'$drug_id', '$lot_id', '0', '0', '0', " .
         "'" . $_SESSION['authUser'] . "', " .
@@ -280,7 +284,8 @@ if ($_POST['form_save'] || $_POST['form_delete']) {
         "'" . (0 - $form_cost)      . "', " .
         "'$form_source_lot', " .
         "'$form_distributor_id', " .
-        "'$form_notes' )");
+        "'$form_notes', " .
+        "'$form_trans_type' )");
 
       // If this is a transfer then reduce source QOH, and also copy some
       // fields from the source when they are missing.

@@ -542,7 +542,7 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
     "WHERE s.sale_date >= '$from_date' AND s.sale_date <= '$to_date'";
   *******************************************************************/
   $query = "SELECT s.sale_id, s.sale_date, s.quantity, s.fee, s.pid, s.encounter, " .
-    "s.xfer_inventory_id, s.distributor_id, d.name, lo.title, " .
+    "s.xfer_inventory_id, s.distributor_id, s.trans_type, d.name, lo.title, " .
     "di.drug_id, di.warehouse_id, di.inventory_id, di.destroy_date, di.on_hand, " .
     "fe.invoice_refno " .
     "FROM drug_inventory AS di " .
@@ -601,15 +601,15 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
           $qtys[3] = 0 - $row['quantity'];
       }
       else if ($row['pid'])
-        $qtys[0] = 0 - $row['quantity'];
+        $qtys[0] = 0 - $row['quantity']; // sale
       /***************************************************************
       else if ($row['distributor_id'])
         $qtys[1] = 0 - $row['quantity'];
       ***************************************************************/
-      else if ($row['fee'] != 0)
-        $qtys[2] = 0 - $row['quantity'];
-      else // no pid, distributor, source lot or fee: must be an adjustment
-        $qtys[4] = 0 - $row['quantity'];
+      else if ($row['trans_type'] != 5)
+        $qtys[2] = 0 - $row['quantity']; // purchase or return
+      else
+        $qtys[4] = 0 - $row['quantity']; // adjustment
     }
 
     thisLineItem($row['drug_id'], $row['warehouse_id'], $row['pid'] + 0,

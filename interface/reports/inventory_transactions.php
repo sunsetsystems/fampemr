@@ -66,7 +66,7 @@ function thisLineItem($row, $xfer=false) {
   else if (!empty($row['xfer_inventory_id']) || $xfer) {
     $ttype = xl('Transfer');
   }
-  else if ($row['fee'] != 0) {
+  else if ($row['trans_type'] != 5) {
     $ttype = xl('Purchase');
   }
   else {
@@ -342,9 +342,9 @@ if ($form_from_date) {
   $grandqty = 0;
 
   $query = "SELECT s.sale_date, s.fee, s.quantity, s.pid, s.encounter, " .
-    "s.billed, s.notes, s.distributor_id, s.xfer_inventory_id, " .
+    "s.billed, s.notes, s.distributor_id, s.xfer_inventory_id, s.trans_type, " .
     "p.fname AS pfname, p.mname AS pmname, p.lname AS plname, " .
-    "u.fname AS dfname, u.mname AS dmname, u.lname AS dlname, u.organization, " .
+    // "u.fname AS dfname, u.mname AS dmname, u.lname AS dlname, u.organization, " .
     "d.name, fe.date, fe.invoice_refno, " .
     "i1.lot_number, i2.lot_number AS lot_number_2, " .
     "lo1.title AS warehouse, lo2.title AS warehouse_2 " .
@@ -353,7 +353,7 @@ if ($form_from_date) {
     "LEFT JOIN drug_inventory AS i1 ON i1.inventory_id = s.inventory_id " .
     "LEFT JOIN drug_inventory AS i2 ON i2.inventory_id = s.xfer_inventory_id " .
     "LEFT JOIN patient_data AS p ON p.pid = s.pid " .
-    "LEFT JOIN users AS u ON u.id = s.distributor_id " .
+    // "LEFT JOIN users AS u ON u.id = s.distributor_id " .
     "LEFT JOIN list_options AS lo1 ON lo1.list_id = 'warehouse' AND " .
     "lo1.option_id = i1.warehouse_id " .
     "LEFT JOIN list_options AS lo2 ON lo2.list_id = 'warehouse' AND " .
@@ -362,14 +362,15 @@ if ($form_from_date) {
     "WHERE s.sale_date >= '$from_date' AND s.sale_date <= '$to_date' AND " .
     "( s.pid = 0 OR s.inventory_id != 0 ) ";
   if ($form_trans_type == 2) { // purchase/return
-    $query .= "AND s.pid = 0 AND s.distributor_id = 0 AND s.xfer_inventory_id = 0 AND s.fee != 0 ";
+    // $query .= "AND s.pid = 0 AND s.distributor_id = 0 AND s.xfer_inventory_id = 0 AND s.trans_type != 5 ";
+    $query .= "AND s.pid = 0 AND s.xfer_inventory_id = 0 AND s.trans_type != 5 ";
   }
   else if ($form_trans_type == 4) { // transfer
     $query .= "AND s.xfer_inventory_id != 0 ";
   }
   else if ($form_trans_type == 5) { // adjustment
     // $query .= "AND s.pid = 0 AND s.distributor_id = 0 AND s.xfer_inventory_id = 0 AND s.fee = 0 ";
-    $query .= "AND s.pid = 0 AND s.xfer_inventory_id = 0 AND s.fee = 0 ";
+    $query .= "AND s.pid = 0 AND s.xfer_inventory_id = 0 AND s.trans_type = 5 ";
   }
   /*******************************************************************
   else if ($form_trans_type == 6) { // distribution

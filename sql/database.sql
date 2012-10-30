@@ -311,6 +311,7 @@ CREATE TABLE `drug_sales` (
   `xfer_inventory_id` int(11) NOT NULL DEFAULT 0 COMMENT 'source if this is a transfer',
   `distributor_id` bigint(20) NOT NULL DEFAULT 0,
   `notes` varchar(255) NOT NULL DEFAULT '',
+  `trans_type` tinyint NOT NULL DEFAULT 1 COMMENT '1=sale, 2=purchase, 3=return, 4=transfer, 5=adjustment',
   PRIMARY KEY  (`sale_id`),
   KEY `pid_encounter` (`pid`, `encounter`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
