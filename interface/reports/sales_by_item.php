@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2006-2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2006-2012 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -26,12 +26,116 @@ function display_desc($desc) {
   return $desc;
 }
 
-function thisLineItem($patient_id, $encounter_id, $rowcat, $description, $transdate, $qty, $amount, $irnumber='') {
-  global $product, $category, $producttotal, $productqty, $cattotal, $catqty, $grandtotal, $grandqty;
-  global $productleft, $catleft;
+// For a given encounter, this gets all charges and allocates payments and
+// adjustments among them, if that has not already been done.
+// Any invoice-level adjustments and payments are allocated among the line
+// items in proportion to their line-level remaining balances.
+//
+function ensureLineAmounts($patient_id, $encounter_id) {
+  global $aItems;
+
+  $invno = "$patient_id.$encounter_id";
+  if (isset($aItems[$invno])) return $invno;
+
+  $adjusts = 0;  // sum of invoice level adjustments
+  $payments = 0; // sum of invoice level payments
+  $denom = 0;    // sum of adjusted line item charges
+  $aItems[$invno] = array();
+
+  // Get charges and copays from billing table.
+  $tres = sqlStatement("SELECT b.code_type, b.code, b.fee " .
+    "FROM billing AS b WHERE " .
+    "b.pid = '$patient_id' AND b.encounter = '$encounter_id' AND " .
+    "b.activity = 1 AND b.fee != 0");
+  while ($trow = sqlFetchArray($tres)) {
+    if ($trow['code_type'] == 'COPAY') {
+      $payments -= $trow['fee'];
+    }
+    else {
+      $codekey = $trow['code_type'] . ':' . $trow['code'];
+      if (!isset($aItems[$invno][$codekey])) {
+        // Charges, Adjustments, Payments
+        $aItems[$invno][$codekey] = array(0, 0, 0);
+      }
+      $aItems[$invno][$codekey][0] += $trow['fee'];
+      $denom += $trow['fee'];
+    }
+  }
+
+  // Get charges from drug_sales table.
+  $tres = sqlStatement("SELECT s.drug_id, s.fee " .
+    "FROM drug_sales AS s WHERE " .
+    "s.pid = '$patient_id' AND s.encounter = '$encounter_id' AND s.fee != 0");
+  while ($trow = sqlFetchArray($tres)) {
+    $codekey = 'PROD:' . $trow['drug_id'];
+    if (!isset($aItems[$invno][$codekey])) {
+      $aItems[$invno][$codekey] = array(0, 0, 0);
+    }
+    $aItems[$invno][$codekey][0] += $trow['fee'];
+    $denom += $trow['fee'];
+  }
+
+  // Get adjustments and other payments from ar_activity table.
+  $tres = sqlStatement("SELECT " .
+    "a.code_type, a.code, a.adj_amount, a.pay_amount " .
+    "FROM ar_activity AS a WHERE " .
+    "a.pid = '$patient_id' AND a.encounter = '$encounter_id'");
+  while ($trow = sqlFetchArray($tres)) {
+    $codekey = $trow['code_type'] . ':' . $trow['code'];
+    if (isset($aItems[$invno][$codekey])) {
+      $aItems[$invno][$codekey][1] += $trow['adj_amount'];
+      $aItems[$invno][$codekey][2] += $trow['pay_amount'];
+      $denom -= $trow['adj_amount'];
+      $denom -= $trow['pay_amount'];
+    }
+    else {
+      $adjusts  += $trow['adj_amount'];
+      $payments += $trow['pay_amount'];
+    }
+  }
+
+  // Allocate all unmatched payments and adjustments among the line items.
+  $adjrem = $adjusts;  // remaining unallocated adjustments
+  $payrem = $payments; // remaining unallocated payments
+  $nlines = count($aItems[$invno]);
+  foreach ($aItems[$invno] AS $codekey => $dummy) {
+    if (--$nlines > 0) {
+      // Avoid dividing by zero!
+      if ($denom) {
+        $factor = ($aItems[$invno][$codekey][0] - $aItems[$invno][$codekey][1] - $aItems[$invno][$codekey][2]) / $denom;
+        $tmp = sprintf('%01.2f', $adjusts * $factor);
+        $aItems[$invno][$codekey][1] += $tmp;
+        $adjrem -= $tmp;
+        $tmp = sprintf('%01.2f', $payments * $factor);
+        $aItems[$invno][$codekey][2] += $tmp;
+        $payrem -= $tmp;
+      }
+    }
+    else {
+      // Last line gets what's left to avoid rounding errors.
+      $aItems[$invno][$codekey][1] += $adjrem;
+      $aItems[$invno][$codekey][2] += $payrem;
+    }
+  }
+
+  return $invno;
+}
+
+function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
+  $description, $transdate, $qty, $amount, $irnumber='') {
+
+  global $product, $category, $productleft, $catleft, $aItems;
+  global $producttotal, $prodadjtotal, $prodpaytotal, $productqty;
+  global $cattotal, $catadjtotal, $catpaytotal, $catqty;
+  global $grandtotal, $grandadjtotal, $grandpaytotal, $grandqty;
 
   $invnumber = $irnumber ? $irnumber : "$patient_id.$encounter_id";
   $rowamount = sprintf('%01.2f', $amount);
+
+  $invno = ensureLineAmounts($patient_id, $encounter_id);
+  $codekey = $code_type . ':' . $code;
+  $rowadj = $aItems[$invno][$codekey][1];
+  $rowpay = $aItems[$invno][$codekey][2];
 
   if (empty($rowcat)) $rowcat = 'None';
   $rowproduct = $description;
@@ -45,7 +149,10 @@ function thisLineItem($patient_id, $encounter_id, $rowcat, $description, $transd
           echo '"' . display_desc($category) . '",';
           echo '"' . display_desc($product)  . '",';
           echo '"' . $productqty             . '",';
-          echo '"'; bucks($producttotal); echo '"' . "\n";
+          echo '"'; bucks($producttotal); echo '",';
+          echo '"'; bucks($prodadjtotal); echo '",';
+          echo '"'; bucks($prodpaytotal); echo '"';
+          echo "\n";
         }
       }
       else {
@@ -63,11 +170,19 @@ function thisLineItem($patient_id, $encounter_id, $rowcat, $description, $transd
   <td class="dehead" align="right">
    <?php bucks($producttotal); ?>
   </td>
+  <td class="dehead" align="right">
+   <?php bucks($prodadjtotal); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($prodpaytotal); ?>
+  </td>
  </tr>
 <?php
       } // End not csv export
     }
     $producttotal = 0;
+    $prodadjtotal = 0;
+    $prodpaytotal = 0;
     $productqty = 0;
     $product = $rowproduct;
     $productleft = $product;
@@ -92,11 +207,19 @@ function thisLineItem($patient_id, $encounter_id, $rowcat, $description, $transd
   <td class="dehead" align="right">
    <?php bucks($cattotal); ?>
   </td>
+  <td class="dehead" align="right">
+   <?php bucks($catadjtotal); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($catpaytotal); ?>
+  </td>
  </tr>
 <?php
       } // End not csv export
     }
     $cattotal = 0;
+    $catadjtotal = 0;
+    $catpaytotal = 0;
     $catqty = 0;
     $category = $rowcat;
     $catleft = $category;
@@ -109,7 +232,10 @@ function thisLineItem($patient_id, $encounter_id, $rowcat, $description, $transd
       echo '"' . oeFormatShortDate(display_desc($transdate)) . '",';
       echo '"' . display_desc($invnumber) . '",';
       echo '"' . display_desc($qty      ) . '",';
-      echo '"'; bucks($rowamount); echo '"' . "\n";
+      echo '"'; bucks($rowamount); echo '", ';
+      echo '"'; bucks($rowadj);    echo '", ';
+      echo '"'; bucks($rowpay);    echo '"';
+      echo "\n";
     }
     else {
 ?>
@@ -133,23 +259,31 @@ function thisLineItem($patient_id, $encounter_id, $rowcat, $description, $transd
   <td class="detail" align="right">
    <?php bucks($rowamount); ?>
   </td>
+  <td class="detail" align="right">
+   <?php bucks($rowadj); ?>
+  </td>
+  <td class="detail" align="right">
+   <?php bucks($rowpay); ?>
+  </td>
  </tr>
-<?
+<?php
     } // End not csv export
   } // end details
-  $producttotal += $rowamount;
-  $cattotal     += $rowamount;
-  $grandtotal   += $rowamount;
-  $productqty   += $qty;
-  $catqty       += $qty;
-  $grandqty     += $qty;
+  $producttotal  += $rowamount;
+  $prodadjtotal  += $rowadj;
+  $prodpaytotal  += $rowpay;
+  $cattotal      += $rowamount;
+  $catadjtotal   += $rowadj;
+  $catpaytotal   += $rowpay;
+  $grandtotal    += $rowamount;
+  $grandadjtotal += $rowadj;
+  $grandpaytotal += $rowpay;
+  $productqty    += $qty;
+  $catqty        += $qty;
+  $grandqty      += $qty;
 } // end function
 
   if (! acl_check('acct', 'rep')) die(xl("Unauthorized access."));
-
-  $INTEGRATED_AR = $GLOBALS['oer_config']['ws_accounting']['enabled'] === 2;
-
-  if (!$INTEGRATED_AR) SLConnect();
 
   $form_from_date = fixDate($_POST['form_from_date'], date('Y-m-d'));
   $form_to_date   = fixDate($_POST['form_to_date']  , date('Y-m-d'));
@@ -169,13 +303,19 @@ function thisLineItem($patient_id, $encounter_id, $rowcat, $description, $transd
       echo '"Date",';
       echo '"Invoice",';
       echo '"Qty",';
-      echo '"Amount"' . "\n";
+      echo '"Price",';
+      echo '"Adj",';
+      echo '"Payment"';
+      echo "\n";
     }
     else {
       echo '"Category",';
       echo '"Item",';
       echo '"Qty",';
-      echo '"Total"' . "\n";
+      echo '"Price",';
+      echo '"Adj",';
+      echo '"Payment"';
+      echo "\n";
     }
   } // end export
   else {
@@ -229,13 +369,13 @@ function doinvopen(ptid,encid) {
   }
   echo "   </select>\n";
 ?>
-   &nbsp;<?php xl('From:','e'); ?>
+   &nbsp;<?php xl('From','e'); ?>:
    <input type='text' name='form_from_date' id="form_from_date" size='10' value='<?php echo $form_from_date ?>'
     onkeyup='datekeyup(this,mypcc)' onblur='dateblur(this,mypcc)' title='yyyy-mm-dd'>
    <img src='../pic/show_calendar.gif' align='absbottom' width='24' height='22'
     id='img_from_date' border='0' alt='[?]' style='cursor:pointer'
     title='<?php xl('Click here to choose a date','e'); ?>'>
-   &nbsp;<?php xl('To:','e'); ?>:
+   &nbsp;<?php xl('To','e'); ?>:
    <input type='text' name='form_to_date' id="form_to_date" size='10' value='<?php echo $form_to_date ?>'
     onkeyup='datekeyup(this,mypcc)' onblur='dateblur(this,mypcc)' title='yyyy-mm-dd'>
    <img src='../pic/show_calendar.gif' align='absbottom' width='24' height='22'
@@ -278,7 +418,13 @@ function doinvopen(ptid,encid) {
    <?php xl('Qty','e'); ?>
   </td>
   <td class="dehead" align="right">
-   <?php xl('Amount','e'); ?>
+   <?php xl('Price','e'); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php xl('Adj','e'); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php xl('Payment','e'); ?>
   </td>
  </tr>
 <?php
@@ -291,87 +437,73 @@ function doinvopen(ptid,encid) {
     $category = "";
     $catleft = "";
     $cattotal = 0;
+    $catadjtotal = 0;
+    $catpaytotal = 0;
     $catqty = 0;
     $product = "";
     $productleft = "";
     $producttotal = 0;
+    $prodadjtotal = 0;
+    $prodpaytotal = 0;
     $productqty = 0;
     $grandtotal = 0;
+    $grandadjtotal = 0;
+    $grandpaytotal = 0;
     $grandqty = 0;
 
-    if ($INTEGRATED_AR) {
-      $query = "SELECT b.fee, b.pid, b.encounter, b.code_type, b.code, b.units, " .
-        "b.code_text, fe.date, fe.facility_id, fe.invoice_refno, lo.title " .
-        "FROM billing AS b " .
-        "JOIN code_types AS ct ON ct.ct_key = b.code_type " .
-        "JOIN form_encounter AS fe ON fe.pid = b.pid AND fe.encounter = b.encounter " .
-        "LEFT JOIN codes AS c ON c.code_type = ct.ct_id AND c.code = b.code AND c.modifier = b.modifier " .
-        "LEFT JOIN list_options AS lo ON lo.list_id = 'superbill' AND lo.option_id = c.superbill " .
-        "WHERE b.code_type != 'COPAY' AND b.activity = 1 AND b.fee != 0 AND " .
-        "fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59'";
-      // If a facility was specified.
-      if ($form_facility) {
-        $query .= " AND fe.facility_id = '$form_facility'";
-      }
-      $query .= " ORDER BY lo.title, b.code, fe.date, fe.id";
-      //
-      $res = sqlStatement($query);
-      while ($row = sqlFetchArray($res)) {
-        thisLineItem($row['pid'], $row['encounter'],
-          $row['title'], $row['code'] . ' ' . $row['code_text'],
-          substr($row['date'], 0, 10), $row['units'], $row['fee'], $row['invoice_refno']);
-      }
-      //
-      $query = "SELECT s.sale_date, s.fee, s.quantity, s.pid, s.encounter, " .
-        "d.name, fe.date, fe.facility_id, fe.invoice_refno " .
-        "FROM drug_sales AS s " .
-        "LEFT JOIN drugs AS d ON d.drug_id = s.drug_id " .
-        "JOIN form_encounter AS fe ON " .
-        "fe.pid = s.pid AND fe.encounter = s.encounter AND " .
-        "fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59' " .
-        "WHERE s.fee != 0";
-      // If a facility was specified.
-      if ($form_facility) {
-        $query .= " AND fe.facility_id = '$form_facility'";
-      }
-      $query .= " ORDER BY d.name, fe.date, fe.id";
-      //
-      $res = sqlStatement($query);
-      while ($row = sqlFetchArray($res)) {
-        thisLineItem($row['pid'], $row['encounter'], xl('Products'), $row['name'],
-          substr($row['date'], 0, 10), $row['quantity'], $row['fee'], $row['invoice_refno']);
-      }
+    $aItems = array();
+
+    $query = "SELECT b.fee, b.pid, b.encounter, b.code_type, b.code, b.units, " .
+      "b.code_text, fe.date, fe.facility_id, fe.invoice_refno, lo.title " .
+      "FROM billing AS b " .
+      "JOIN code_types AS ct ON ct.ct_key = b.code_type " .
+      "JOIN form_encounter AS fe ON fe.pid = b.pid AND fe.encounter = b.encounter " .
+      "LEFT JOIN codes AS c ON c.code_type = ct.ct_id AND c.code = b.code AND c.modifier = b.modifier " .
+      "LEFT JOIN list_options AS lo ON lo.list_id = 'superbill' AND lo.option_id = c.superbill " .
+      "WHERE b.code_type != 'COPAY' AND b.activity = 1 AND b.fee != 0 AND " .
+      "fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59'";
+    // If a facility was specified.
+    if ($form_facility) {
+      $query .= " AND fe.facility_id = '$form_facility'";
     }
-    else {
-      $query = "SELECT ar.invnumber, ar.transdate, " .
-        "invoice.description, invoice.qty, invoice.sellprice " .
-        "FROM ar, invoice WHERE " .
-        "ar.transdate >= '$from_date' AND ar.transdate <= '$to_date' " .
-        "AND invoice.trans_id = ar.id " .
-        "ORDER BY invoice.description, ar.transdate, ar.id";
-      $t_res = SLQuery($query);
-      if ($sl_err) die($sl_err);
-      for ($irow = 0; $irow < SLRowCount($t_res); ++$irow) {
-        $row = SLGetRow($t_res, $irow);
-        list($patient_id, $encounter_id) = explode(".", $row['invnumber']);
-        // If a facility was specified then skip invoices whose encounters
-        // do not indicate that facility.
-        if ($form_facility) {
-          $tmp = sqlQuery("SELECT count(*) AS count FROM form_encounter WHERE " .
-            "pid = '$patient_id' AND encounter = '$encounter_id' AND " .
-            "facility_id = '$form_facility'");
-          if (empty($tmp['count'])) continue;
-        }
-        thisLineItem($patient_id, $encounter_id, '', $row['description'],
-          $row['transdate'], $row['qty'], $row['sellprice'] * $row['qty']);
-      } // end for
-    } // end not $INTEGRATED_AR
+    $query .= " ORDER BY lo.title, b.code, fe.date, fe.id";
+    //
+    $res = sqlStatement($query);
+    while ($row = sqlFetchArray($res)) {
+      thisLineItem($row['pid'], $row['encounter'], $row['code_type'], $row['code'],
+        $row['title'], $row['code'] . ' ' . $row['code_text'],
+        substr($row['date'], 0, 10), $row['units'], $row['fee'], $row['invoice_refno']);
+    }
+    //
+    $query = "SELECT s.sale_date, s.fee, s.quantity, s.pid, s.encounter, " .
+      "s.drug_id, d.name, fe.date, fe.facility_id, fe.invoice_refno " .
+      "FROM drug_sales AS s " .
+      "LEFT JOIN drugs AS d ON d.drug_id = s.drug_id " .
+      "JOIN form_encounter AS fe ON " .
+      "fe.pid = s.pid AND fe.encounter = s.encounter AND " .
+      "fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59' " .
+      "WHERE s.fee != 0";
+    // If a facility was specified.
+    if ($form_facility) {
+      $query .= " AND fe.facility_id = '$form_facility'";
+    }
+    $query .= " ORDER BY d.name, fe.date, fe.id";
+    //
+    $res = sqlStatement($query);
+    while ($row = sqlFetchArray($res)) {
+      thisLineItem($row['pid'], $row['encounter'], 'PROD', $row['drug_id'],
+        xl('Products'), $row['name'], substr($row['date'], 0, 10), $row['quantity'],
+        $row['fee'], $row['invoice_refno']);
+    }
 
     if ($_POST['form_csvexport']) {
       if (! $_POST['form_details']) {
         echo '"' . display_desc($product) . '",';
         echo '"' . $productqty            . '",';
-        echo '"'; bucks($producttotal); echo '"' . "\n";
+        echo '"'; bucks($producttotal); echo '",';
+        echo '"'; bucks($prodadjtotal); echo '",';
+        echo '"'; bucks($prodpaytotal); echo '"';
+        echo "\n";
       }
     }
     else {
@@ -390,6 +522,12 @@ function doinvopen(ptid,encid) {
   <td class="dehead" align="right">
    <?php bucks($producttotal); ?>
   </td>
+  <td class="dehead" align="right">
+   <?php bucks($prodadjtotal); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($prodpaytotal); ?>
+  </td>
  </tr>
 
  <tr bgcolor="#ffdddd">
@@ -405,6 +543,12 @@ function doinvopen(ptid,encid) {
   <td class="dehead" align="right">
    <?php bucks($cattotal); ?>
   </td>
+  <td class="dehead" align="right">
+   <?php bucks($catadjtotal); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($catpaytotal); ?>
+  </td>
  </tr>
 
  <tr bgcolor="#dddddd">
@@ -417,12 +561,17 @@ function doinvopen(ptid,encid) {
   <td class="dehead" align="right">
    <?php bucks($grandtotal); ?>
   </td>
+  <td class="dehead" align="right">
+   <?php bucks($grandadjtotal); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($grandpaytotal); ?>
+  </td>
  </tr>
 
-<?
+<?php
     } // End not csv export
   }
-  if (!$INTEGRATED_AR) SLClose();
 
   if (! $_POST['form_csvexport']) {
 ?>
