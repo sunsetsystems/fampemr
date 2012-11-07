@@ -210,6 +210,7 @@ function isEncounterBilled($pid, $encounter) {
     "billing.billed FROM billing, code_types WHERE " .
     "billing.pid = '$pid' AND " .
     "billing.encounter = '$encounter' AND " .
+    "billing.activity = 1 AND " .
     "code_types.ct_key = billing.code_type AND " .
     "code_types.ct_fee = 1 " .
     "UNION " .
