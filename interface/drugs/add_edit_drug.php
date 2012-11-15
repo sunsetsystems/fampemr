@@ -136,6 +136,19 @@ function dispensable_changed() {
  return true;
 }
 
+function validate(f) {
+ var saving = f.form_save.clicked ? true : false;
+ f.form_save.clicked = false;
+ if (saving) {
+  if (f.form_name.value.search(/[^\s]/) < 0) {
+   alert('<?php echo xl('Product name is required'); ?>');
+   return false;
+  }
+ }
+ top.restoreSession();
+ return true;
+}
+
 </script>
 
 </head>
@@ -310,7 +323,8 @@ else {
 }
 ?>
 
-<form method='post' name='theform' action='add_edit_drug.php?drug=<?php echo $drug_id; ?>'>
+<form method='post' name='theform' action='add_edit_drug.php?drug=<?php echo $drug_id; ?>'
+ onsubmit='return validate(this);'>
 <center>
 
 <table border='0' width='100%'>
@@ -542,7 +556,8 @@ else {
 </table>
 
 <p>
-<input type='submit' name='form_save' value='<?php xl('Save','e'); ?>' />
+<input type='submit' name='form_save' value='<?php xl('Save','e'); ?>'
+ onclick='return this.clicked = true;' />
 
 <?php if (acl_check('admin', 'super')) { ?>
 &nbsp;
