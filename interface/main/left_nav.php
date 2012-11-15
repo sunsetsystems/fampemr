@@ -915,7 +915,6 @@ if (!empty($reg)) {
   <li><span><?php xl('Inventory','e') ?></span>
     <ul>
       <?php genMiscLink('RTop','adm','0',xl('Management'),'drugs/drug_inventory.php'); ?>
-      <?php genPopLink(xl('Destroyed'),'destroyed_drugs_report.php'); ?>
     </ul>
   </li>
 <?php } ?>
@@ -995,6 +994,7 @@ if (!empty($reg)) {
           <?php genPopLink(xl('Activity'),'inventory_activity.php'); ?>
           <?php genPopLink(xl('Transactions'),'inventory_transactions.php'); ?>
           <?php genPopLink(xl('Price List'),'inventory_templates.php'); ?>
+          <?php genPopLink(xl('Destroyed'),'destroyed_drugs_report.php'); ?>
         </ul>
       </li>
 <?php } ?>
