@@ -231,9 +231,9 @@ function facchanged() {
    echo " <tr class='detail' bgcolor='$bgcolor'>\n";
    echo "  <td onclick='dodclick($lastid)'>" .
     "<a href='' onclick='return false'>" .
-    htmlentities($row['name']) . "</a></td>\n";
+    htmlspecialchars($row['name']) . "</a></td>\n";
    echo "  <td>" . ($row['active'] ? xl('Yes') : xl('No')) . "</td>\n";
-   echo "  <td>" . htmlentities($row['ndc_number']) . "</td>\n";
+   echo "  <td>" . htmlspecialchars($row['ndc_number']) . "</td>\n";
    echo "  <td>" . 
 	generate_display_field(array('data_type'=>'1','list_id'=>'drug_form'), $row['form']) .
 	"</td>\n";
@@ -253,7 +253,7 @@ function facchanged() {
    echo "  <td colspan='7'>&nbsp;</td>\n";
   }
   if (!empty($row['inventory_id'])) {
-   $lot_number = htmlentities($row['lot_number']);
+   $lot_number = htmlspecialchars($row['lot_number']);
    echo "  <td onclick='doiclick($lastid," . $row['inventory_id'] . ")'>" .
     "<a href='' onclick='return false'>$lot_number</a></td>\n";
    echo "  <td>" . ($row['facid'] ? $row['facname'] : ('(' . xl('Unassigned') . ')')) . "</td>\n";

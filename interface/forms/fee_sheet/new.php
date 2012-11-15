@@ -1079,7 +1079,7 @@ while ($prow = sqlFetchArray($pres)) {
   echo ($i <= 1) ? " <tr>\n" : "";
   echo "  <td width='50%' align='center' nowrap>\n";
   echo "   <select style='width:96%' onchange='codeselect(this)'>\n";
-  echo "    <option value=''> " . $prow['title'] . "\n";
+  echo "    <option value=''> " . xl_list_label($prow['title']) . "\n";
   $res = sqlStatement("SELECT code_type, code, code_text,modifier FROM codes " .
     "WHERE superbill = '" . $prow['option_id'] . "' AND active = 1 " .
     "ORDER BY code_text");
