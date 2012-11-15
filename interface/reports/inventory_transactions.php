@@ -18,6 +18,7 @@ require_once("$srcdir/formdata.inc.php");
 //
 $ORDERHASH = array(
   'date' => 's.sale_date, s.sale_id',
+  'tran' => 's.trans_type, s.sale_date, s.sale_id',
   'prod' => 'd.name, s.sale_date, s.sale_id',
   'wh'   => 'warehouse, s.sale_date, s.sale_id',
   'who'  => 'plname, pfname, pmname, s.sale_date, s.sale_id',
@@ -239,7 +240,7 @@ function dosort(orderby) {
 <?php
 foreach (array(
   '0' => xl('All'),
-  '2' => xl('Purchase/Return'),
+  '2' => xl('Purchase/Receipt'),
   '1' => xl('Sale'),
   // '6' => xl('Distribution'),
   '4' => xl('Transfer'),
@@ -293,7 +294,9 @@ foreach (array(
    <?php xl('Date','e'); ?> </a>
   </td>
   <td class="dehead">
-   <?php xl('Transaction','e'); ?>
+   <a href="#" onclick="return dosort('tran')"
+   <?php if ($form_orderby == "tran") echo " style=\"color:#00cc00\""; ?>>
+   <?php xl('Transaction','e'); ?> </a>
   </td>
   <td class="dehead">
    <a href="#" onclick="return dosort('prod')"
@@ -361,7 +364,7 @@ if ($form_from_date) {
     "LEFT JOIN form_encounter AS fe ON fe.pid = s.pid AND fe.encounter = s.encounter " .
     "WHERE s.sale_date >= '$from_date' AND s.sale_date <= '$to_date' AND " .
     "( s.pid = 0 OR s.inventory_id != 0 ) ";
-  if ($form_trans_type == 2) { // purchase/return
+  if ($form_trans_type == 2) { // purchase/receipt
     // $query .= "AND s.pid = 0 AND s.distributor_id = 0 AND s.xfer_inventory_id = 0 AND s.trans_type != 5 ";
     $query .= "AND s.pid = 0 AND s.xfer_inventory_id = 0 AND s.trans_type != 5 ";
   }
