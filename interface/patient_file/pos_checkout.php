@@ -160,10 +160,16 @@ function receiptPaymentLine($paydate, $amount, $description='', $method='') {
 //
 function generate_receipt($patient_id, $encounter=0) {
   global $css_header, $details, $rapid_data_entry, $aAdjusts;
+  global $web_root, $webserver_root;
 
+  /*******************************************************************
   // Get details for what we guess is the primary facility.
   $frow = sqlQuery("SELECT * FROM facility " .
     "ORDER BY billing_location DESC, accepts_assignment DESC, id LIMIT 1");
+  *******************************************************************/
+  // Get details for the user's default facility.
+  $frow = sqlQuery("SELECT f.* FROM facility AS f, users AS u " .
+    "WHERE u.id = '" . $_SESSION["authUserID"] . "' AND f.id = u.facility_id");
 
   $patdata = getPatientData($patient_id, 'fname,mname,lname,pubpid,street,city,state,postal_code');
 
@@ -192,6 +198,14 @@ function generate_receipt($patient_id, $encounter=0) {
 <?php html_header_show(); ?>
 <link rel='stylesheet' href='<?php echo $css_header ?>' type='text/css'>
 <title><?php xl('Client Receipt','e'); ?></title>
+
+<style type="text/css">
+body, td {
+ font-family: sans-serif;
+ font-size: 10pt;
+}
+</style>
+
 <script type="text/javascript" src="../../library/dialog.js"></script>
 <script language="JavaScript">
 
@@ -229,9 +243,9 @@ function generate_receipt($patient_id, $encounter=0) {
   <td width='25%' align='left' valign='top'>
 <?php
   // TBD: Maybe make a global for this file name.
-  $receipt_logo_path = "$web_root/sites/" . $_SESSION['site_id'] . "/images/receipt_logo.png";
-  if (is_file($receipt_logo_path)) {
-    echo "<img src='$receipt_logo_path'>";
+  $ma_logo_path = "sites/" . $_SESSION['site_id'] . "/images/ma_logo.png";
+  if (is_file("$webserver_root/$ma_logo_path")) {
+    echo "<img src='$web_root/$ma_logo_path' />";
   }
   else {
     echo "&nbsp;";
@@ -290,19 +304,19 @@ function generate_receipt($patient_id, $encounter=0) {
   <td width='50%' align='right' valign='top'>
    <table>
     <tr>
-     <td><?php xl('Beginning Account Balance','e'); ?></td>
+     <td><?php xl('Beginning Account Balance','e'); ?>&nbsp;</td>
      <td align='right'><?php echo oeFormatMoney($head_begbal); ?></td>
     </tr>
     <tr>
-     <td><?php xl('Total Visit Charges','e'); ?></td>
+     <td><?php xl('Total Visit Charges','e'); ?>&nbsp;</td>
      <td align='right'><?php echo oeFormatMoney($head_charges); ?></td>
     </tr>
     <tr>
-     <td><?php xl('Payments','e'); ?></td>
+     <td><?php xl('Payments','e'); ?>&nbsp;</td>
      <td align='right'><?php echo oeFormatMoney($head_payments); ?></td>
     </tr>
     <tr>
-     <td><?php xl('Ending Account Balance','e'); ?></td>
+     <td><?php xl('Ending Account Balance','e'); ?>&nbsp;</td>
      <td align='right'><?php echo oeFormatMoney($head_endbal); ?></td>
     </tr>
    </table>
@@ -319,7 +333,8 @@ function generate_receipt($patient_id, $encounter=0) {
  </tr>
 
  <tr>
-  <td colspan='<?php echo empty($GLOBALS['gbl_checkout_line_adjustments']) ? 5 : 7; ?>'>
+  <td colspan='<?php echo empty($GLOBALS['gbl_checkout_line_adjustments']) ? 5 : 7; ?>'
+   style='border-top:1px solid black; padding-top:5pt;'>
     <b><?php echo xl('Charges'); ?></b>
   </td>
  </tr>
@@ -415,7 +430,7 @@ function generate_receipt($patient_id, $encounter=0) {
 
 <table cellpadding='2' width='95%'>
  <tr>
-  <td colspan='4'>
+  <td colspan='4' style='border-top:1px solid black; padding-top:5pt;'>
     <b><?php echo xl('Payments'); ?></b>
   </td>
  </tr>

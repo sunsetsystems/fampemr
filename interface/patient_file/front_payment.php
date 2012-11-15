@@ -520,13 +520,13 @@ function calctotal() {
   </td>
 <?php } ?>
   <td class="dehead" align="right">
-   <?php xl('Payment','e')?>
+   <?php xl('Payment','e')?>&nbsp;
   </td>
   <td class="dehead" align="right">
-   <?php xl('Pay Meth','e')?>
+   <?php xl('Pay Method','e')?>&nbsp;&nbsp;
   </td>
   <td class="dehead" align="right">
-   <?php xl('Ref No','e')?>
+   <?php xl('Ref No','e')?>&nbsp;&nbsp;&nbsp;
   </td>
  </tr>
 
@@ -607,12 +607,12 @@ function calctotal() {
 ?>
 
  <tr bgcolor="#cccccc">
-  <td class="dehead" colspan="<?php echo $GLOBALS['simplified_demographics'] ? 4 : 6; ?>">
+  <td class="dehead" colspan="<?php echo $GLOBALS['simplified_demographics'] ? 4 : 6; ?>" align='right'>
    <?php xl('Total Amount Paid','e')?>
   </td>
   <td class="dehead" align="right">
    <input type='text' name='form_paytotal' size='6' value=''
-    style='color:#00aa00' readonly />
+    style='color:#00aa00; background-color:transparent;' readonly />
   </td>
   <td class="dehead" colspan="2">
    &nbsp;
