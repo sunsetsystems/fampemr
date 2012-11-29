@@ -225,7 +225,9 @@
 
   // Post a payment, new style.
   //
-  function arPostPayment($patient_id, $encounter_id, $session_id, $amount, $code, $payer_type, $memo, $debug, $time='') {
+  function arPostPayment($patient_id, $encounter_id, $session_id, $amount,
+    $code, $payer_type, $memo, $debug, $time='', $date='')
+  {
     $codeonly = $code;
     $modifier = '';
     $tmp = strpos($code, ':');
@@ -234,9 +236,10 @@
       $modifier = substr($code, $tmp+1);
     }
     if (empty($time)) $time = date('Y-m-d H:i:s');
+    if (empty($date)) $date = substr($time, 0, 10);
     $query = "INSERT INTO ar_activity ( " .
-      "pid, encounter, code, modifier, payer_type, post_time, post_user, " .
-      "session_id, memo, pay_amount " .
+      "pid, encounter, code, modifier, payer_type, post_time, post_date, " .
+      "post_user, session_id, memo, pay_amount " .
       ") VALUES ( " .
       "'$patient_id', " .
       "'$encounter_id', " .
@@ -244,6 +247,7 @@
       "'$modifier', " .
       "'$payer_type', " .
       "'$time', " .
+      "'$date', " .
       "'" . $_SESSION['authUserID'] . "', " .
       "'$session_id', " .
       "'$memo', " .

@@ -497,3 +497,9 @@ UPDATE drug_sales SET trans_type = 2 WHERE trans_type = 1 AND pid = 0 AND quanti
 UPDATE drug_sales SET trans_type = 3 WHERE trans_type = 1 AND pid = 0;
 #EndIf
 
+#IfMissingColumn ar_activity post_date
+ALTER TABLE ar_activity
+  ADD post_date date DEFAULT NULL COMMENT 'Posting date if specified at payment time';
+UPDATE ar_activity SET post_date = post_time;
+#EndIf
+

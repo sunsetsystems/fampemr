@@ -69,7 +69,7 @@ function echoLine($enc, $billed, $date, $charges, $ptpaid, $inspaid, $duept) {
     echo "  <td class='detail' align='right'>" . bucks($duept) . "</td>\n";
   echo "  <td class='detail' align='right'><input type='text' name='$iname' " .
     "size='6' value='" . rawbucks($getfrompt) . "' onchange='calctotal()' " .
-    "onkeyup='calctotal()' /></td>\n";
+    "onkeyup='calctotal()' style='text-align:right' /></td>\n";
   echo "  <td class='detail' align='right'>" .
     generate_select_list('form_meth[' . $enc . ']', 'paymethod', '', '', '') .
     "</td>\n";
@@ -180,14 +180,21 @@ function calcTaxes($row, $amount) {
   return $total;
 }
 
-function postPayment($form_pid, $enc, $form_method, $form_source, $amount, $posting_date) {
+function postPayment($form_pid, $enc, $form_method, $form_source, $amount, $post_time, $post_date) {
   $thissrc = '';
   if ($form_method) {
     $thissrc .= $form_method;
     if ($form_source) $thissrc .= " $form_source";
   }
   $session_id = 0; // Is this OK?
-  arPostPayment($form_pid, $enc, $session_id, $amount, '', 0, $thissrc, 0, $posting_date);
+  arPostPayment($form_pid, $enc, $session_id, $amount, '', 0, $thissrc, 0, $post_time, $post_date);
+}
+
+function getListTitle($list, $option) {
+  $row = sqlQuery("SELECT title FROM list_options WHERE " .
+    "list_id = '$list' AND option_id = '$option'");
+  if (empty($row['title'])) return $option;
+  return xl_list_label($row['title']);
 }
 
 $now = time();
@@ -208,7 +215,7 @@ if ($_POST['form_save_pr'] || $_POST['form_save_op'] || $_POST['form_save_co'] |
   $form_pid = $_POST['form_pid'];
 
   // Get the posting date from the form as yyyy-mm-dd.
-  $posting_date = $timestamp;
+  $posting_date = substr($timestamp, 0, 10);
   if (preg_match("/(\d\d\d\d)\D*(\d\d)\D*(\d\d)/", $_POST['form_posting_date'], $matches)) {
     $posting_date = $matches[1] . '-' . $matches[2] . '-' . $matches[3];
   }
@@ -222,7 +229,7 @@ if ($_POST['form_save_pr'] || $_POST['form_save_op'] || $_POST['form_save_co'] |
       if ($amount = 0 + $payment) {
         if (!$enc) $enc = todaysEncounter($form_pid);
         postPayment($form_pid, $enc, $form_method, $form_source, $amount,
-          $posting_date);
+          $timestamp, $posting_date);
         frontPayment($form_pid, $enc, $form_method, $form_source,
           $billed ? 0 : $amount, $billed ? $amount : 0);
       }
@@ -239,38 +246,30 @@ if ($_POST['form_save_pr'] || $_REQUEST['receipt']) {
     $timestamp = decorateString('....-..-.. ..:..:..', $_GET['time']);
   }
 
-  // Get details for what we guess is the primary facility.
-  $frow = sqlQuery("SELECT * FROM facility " .
-    "ORDER BY billing_location DESC, accepts_assignment DESC, id LIMIT 1");
-
   // Get the patient's name and chart number.
   $patdata = getPatientData($form_pid, 'fname,mname,lname,pubpid');
 
   // Re-fetch payment info.
   $payrow = sqlQuery("SELECT " .
-    "SUM(amount1) AS amount1, " .
-    "SUM(amount2) AS amount2, " .
-    "MAX(method) AS method, " .
-    "MAX(source) AS source, " .
-    "MAX(dtime) AS dtime, " .
-    // "MAX(user) AS user " .
     "MAX(user) AS user, " .
     "MAX(encounter) as encounter ".
     "FROM payments WHERE " .
     "pid = '$form_pid' AND dtime = '$timestamp'");
 
+  $pres = sqlStatement("SELECT " .
+    "p.amount1, p.amount2, p.method, p.source, p.user, p.encounter, ".
+    "fe.date " .
+    "FROM payments AS p, form_encounter AS fe WHERE " .
+    "p.pid = '$form_pid' AND p.dtime = '$timestamp' AND " .
+    "fe.pid = p.pid AND fe.encounter = p.encounter " .
+    "ORDER BY fe.date, p.encounter");
+
   // Create key for deleting, just in case.
   $payment_key = $form_pid . '.' . preg_replace('/[^0-9]/', '', $timestamp);
 
-  // get facility from encounter
-  $tmprow = sqlQuery(sprintf("
-    SELECT facility_id
-    FROM form_encounter
-    WHERE encounter = '%s'",
-    $payrow['encounter']
-    ));
-  $frow = sqlQuery(sprintf("SELECT * FROM facility " .
-    " WHERE id = '%s'",$tmprow['facility_id']));
+  // Get details for the user's default facility.
+  $frow = sqlQuery("SELECT f.* FROM facility AS f, users AS u " .
+    "WHERE u.id = '" . $_SESSION["authUserID"] . "' AND f.id = u.facility_id");
 
   ////////////////////////////////////////////////////////////////////
   // Begin receipt printing.                                        //
@@ -344,26 +343,52 @@ if ($_POST['form_save_pr'] || $_REQUEST['receipt']) {
        $patdata['lname'] . " (" . $patdata['pubpid'] . ")" ?></td>
  </tr>
  <tr>
-  <td><?php xl('Payment Method','e'); ?>:</td>
-  <td><?php echo $payrow['method'] ?></td>
- </tr>
- <tr>
-  <td><?php xl('Check/Ref Number','e'); ?>:</td>
-  <td><?php echo $payrow['source'] ?></td>
- </tr>
- <tr>
-  <td><?php xl('Amount for This Visit','e'); ?>:</td>
-  <td><?php echo oeFormatMoney($payrow['amount1']) ?></td>
- </tr>
- <tr>
-  <td><?php xl('Amount for Past Balance','e'); ?>:</td>
-  <td><?php echo oeFormatMoney($payrow['amount2']) ?></td>
- </tr>
- <tr>
   <td><?php xl('Received By','e'); ?>:</td>
   <td><?php echo $payrow['user'] ?></td>
  </tr>
 </table>
+
+<!-- Table of payment lines starts here. -->
+
+<table cellpadding='2'>
+ <tr>
+  <td colspan='5'> <!-- style='border-top:1px solid black; padding-top:5pt;' -->
+    <b><?php echo xl('Payments'); ?></b>
+  </td>
+ </tr>
+
+ <tr>
+  <td><b><?php xl('Date of Service','e'); ?></b>&nbsp;</td>
+  <td><b><?php xl('Payment Method','e'); ?></b>&nbsp;</td>
+  <td><b><?php xl('Ref No','e'); ?></b>&nbsp;</td>
+  <td align='right'><b><?php xl('Amount for This Visit','e'); ?></b></td>
+  <td align='right'>&nbsp;<b><?php xl('Amount for Past Balance','e'); ?></b></td>
+ </tr>
+
+<?php
+  $payments1 = 0;
+  $payments2 = 0;
+  while ($prow = sqlFetchArray($pres)) {
+    $payments1 += sprintf('%01.2f', $prow['amount1']);
+    $payments2 += sprintf('%01.2f', $prow['amount2']);
+    echo " <tr>\n";
+    echo "  <td>" . oeFormatShortDate(substr($prow['date'], 0, 10)) . "</td>\n";
+    echo "  <td>" . htmlspecialchars(getListTitle('paymethod', $prow['method'])) . "</td>\n";
+    echo "  <td>" . $prow['source'] . "</td>\n";
+    echo "  <td align='right'>" . oeFormatMoney($prow['amount1']) . "</td>\n";
+    echo "  <td align='right'>" . oeFormatMoney($prow['amount2']) . "</td>\n";
+    echo " </tr>\n";
+  }
+?>
+ <tr>
+  <td colspan='2'>&nbsp;</td>
+  <td><b><?php xl('Total Payments','e'); ?></b></td>
+  <td align='right'><?php echo oeFormatMoney($payments1, true) ?></td>
+  <td align='right'><?php echo oeFormatMoney($payments2, true) ?></td>
+ </tr>
+</table>
+
+<!-- End of payment lines. -->
 
 <div id='hideonprint'>
 <p>
@@ -523,7 +548,7 @@ function calctotal() {
    <?php xl('Payment','e')?>&nbsp;
   </td>
   <td class="dehead" align="right">
-   <?php xl('Pay Method','e')?>&nbsp;&nbsp;
+   <?php xl('Payment Method','e')?>&nbsp;&nbsp;
   </td>
   <td class="dehead" align="right">
    <?php xl('Ref No','e')?>&nbsp;&nbsp;&nbsp;
@@ -612,7 +637,7 @@ function calctotal() {
   </td>
   <td class="dehead" align="right">
    <input type='text' name='form_paytotal' size='6' value=''
-    style='color:#00aa00; background-color:transparent;' readonly />
+    style='color:#00aa00; background-color:transparent; text-align:right;' readonly />
   </td>
   <td class="dehead" colspan="2">
    &nbsp;
