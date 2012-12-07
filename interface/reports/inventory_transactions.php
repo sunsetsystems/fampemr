@@ -68,7 +68,7 @@ function thisLineItem($row, $xfer=false) {
     $ttype = xl('Transfer');
   }
   else if ($row['trans_type'] != 5) {
-    $ttype = xl('Purchase');
+    $ttype = xl('Purchase/Receipt');
   }
   else {
     $ttype = xl('Adjustment');

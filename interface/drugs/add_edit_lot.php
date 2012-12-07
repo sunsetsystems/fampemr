@@ -391,9 +391,9 @@ generate_form_field(array('data_type' => 14, 'field_id' => 'vendor_id',
 <?php
 foreach (array(
   '0' => xl('None'),
-  '2' => xl('Purchase'),
+  '2' => xl('Purchase/Receipt'),
   '3' => xl('Return'),
-  '6' => xl('Distribution'),
+  // '6' => xl('Distribution'),
   '4' => xl('Transfer'),
   '5' => xl('Adjustment'),
 ) as $key => $value)

@@ -86,7 +86,7 @@ function updateInvoiceRefNumber() {
   return $irnumber;
 }
 
-// Output HTML for an invoice line item.
+// Output HTML for a receipt line item.
 //
 // function receiptDetailLine($svcdate, $description, $amount, $quantity) {
 function receiptDetailLine($code_type, $code, $description, $quantity, $charge, &$aTotals='') {
@@ -131,7 +131,7 @@ function receiptDetailLine($code_type, $code, $description, $quantity, $charge, 
   echo " <tr>\n";
   echo "  <td>$code</td>\n";
   echo "  <td>$description</td>\n";
-  echo "  <td align='right'>$quantity</td>\n";
+  echo "  <td align='center'>$quantity</td>\n";
   echo "  <td align='right'>" . oeFormatMoney($price,false,true) . "</td>\n";
   if (!empty($GLOBALS['gbl_checkout_line_adjustments'])) {
     echo "  <td align='right'>" . oeFormatMoney($charge,false,true) . "</td>\n";
@@ -141,15 +141,20 @@ function receiptDetailLine($code_type, $code, $description, $quantity, $charge, 
   echo " </tr>\n";
 }
 
-// Output HTML for an invoice payment.
+// Output HTML for a receipt payment line.
 //
 function receiptPaymentLine($paydate, $amount, $description='', $method='') {
-  $amount = sprintf('%01.2f', 0 - $amount); // make it negative
+  $amount = sprintf('%01.2f', $amount); // make it negative
   echo " <tr>\n";
+  echo "  <td>&nbsp;</td>\n";
   echo "  <td>" . oeFormatShortDate($paydate) . "</td>\n";
-  echo "  <td>$method</td>\n";
+  echo "  <td align='center'>$method</td>\n";
+  if ($GLOBALS['gbl_checkout_line_adjustments']) {
+    echo "  <td>&nbsp;</td>\n";
+  }
   echo "  <td>" . xl('Payment') . " $description</td>\n";
-  echo "  <td align='right'>" . oeFormatMoney($amount) . "</td>\n";
+  echo "  <td colspan='" . ($GLOBALS['gbl_checkout_line_adjustments'] ? 2 : 1) .
+       "' align='right'>" . oeFormatMoney($amount) . "</td>\n";
   echo " </tr>\n";
 }
 
@@ -162,24 +167,12 @@ function generate_receipt($patient_id, $encounter=0) {
   global $css_header, $details, $rapid_data_entry, $aAdjusts;
   global $web_root, $webserver_root;
 
-  /*******************************************************************
-  // Get details for what we guess is the primary facility.
-  $frow = sqlQuery("SELECT * FROM facility " .
-    "ORDER BY billing_location DESC, accepts_assignment DESC, id LIMIT 1");
-  *******************************************************************/
-  // Get details for the user's default facility.
-  $frow = sqlQuery("SELECT f.* FROM facility AS f, users AS u " .
-    "WHERE u.id = '" . $_SESSION["authUserID"] . "' AND f.id = u.facility_id");
-
-  $patdata = getPatientData($patient_id, 'fname,mname,lname,pubpid,street,city,state,postal_code');
-
   // Get the most recent invoice data or that for the specified encounter.
-  //
   if ($encounter) {
-    $ferow = sqlQuery("SELECT id, date, encounter FROM form_encounter " .
+    $ferow = sqlQuery("SELECT id, date, encounter, facility_id FROM form_encounter " .
       "WHERE pid = '$patient_id' AND encounter = '$encounter'");
   } else {
-    $ferow = sqlQuery("SELECT id, date, encounter FROM form_encounter " .
+    $ferow = sqlQuery("SELECT id, date, encounter, facility_id FROM form_encounter " .
       "WHERE pid = '$patient_id' " .
       "ORDER BY id DESC LIMIT 1");
   }
@@ -187,6 +180,12 @@ function generate_receipt($patient_id, $encounter=0) {
   $trans_id = $ferow['id'];
   $encounter = $ferow['encounter'];
   $svcdate = substr($ferow['date'], 0, 10);
+
+  // Get details for the visit's facility.
+  $frow = sqlQuery("SELECT f.* FROM facility AS f " .
+    "WHERE f.id = '" . $ferow['facility_id'] . "'");
+
+  $patdata = getPatientData($patient_id, 'fname,mname,lname,pubpid,street,city,state,postal_code');
 
   // Get invoice reference number.
   $encrow = sqlQuery("SELECT invoice_refno FROM form_encounter WHERE " .
@@ -304,19 +303,19 @@ body, td {
   <td width='50%' align='right' valign='top'>
    <table>
     <tr>
-     <td><?php xl('Beginning Account Balance','e'); ?>&nbsp;</td>
+     <td><?php xl('Beginning Account Balance','e'); ?>&nbsp;&nbsp;&nbsp;&nbsp;</td>
      <td align='right'><?php echo oeFormatMoney($head_begbal); ?></td>
     </tr>
     <tr>
-     <td><?php xl('Total Visit Charges','e'); ?>&nbsp;</td>
+     <td><?php xl('Total Visit Charges','e'); ?>&nbsp;&nbsp;&nbsp;&nbsp;</td>
      <td align='right'><?php echo oeFormatMoney($head_charges); ?></td>
     </tr>
     <tr>
-     <td><?php xl('Payments','e'); ?>&nbsp;</td>
+     <td><?php xl('Payments','e'); ?>&nbsp;&nbsp;&nbsp;&nbsp;</td>
      <td align='right'><?php echo oeFormatMoney($head_payments); ?></td>
     </tr>
     <tr>
-     <td><?php xl('Ending Account Balance','e'); ?>&nbsp;</td>
+     <td><?php xl('Ending Account Balance','e'); ?>&nbsp;&nbsp;&nbsp;&nbsp;</td>
      <td align='right'><?php echo oeFormatMoney($head_endbal); ?></td>
     </tr>
    </table>
@@ -334,7 +333,7 @@ body, td {
 
  <tr>
   <td colspan='<?php echo empty($GLOBALS['gbl_checkout_line_adjustments']) ? 5 : 7; ?>'
-   style='border-top:1px solid black; padding-top:5pt;'>
+   style='padding-top:5pt;'>
     <b><?php echo xl('Charges'); ?></b>
   </td>
  </tr>
@@ -342,7 +341,7 @@ body, td {
  <tr>
   <td><b><?php xl('Code','e'); ?></b></td>
   <td><b><?php xl('Description','e'); ?></b></td>
-  <td align='right'><b><?php echo $details ? xl('Qty'  ) : '&nbsp;'; ?></b></td>
+  <td align='center'><b><?php echo $details ? xl('Qty'  ) : '&nbsp;'; ?></b></td>
   <td align='right'><b><?php echo $details ? xl('Price') : '&nbsp;'; ?></b></td>
 <?php if (!empty($GLOBALS['gbl_checkout_line_adjustments'])) { ?>
   <td align='right'><b><?php xl('Charge','e'); ?></b></td>
@@ -351,6 +350,13 @@ body, td {
   <td align='right'><b><?php xl('Total','e'); ?></b></td>
  </tr>
 <?php } // end if details ?>
+
+ <tr>
+  <td colspan='<?php echo empty($GLOBALS['gbl_checkout_line_adjustments']) ? 5 : 7; ?>'
+   style='border-top:1px solid black; font-size:1px; padding:0;'>
+    &nbsp;
+  </td>
+ </tr>
 
 <?php
   // Create array aAdjusts from ar_activity rows for $inv_encounter.
@@ -393,12 +399,21 @@ body, td {
     receiptDetailLine('', xl('Adjustment'), $payer . ' ' . $arow['memo'], 1,
       0 - $arow['adj_amount'], $aTotals);
   }
+?>
 
+ <tr>
+  <td colspan='<?php echo empty($GLOBALS['gbl_checkout_line_adjustments']) ? 5 : 7; ?>'
+   style='border-top:1px solid black; font-size:1px; padding:0;'>
+    &nbsp;
+  </td>
+ </tr>
+
+<?php
   // Sub-Total line with totals of all numeric columns.
   if ($details) {
     echo " <tr>\n";
     echo "  <td colspan='2' align='right'><b>" . xl('Sub-Total') . "</b></td>\n";
-    echo "  <td align='right'>" . $aTotals[0] . "</td>\n";
+    echo "  <td align='center'>" . $aTotals[0] . "</td>\n";
     echo "  <td align='right'>" . oeFormatMoney($aTotals[1]) . "</td>\n";
     if (!empty($GLOBALS['gbl_checkout_line_adjustments'])) {
       echo "  <td align='right'>" . oeFormatMoney($aTotals[2]) . "</td>\n";
@@ -421,25 +436,38 @@ body, td {
   // Total Charges line.
   echo " <tr>\n";
   echo "  <td colspan='" . (empty($GLOBALS['gbl_checkout_line_adjustments']) ? 2 : 4) . "'>&nbsp;</td>\n";
-  echo "  <td colspan='2'><b>" . xl('Total Charges') . "</b></td>\n";
+  echo "  <td colspan='2' align='right'><b>" . xl('Total Charges') . "</b></td>\n";
   echo "  <td align='right'>" . oeFormatMoney($aTotals[4]) . "</td>\n";
   echo " </tr>\n";
 ?>
 
+<!--
 </table>
-
 <table cellpadding='2' width='95%'>
+-->
+
  <tr>
-  <td colspan='4' style='border-top:1px solid black; padding-top:5pt;'>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 7 : 5; ?>' style='padding-top:5pt;'>
     <b><?php echo xl('Payments'); ?></b>
   </td>
  </tr>
 
  <tr>
+  <td>&nbsp;</td>
   <td><b><?php xl('Date of Service','e'); ?></b></td>
-  <td><b><?php xl('Payment Method','e'); ?></b></td>
+  <td align='center'><b><?php xl('Payment Method','e'); ?></b></td>
+<?php if ($GLOBALS['gbl_checkout_line_adjustments']) { ?>
+  <td>&nbsp;</td>
+<?php } ?>
   <td><b><?php xl('Ref No','e'); ?></b></td>
-  <td align='right'><b><?php xl('Amount','e'); ?></b></td>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 2 : 1; ?>' align='right'><b><?php xl('Amount','e'); ?></b></td>
+ </tr>
+
+ <tr>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 7 : 5; ?>'
+   style='border-top:1px solid black; font-size:1px; padding:0;'>
+    &nbsp;
+  </td>
  </tr>
 
 <?php
@@ -471,18 +499,31 @@ body, td {
       $payer . ' ' . $inrow['reference'], $inrow['memo']);
   }
 ?>
+
  <tr>
-  <td colspan='2'>&nbsp;</td>
-  <td><b><?php xl('Total Payments','e'); ?></b></td>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 7 : 5; ?>'
+   style='border-top:1px solid black; font-size:1px; padding:0;'>
+    &nbsp;
+  </td>
+ </tr>
+
+ <tr>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 4 : 2; ?>'>&nbsp;</td>
+  <td colspan='2' align='right'><b><?php xl('Total Payments','e'); ?></b></td>
   <td align='right'><?php echo oeFormatMoney($payments, true) ?></td>
  </tr>
+
 </table>
 </center>
 
 <p>
 <?php
   // The user-customizable note.
-  echo htmlspecialchars($GLOBALS['gbl_checkout_receipt_note']);
+  if (!empty($GLOBALS['gbl_checkout_receipt_note'])) {
+    echo str_repeat('*', 80) . '<br />';
+    echo '&nbsp;&nbsp;' . htmlspecialchars($GLOBALS['gbl_checkout_receipt_note']) . '<br />';
+    echo str_repeat('*', 80) . '<br />';
+  }
 ?>
 </p>
 
@@ -534,16 +575,20 @@ function write_form_headers() {
   <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 7 : 4; ?>' align='center'>
    <b><?php xl('Patient Checkout for ','e'); ?><?php echo $patdata['fname'] . " " .
    $patdata['lname'] . " (" . $patdata['pubpid'] . ")" ?></b>
-   <br />
+   <br />&nbsp;
+   <p>
 <?php
   $prvbal = get_patient_balance($patient_id, $inv_encounter);
-  echo xl('Previous Balance') . ' ' . oeFormatMoney($prvbal);
+  echo xl('Previous Balance') . '&nbsp;&nbsp;&nbsp;&nbsp;';
+  echo "<input type='text' value='" . oeFormatMoney($prvbal) . "' size='6' ";
+  echo "style='text-align:right;background-color:transparent' readonly />\n";
   if ($prvbal > 0) {
     echo "&nbsp;<input type='button' value='" . xl('Pay Previous Balance') .
       "' onclick='payprevious()' />\n";
   }
 ?>
    <br />&nbsp;
+   </p>
   </td>
  </tr>
 
@@ -563,7 +608,7 @@ function write_form_headers() {
 <?php } else { ?>
   <td align='right'><b><?php xl('Price','e'); ?></b></td>
   <td align='right'><b><?php xl('Charge','e'); ?></b></td>
-  <td align='right'><b><?php xl('Adjust','e'); ?></b></td>
+  <td align='right'><b><?php xl('Adjustment','e'); ?></b></td>
   <td align='right'><b><?php xl('Total','e'); ?></b></td>
 <?php } ?>
  </tr>
@@ -665,10 +710,17 @@ function write_old_payment_line($pay_type, $date, $method, $reference, $amount) 
   write_form_headers();
   $amount = sprintf("%01.2f", $amount);
   echo " <tr>\n";
+  if ($GLOBALS['gbl_checkout_line_adjustments']) {
+    echo "  <td>&nbsp;</td>\n";
+  }
   echo "  <td>" . htmlspecialchars($pay_type ) . "</td>\n";
-  echo "  <td>" . htmlspecialchars($method   ) . "</td>\n";
+  echo "  <td" .
+       ($GLOBALS['gbl_checkout_line_adjustments'] ? " colspan='2'" : "") .
+       ">" . htmlspecialchars($method) . "</td>\n";
   echo "  <td>" . htmlspecialchars($reference) . "</td>\n";
-  echo "  <td align='right'><input type='text' name='oldpay[$lino][amount]' " .
+  echo "  <td align='right'" .
+       ($GLOBALS['gbl_checkout_line_adjustments'] ? " colspan='2'" : "") .
+       "><input type='text' name='oldpay[$lino][amount]' " .
        "value='$amount' size='6' maxlength='8'";
   echo " style='text-align:right;background-color:transparent' readonly";
   echo "></td>\n";
@@ -676,20 +728,16 @@ function write_old_payment_line($pay_type, $date, $method, $reference, $amount) 
   ++$lino;
 }
 
-// Array of HTML for the 4 cells of an input payment row.
+// Array of HTML for the 4 or 5 cells of an input payment row.
 // "%d" will be replaced by a payment line number on the client side.
 //
 $aCellHTML = array();
+if ($GLOBALS['gbl_checkout_line_adjustments']) {
+  $aCellHTML[] = "&nbsp;";
+}
 $aCellHTML[] = htmlspecialchars(xl('New Payment'));
 $aCellHTML[] = strtr(generate_select_list('payment[%d][method]', 'paymethod', '', '', ''), array("\n" => ""));
 $aCellHTML[] = "<input type='text' name='payment[%d][refno]' size='10' />";
-/*********************************************************************
-if ($GLOBALS['gbl_checkout_line_adjustments']) {
-  $aCellHTML[] = "&nbsp;";
-  $aCellHTML[] = "&nbsp;";
-  $aCellHTML[] = "&nbsp;";
-}
-*********************************************************************/
 $aCellHTML[] = "<input type='text' name='payment[%d][amount]' size='6' style='text-align:right' onkeyup='setComputedValues()' />";
 
 // Create the taxes array.  Key is tax id, value is
@@ -1158,7 +1206,10 @@ while ($urow = sqlFetchArray($ures)) {
 <?php
 foreach ($aCellHTML as $ix => $html) {
   echo "    var html = \"$html\";\n";
-  echo "    cell = row.insertCell($ix);\n";
+  echo "    cell = row.insertCell(row.cells.length);\n";
+  if ($GLOBALS['gbl_checkout_line_adjustments']) {
+    if ($ix == 2 || $ix == 4) echo "    cell.colSpan = 2;\n";
+  }
   echo "    cell.innerHTML = html.replace(/%d/, paylino);\n";
 }
 ?>
@@ -1180,7 +1231,10 @@ foreach ($aCellHTML as $ix => $html) {
 <center>
 
 <p>
+<!--
 <table cellspacing='5' width='100%'>
+-->
+<table cellspacing='5' id='paytable' width='85%'>
 <?php
 $inv_encounter = '';
 $inv_date      = '';
@@ -1310,12 +1364,15 @@ else {
 }
 echo " </tr>\n";
 ?>
-</table>
 
+<!--
+</table>
 <table cellspacing='5' id='paytable' width='100%'>
+-->
 
  <tr>
-  <td colspan='4' style='border-top:1px solid black; padding-top:5pt;'>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 7 : 4; ?>'
+   style='border-top:1px solid black; padding-top:5pt;'>
    <b><?php xl('Payments','e'); ?></b>
   </td>
  </tr>
@@ -1323,10 +1380,19 @@ echo " </tr>\n";
 <?php
 // Start new section for payments.
 echo "  <tr>\n";
-echo "   <td width='30%'><b>" . xl('Type') . "</b></td>\n";
-echo "   <td width='30%'><b>" . xl('Payment Method') . "</b></td>\n";
-echo "   <td width='30%'><b>" . xl('Reference') . "</b></td>\n";
-echo "   <td width='10%' align='right' nowrap><b>" . xl('Payment Amount') . "</b></td>\n";
+if ($GLOBALS['gbl_checkout_line_adjustments']) {
+  echo "   <td>&nbsp;</td>\n";
+  echo "   <td><b>" . xl('Type') . "</b></td>\n";
+  echo "   <td colspan='2'><b>" . xl('Payment Method') . "</b></td>\n";
+  echo "   <td><b>" . xl('Reference') . "</b></td>\n";
+  echo "   <td colspan='2' align='right' nowrap><b>" . xl('Payment Amount') . "</b></td>\n";
+}
+else {
+  echo "   <td><b>" . xl('Type') . "</b></td>\n";
+  echo "   <td><b>" . xl('Payment Method') . "</b></td>\n";
+  echo "   <td><b>" . xl('Reference') . "</b></td>\n";
+  echo "   <td align='right'><b>" . xl('Payment Amount') . "</b></td>\n";
+}
 echo "  </tr>\n";
 
 $lino = 0;
@@ -1371,9 +1437,15 @@ while ($arow = sqlFetchArray($ares)) {
 
 // Line for total payments.
 echo " <tr id='totalpay'>\n";
+if ($GLOBALS['gbl_checkout_line_adjustments']) {
+  echo "  <td>&nbsp;</td>\n";
+}
 echo "  <td><a href='#' onclick='return addPayLine()'>[" . xl('Add Row') . "]</a></td>\n";
-echo "  <td colspan='2' align='right'><b>" . xl('Total Payments This Visit') . "</b></td>\n";
-echo "  <td align='right'><input type='text' name='form_totalpay' " .
+echo "  <td colspan='" . ($GLOBALS['gbl_checkout_line_adjustments'] ? "3" : "2") .
+     "' align='right'><b>" . xl('Total Payments This Visit') . "</b></td>\n";
+echo "  <td align='right'" .
+     ($GLOBALS['gbl_checkout_line_adjustments'] ? " colspan='2'" : "") .
+     "><input type='text' name='form_totalpay' " .
      "value='$amount' size='6' maxlength='8' " .
      "style='text-align:right;background-color:transparent' readonly";
 echo "></td>\n";
@@ -1381,11 +1453,14 @@ echo " </tr>\n";
 
 // Line for Difference.
 echo "  <tr>\n";
-echo "   <td colspan='4' style='border-top:1px solid black; font-size:1pt; padding:0px;'>&nbsp;</td>\n";
+echo "   <td colspan='" . ($GLOBALS['gbl_checkout_line_adjustments'] ? 7 : 4) .
+     "' style='border-top:1px solid black; font-size:1pt; padding:0px;'>&nbsp;</td>\n";
 echo "  </tr>\n";
 echo " <tr>\n";
-echo "  <td colspan='3' align='right'><b>" . xl('Difference') . "</b></td>\n";
-echo "  <td align='right'><input type='text' name='form_difference' " .
+echo "  <td colspan='" . ($GLOBALS['gbl_checkout_line_adjustments'] ? 5 : 3) .
+     "' align='right'><b>" . xl('Difference') . "</b></td>\n";
+echo "  <td colspan='" . ($GLOBALS['gbl_checkout_line_adjustments'] ? 2 : 1) .
+     "' align='right'><input type='text' name='form_difference' " .
      "value='' size='6' maxlength='8' " .
      "style='text-align:right;background-color:transparent' readonly";
 echo "></td>\n";
@@ -1400,10 +1475,12 @@ if ($inv_encounter) {
 
 // Line for Discount.
 echo " <tr>\n";
-echo "  <td colspan='3' align='right'>";
+echo "  <td colspan='" . ($GLOBALS['gbl_checkout_line_adjustments'] ? 5 : 3) .
+     "' align='right'>";
 echo "<a href='#' onclick='return computeDiscount()'>[" . xl('Compute') ."]</a> <b>";
 echo xl('Discount/Adjustment') . "</b></td>\n";
-echo "  <td align='right'><input type='text' name='form_discount' " .
+echo "  <td colspan='" . ($GLOBALS['gbl_checkout_line_adjustments'] ? 2 : 1) .
+     "' align='right'><input type='text' name='form_discount' " .
      "value='' size='6' maxlength='8' onkeyup='billingChanged()' " .
      "style='text-align:right'";
 echo "></td>\n";
@@ -1411,8 +1488,10 @@ echo " </tr>\n";
 
 // Line for Balance Due
 echo " <tr>\n";
-echo "  <td colspan='3' align='right'><b>" . xl('Balance Due') . "</b></td>\n";
-echo "  <td align='right'><input type='text' name='form_balancedue' " .
+echo "  <td colspan='" . ($GLOBALS['gbl_checkout_line_adjustments'] ? 5 : 3) .
+     "' align='right'><b>" . xl('Balance Due') . "</b></td>\n";
+echo "  <td colspan='" . ($GLOBALS['gbl_checkout_line_adjustments'] ? 2 : 1) .
+     "' align='right'><input type='text' name='form_balancedue' " .
      "value='' size='6' maxlength='8' " .
      "style='text-align:right;background-color:transparent' readonly";
 echo "></td>\n";
@@ -1420,10 +1499,10 @@ echo " </tr>\n";
 ?>
 
  <tr>
-  <td colspan='3' align='right'>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 5 : 3; ?>' align='right'>
    <b><?php xl('Posting Date','e'); ?></b>
   </td>
-  <td align='right'>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 2 : 1; ?>' align='right'>
    <input type='text' size='10' name='form_date' id='form_date'
     value='<?php echo $inv_date ?>'
     title='yyyy-mm-dd date of service'
@@ -1441,10 +1520,10 @@ $irnumber = getInvoiceRefNumber();
 if (!empty($irnumber)) {
 ?>
  <tr>
-  <td colspan='3' align='right'>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 5 : 3; ?>' align='right'>
    <b><?php xl('Tentative Invoice Ref No','e'); ?></b>
   </td>
-  <td align='right'>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 2 : 1; ?>' align='right'>
    <?php echo $irnumber; ?>
   </td>
  </tr>
@@ -1454,10 +1533,10 @@ if (!empty($irnumber)) {
 else if (!empty($GLOBALS['gbl_mask_invoice_number'])) {
 ?>
  <tr>
-  <td colspan='3' align='right'>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 5 : 3; ?>' align='right'>
    <b><?php xl('Invoice Reference Number','e'); ?></b>
   </td>
-  <td align='right'>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 2 : 1; ?>' align='right'>
    <input type='text' name='form_irnumber' size='10' value=''
     onkeyup='maskkeyup(this,"<?php echo addslashes($GLOBALS['gbl_mask_invoice_number']); ?>")'
     onblur='maskblur(this,"<?php echo addslashes($GLOBALS['gbl_mask_invoice_number']); ?>")'
@@ -1469,7 +1548,7 @@ else if (!empty($GLOBALS['gbl_mask_invoice_number'])) {
 ?>
 
  <tr>
-  <td colspan='4' align='center'>
+  <td colspan='<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 7 : 4; ?>' align='center'>
    &nbsp;<br>
    <input type='submit' name='form_save' value='<?php xl('Save','e'); ?>'
 <?php if ($rapid_data_entry) echo "    style='background-color:#cc0000';color:#ffffff'"; ?>

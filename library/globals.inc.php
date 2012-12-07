@@ -400,7 +400,7 @@ $GLOBALS_METADATA = array(
     ),
 
     'gbl_min_max_months' => array(
-      xl('Min/max Inventory as Months'),
+      xl('Min/Max Inventory as Months'),
       'bool',                           // data type
       '0',                              // default = false
       xl('Min/max inventory is expressed as months of supply instead of units')

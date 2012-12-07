@@ -72,7 +72,7 @@ function echoLine($enc, $billed, $date, $charges, $ptpaid, $inspaid, $duept) {
     "onkeyup='calctotal()' style='text-align:right' /></td>\n";
   echo "  <td class='detail' align='right'>" .
     generate_select_list('form_meth[' . $enc . ']', 'paymethod', '', '', '') .
-    "</td>\n";
+    "&nbsp;&nbsp;</td>\n";
   echo "  <td class='detail' align='right'>" .
     "<input type='text' name='form_src[" . $enc . "]' size='6' />" .
     "<input type='hidden' name='form_bill[" . $enc . "]' value='$billed' />" .
@@ -529,7 +529,7 @@ function calctotal() {
    <?php xl('Charges','e')?>
   </td>
   <td class="dehead" align="right">
-   <?php xl('Client Paid','e')?>&nbsp;
+   <?php xl('Client Paid','e')?>
   </td>
 <?php if (!$GLOBALS['simplified_demographics']) { ?>
   <td class="dehead" align="right">
@@ -548,7 +548,7 @@ function calctotal() {
    <?php xl('Payment','e')?>&nbsp;
   </td>
   <td class="dehead" align="right">
-   <?php xl('Payment Method','e')?>&nbsp;&nbsp;
+   <?php xl('Payment Method','e')?>
   </td>
   <td class="dehead" align="right">
    <?php xl('Ref No','e')?>&nbsp;&nbsp;&nbsp;
