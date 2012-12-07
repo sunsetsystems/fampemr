@@ -1604,9 +1604,19 @@ if ($_POST['form_submit']) {
     // on each contraceptive start date.
     //
     if ($form_content == 3 || $form_content == 6) {
-     if ($form_by === '6' || $form_by === '7' || $form_by === '105') {
 
-      // This counts instances of "contraception starting" for the MA.  Note that a
+     // Per CV 2012-10-12 re the IPPF Stats report:
+     // "the report should be modified so that the report can run when Content = New User and
+     // Row = Contraceptive Service [...] There should be a warning when it’s run for Contraceptive
+     // Product or Contraceptive Method that New User content type is valid only with Contraceptive
+     // Service reporting."
+     if ($report_type == 'i' && $form_by !== '104') { // content is new acceptors but incompatible report type
+      $alertmsg = xl("New Acceptors content type is valid only for contraceptive service reporting.");
+     }
+
+     else if ($form_by === '6' || $form_by === '7' || $form_by === '104' || $form_by === '105') {
+
+      // This enumerates instances of "contraception starting" for the MA.  Note that a
       // client could be counted twice, once for nonsurgical and once for surgical.
       // Note also that we filter based on start date which is the same as encounter
       // date.
