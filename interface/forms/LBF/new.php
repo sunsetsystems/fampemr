@@ -302,7 +302,9 @@ function validate(f) {
       if ($formhistory > 0) {
         echo " <tr>";
         echo "<td colspan='$CPR' align='right' class='bold'>";
-        echo htmlspecialchars(xl('Current'));
+        // Including actual date per IPPF request 2012-08-23.
+        echo oeFormatShortDate(substr($enrow['date'], 0, 10));
+        echo ' (' . htmlspecialchars(xl('Current')) . ')';
         echo "&nbsp;</td>\n";
         $hres = sqlStatement("SELECT f.form_id, fe.date " .
           "FROM forms AS f, form_encounter AS fe WHERE " .

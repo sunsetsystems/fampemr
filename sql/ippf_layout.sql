@@ -2014,6 +2014,7 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','121181413','Female VSC - Laparotomy'                     ,23,0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','122182213','Male VSC - Incisional vasectomy'             ,24,0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','122182313','Male VSC - No-scalpel Vasectomy'             ,25,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('ippfconmeth','145212110','Emergency Contraception'                     ,26,0);
 
 -- The following revised/added 2011-10-12 and then revoked before release:
 
