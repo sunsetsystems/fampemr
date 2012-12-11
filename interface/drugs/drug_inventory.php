@@ -223,6 +223,7 @@ function facchanged() {
 <?php 
  $lastid = "";
  $encount = 0;
+ $today = date('Y-m-d');
  while ($row = sqlFetchArray($res)) {
   if ($lastid != $row['drug_id']) {
    ++$encount;
@@ -254,12 +255,17 @@ function facchanged() {
   }
   if (!empty($row['inventory_id'])) {
    $lot_number = htmlspecialchars($row['lot_number']);
+   $expired = !empty($row['expiration']) && strcmp($row['expiration'], $today) <= 0;
    echo "  <td onclick='doiclick($lastid," . $row['inventory_id'] . ")'>" .
     "<a href='' onclick='return false'>$lot_number</a></td>\n";
    echo "  <td>" . ($row['facid'] ? $row['facname'] : ('(' . xl('Unassigned') . ')')) . "</td>\n";
    echo "  <td>" . $row['title'] . "</td>\n";
    echo "  <td>" . $row['on_hand'] . "</td>\n";
-   echo "  <td>" . oeFormatShortDate($row['expiration']) . "</td>\n";
+   echo "  <td>";
+   if ($expired) echo "<font color='red'>";
+   echo oeFormatShortDate($row['expiration']);
+   if ($expired) echo "</font>";
+   echo "</td>\n";
   } else {
    echo "  <td colspan='5'>&nbsp;</td>\n";
   }
