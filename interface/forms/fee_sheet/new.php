@@ -1106,7 +1106,7 @@ if ($GLOBALS['sell_non_drug_products']) {
   echo "    <option value=''> " . xl('Products') . "\n";
   $tres = sqlStatement("SELECT dt.drug_id, dt.selector, d.name " .
     "FROM drug_templates AS dt, drugs AS d WHERE " .
-    "d.drug_id = dt.drug_id AND d.active = 1 " .
+    "d.drug_id = dt.drug_id AND d.active = 1 AND d.consumable = 0 " .
     "ORDER BY d.name, dt.selector, dt.drug_id");
   while ($trow = sqlFetchArray($tres)) {
     echo "    <option value='PROD|" . $trow['drug_id'] . '|' . $trow['selector'] . "'>" .

@@ -1,5 +1,5 @@
 <?php
- // Copyright (C) 2006-2011 Rod Roark <rod@sunsetsystems.com>
+ // Copyright (C) 2006-2012 Rod Roark <rod@sunsetsystems.com>
  //
  // This program is free software; you can redistribute it and/or
  // modify it under the terms of the GNU General Public License
@@ -190,7 +190,8 @@ if (($_POST['form_save'] || $_POST['form_delete']) && !$alertmsg) {
      "dispensable = "     . (empty($_POST['form_dispensable'    ]) ? 0 : 1) . ", " .
      "allow_multiple = "  . (empty($_POST['form_allow_multiple' ]) ? 0 : 1) . ", " .
      "allow_combining = " . (empty($_POST['form_allow_combining']) ? 0 : 1) . ", " .
-     "active = "          . (empty($_POST['form_active']) ? 0 : 1) . " " .
+     "active = "          . (empty($_POST['form_active'         ]) ? 0 : 1) . ", " .
+     "consumable = "      . (empty($_POST['form_consumable'     ]) ? 0 : 1) . " " .
      "WHERE drug_id = '$drug_id'");
     sqlStatement("DELETE FROM drug_templates WHERE drug_id = '$drug_id'");
    }
@@ -208,7 +209,7 @@ if (($_POST['form_save'] || $_POST['form_delete']) && !$alertmsg) {
    $drug_id = sqlInsert("INSERT INTO drugs ( " .
     "name, ndc_number, on_order, reorder_point, max_level, form, " .
     "size, unit, route, cyp_factor, related_code, " .
-    "dispensable, allow_multiple, allow_combining, active " .
+    "dispensable, allow_multiple, allow_combining, active, consumable " .
     ") VALUES ( " .
     "'" . escapedff('form_name')          . "', " .
     "'" . escapedff('form_ndc_number')    . "', " .
@@ -224,7 +225,8 @@ if (($_POST['form_save'] || $_POST['form_delete']) && !$alertmsg) {
     (empty($_POST['form_dispensable'    ]) ? 0 : 1) . ", " .
     (empty($_POST['form_allow_multiple' ]) ? 0 : 1) . ", " .
     (empty($_POST['form_allow_combining']) ? 0 : 1) . ", " .
-    (empty($_POST['form_active']) ? 0 : 1)        .
+    (empty($_POST['form_active'         ]) ? 0 : 1) . ", " .
+    (empty($_POST['form_consumable'     ]) ? 0 : 1)        .
     ")");
   }
 
@@ -309,6 +311,7 @@ else {
     'dispensable' => '1',
     'allow_multiple' => '1',
     'allow_combining' => '',
+    'consumable' => '0',
     'ndc_number' => '',
     'on_order' => '0',
     'reorder_point' => '0',
@@ -337,9 +340,12 @@ else {
  </tr>
 
  <tr>
-  <td valign='top' nowrap><b><?php xl('Active','e'); ?>:</b></td>
+  <td valign='top' nowrap><b><?php xl('Attributes','e'); ?>:</b></td>
   <td>
    <input type='checkbox' name='form_active' value='1'<?php if ($row['active']) echo ' checked'; ?> />
+   <?php xl('Active','e'); ?> &nbsp;
+   <input type='checkbox' name='form_consumable' value='1'<?php if ($row['consumable']) echo ' checked'; ?> />
+   <?php xl('Consumable','e'); ?>
   </td>
  </tr>
 

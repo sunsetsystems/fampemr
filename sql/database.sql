@@ -361,6 +361,7 @@ CREATE TABLE `drugs` (
   `allow_combining` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 = allow filling an order from multiple lots',
   `allow_multiple`  tinyint(1) NOT NULL DEFAULT 1 COMMENT '1 = allow multiple lots at one warehouse',
   `dispensable`     tinyint(1) NOT NULL DEFAULT 1 COMMENT '0 = pharmacy elsewhere, 1 = dispensed here',
+  `consumable`      tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 = will not show on the fee sheet',
   PRIMARY KEY  (`drug_id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;
 
