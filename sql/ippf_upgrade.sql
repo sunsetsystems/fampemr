@@ -1535,3 +1535,6 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default, option_va
 INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, ct_nofs, ct_diag ) VALUES ('ADM',17, 5, 0, '', 1, 0, 0, 0);
 #EndIf
 
+UPDATE list_options SET title = 'Client has received ITS Counselling' WHERE
+  list_id = 'genitshist' AND title = 'Client has received ITS  Counselling';
+

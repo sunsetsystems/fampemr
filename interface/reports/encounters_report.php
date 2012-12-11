@@ -257,7 +257,7 @@ $res = sqlStatement($query);
  // Build a drop-down list of providers.
  //
  $query = "SELECT id, lname, fname FROM users WHERE " .
-  "authorized = 1 ORDER BY lname, fname";
+  "active = 1 AND authorized = 1 ORDER BY lname, fname";
  $ures = sqlStatement($query);
  echo "   <select name='form_provider'>\n";
  echo "    <option value=''>-- " . xl('All') . " --\n";

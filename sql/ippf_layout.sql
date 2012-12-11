@@ -1283,7 +1283,7 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default, option_va
 
 DELETE FROM list_options WHERE list_id = 'genitshist';
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, option_value ) VALUES ('genitshist','info' ,'Client is informed about ITS transmission',  1,0,0);
-INSERT INTO list_options ( list_id, option_id, title, seq, is_default, option_value ) VALUES ('genitshist','couns','Client has received ITS  Counselling'     ,  2,0,0);
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default, option_value ) VALUES ('genitshist','couns','Client has received ITS Counselling'      ,  2,0,0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, option_value ) VALUES ('genitshist','test' ,'Client has been ITS tested'               ,  3,0,0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, option_value ) VALUES ('genitshist','pos'  ,'Client has tested ITS positive'           ,  4,0,0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, option_value ) VALUES ('genitshist','treat','Client has received ITS treatment'        ,  5,0,0);

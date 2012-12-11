@@ -464,7 +464,7 @@ function divclick(cb, divid) {
   <td valign='top' nowrap>&nbsp;</td>
   <td valign='top'>
    <select name='form_titles' size='4' onchange='set_text()'>
-   </select> <?php xl('(Select one of these, or type your own title)','e'); ?>
+   </select> (<?php xl('Select one of these, or type your own title','e'); ?>)
   </td>
  </tr>
 
