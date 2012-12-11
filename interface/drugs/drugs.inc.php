@@ -36,7 +36,7 @@ function send_drug_email($subject, $body) {
 
 function sellDrug($drug_id, $quantity, $fee, $patient_id=0, $encounter_id=0,
   $prescription_id=0, $sale_date='', $user='', $default_warehouse='',
-  $testonly=false) {
+  $testonly=false, &$expiredlots=null) {
 
   if (empty($patient_id))   $patient_id   = $GLOBALS['pid'];
   if (empty($sale_date))    $sale_date    = date('Y-m-d');
@@ -76,6 +76,7 @@ function sellDrug($drug_id, $quantity, $fee, $patient_id=0, $encounter_id=0,
   $qty_left = $quantity;
   $bad_lot_list = '';
   $total_on_hand = 0;
+  $gotexpired = false;
 
   // If the user has a default warehouse, sort those lots first.
   $orderby = ($default_warehouse === '') ?
@@ -106,7 +107,10 @@ function sellDrug($drug_id, $quantity, $fee, $patient_id=0, $encounter_id=0,
       if ($bad_lot_list) $bad_lot_list .= ', ';
       $bad_lot_list .= $tmp;
     }
-    if ($expired) continue;
+    if ($expired) {
+      $gotexpired = true;
+      continue;
+    }
 
     /*****************************************************************
     // Note the first row in case total quantity is insufficient and we are
@@ -121,6 +125,8 @@ function sellDrug($drug_id, $quantity, $fee, $patient_id=0, $encounter_id=0,
       $qty_left -= $on_hand;
     }
   }
+
+  if ($expiredlots !== null) $expiredlots = $gotexpired;
 
   if ($testonly) {
     // Just testing inventory, so return true if OK, false if insufficient.

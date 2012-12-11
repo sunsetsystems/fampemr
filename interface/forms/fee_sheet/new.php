@@ -489,6 +489,7 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   // Check for insufficient product inventory levels.
   $prod = $_POST['prod'];
   $insufficient = 0;
+  $expiredlots = false;
   for ($lino = 1; $prod["$lino"]['drug_id']; ++$lino) {
     $iter = $prod["$lino"];
     if (!empty($iter['billed'])) continue;
@@ -512,7 +513,7 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
     else {
       // This only checks for sufficient inventory, nothing is updated.
       if (!sellDrug($drug_id, $units, 0, $pid, $encounter, 0,
-        $visit_date, '', $default_warehouse, true)) {
+        $visit_date, '', $default_warehouse, true, $expiredlots)) {
         $insufficient = $drug_id;
       }
     }
@@ -520,6 +521,7 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   if ($insufficient) {
     $drow = sqlQuery("SELECT name FROM drugs WHERE drug_id = '$insufficient'");
     $alertmsg = xl('Insufficient inventory for product') . ' "' . $drow['name'] . '"';
+    if ($expiredlots) $alertmsg .= ": " . xl('Check expiration dates');
   }
 }
 
