@@ -300,9 +300,9 @@ echo date('d M Y', strtotime($atmp[count($atmp)-1]));
 // FACILITY FILTERING (lemonsoftware)
 // $facilities = getFacilities();
 if ($_SESSION['authorizeduser'] == 1) {
-  $facilities = getFacilities();
+  $facilities = getFacilities('', 'name');
 } else {
-  $facilities = getUserFacilities($_SESSION['authId']); // from users_facility
+  $facilities = getUserFacilities($_SESSION['authId'], 'name'); // from users_facility
  	if (count($facilities) == 1)
     $_SESSION['pc_facility'] = key($facilities);
 }

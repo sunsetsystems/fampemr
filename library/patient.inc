@@ -164,18 +164,17 @@ returns all facilities or just the id for the first one
 @param string - if 'first' return first facility ordered by id
 @return array | int for 'first' case
 */
-function getFacilities($first = '') {
-    $r = sqlStatement("SELECT * FROM facility ORDER BY id");
-    $ret = array();
-    while ( $row = sqlFetchArray($r) ) {
-       $ret[] = $row;
-}
-
-        if ( $first == 'first') {
-            return $ret[0]['id'];
-        } else {
-            return $ret;
-        }
+function getFacilities($first = '', $orderby = 'id') {
+  $r = sqlStatement("SELECT * FROM facility ORDER BY $orderby");
+  $ret = array();
+  while ($row = sqlFetchArray($r)) {
+    $ret[] = $row;
+  }
+  if ($first == 'first') {
+    return $ret[0]['id'];
+  } else {
+    return $ret;
+  }
 }
 
 /**
@@ -187,18 +186,17 @@ returns all service_location facilities or just the id for the first one
 @param string - if 'first' return first facility ordered by id
 @return array | int for 'first' case
 */
-function getServiceFacilities($first = '') {
-    $r = sqlStatement("SELECT * FROM facility WHERE service_location != 0 ORDER BY id");
+function getServiceFacilities($first = '', $orderby = 'id') {
+    $r = sqlStatement("SELECT * FROM facility WHERE service_location != 0 ORDER BY $orderby");
     $ret = array();
     while ( $row = sqlFetchArray($r) ) {
        $ret[] = $row;
-}
-
-        if ( $first == 'first') {
-            return $ret[0]['id'];
-        } else {
-            return $ret;
-        }
+    }
+    if ( $first == 'first') {
+        return $ret[0]['id'];
+    } else {
+        return $ret;
+    }
 }
 
 //(CHEMED) facility filter
