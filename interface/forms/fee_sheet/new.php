@@ -853,6 +853,7 @@ function validate(f) {
  f.bn_search.clicked = false;
  var max_contra_cyp = 0;
  var max_contra_code = '';
+ // Loop thru the services.
  for (var lino = 1; f['bill['+lino+'][code_type]']; ++lino) {
   var pfx = 'bill['+lino+']';
   if (f[pfx+'[del]'] && f[pfx+'[del]'].checked) continue;
@@ -892,7 +893,7 @@ function validate(f) {
    }
   }
   if (f[pfx+'[method]'] && f[pfx+'[method]'].value) {
-   // This applies to contraception for family planning clinics.
+   // The following applies to contraception for family planning clinics.
    var tmp_cyp = parseFloat(f[pfx+'[cyp]'].value);
    var tmp_meth = f[pfx+'[method]'].value;
    if (tmp_cyp > max_contra_cyp) {
@@ -900,34 +901,60 @@ function validate(f) {
     max_contra_code = tmp_meth;
    }
 <?php if ($patient_male) { ?>
-   tmp_meth = tmp_meth.substring(0, 6);
-   if (tmp_meth != '112141' // male condoms
-    && tmp_meth != '122182' // male vasectomy
-    && tmp_meth != '141200' // fp general counseling
+   var tmp = tmp_meth.substring(0, 6);
+   if (tmp != '112141' // male condoms
+    && tmp != '122182' // male vasectomy
+    && tmp != '141200' // fp general counseling
    ) {
-    if (!confirm('<?php echo xl('Warning: contraceptive method is not compatible with a male patient'); ?>'))
+    if (!confirm('<?php echo xl('Warning: Contraceptive method is not compatible with a male patient.'); ?>'))
      return false;
    }
 <?php } // end if male patient ?>
 <?php if ($patient_age < 10 || patient_age > 50) { ?>
-   if (!confirm('<?php echo xl('Warning: contraception for a patient under 10 or over 50'); ?>'))
+   if (!confirm('<?php echo xl('Warning: Contraception for a patient under 10 or over 50.'); ?>'))
     return false;
 <?php } // end if improper age ?>
-   var got_prod = false;
-   for (var plino = 1; f['prod['+plino+'][drug_id]']; ++plino) {
-    var ppfx = 'prod['+plino+']';
-    if (f[ppfx+'[del]'] && f[ppfx+'[del]'].checked) continue;
-    if (f[ppfx+'[method]'] && f[ppfx+'[method]'].value) {
-     if (f[ppfx+'[method]'].value == tmp_meth) got_prod = true;
+   // Nonsurgical methods should normally include a corresponding product.
+   if (tmp_meth.substring(0, 2) != '12') {
+    var got_prod = false;
+    for (var plino = 1; f['prod['+plino+'][drug_id]']; ++plino) {
+     var ppfx = 'prod[' + plino + ']';
+     if (f[ppfx+'[del]'] && f[ppfx+'[del]'].checked) continue;
+     if (f[ppfx+'[method]'] && f[ppfx+'[method]'].value) {
+      if (f[ppfx+'[method]'].value == tmp_meth) got_prod = true;
+     }
     }
-   }
-   if (!got_prod) {
-    if (!confirm('<?php echo xl('Warning: there is no product matching the contraceptive service'); ?>'))
-     return false;
+    if (!got_prod) {
+     if (!confirm('<?php echo xl('Warning: There is no product matching the contraceptive service.'); ?>'))
+      return false;
+    }
    }
   }
   // End contraception validation.
  }
+ // The following applies to contraception for family planning clinics.
+ // Loop thru the products.
+ for (var lino = 1; f['prod['+lino+'][drug_id]']; ++lino) {
+  var pfx = 'prod['+lino+']';
+  if (f[pfx+'[del]'] && f[pfx+'[del]'].checked) continue;
+  if (f[pfx+'[method]'] && f[pfx+'[method]'].value) {
+   var tmp_meth = f[pfx+'[method]'].value;
+   // Contraceptive products should normally include a corresponding method.
+   var got_svc = false;
+   for (var slino = 1; f['bill['+slino+'][code_type]']; ++slino) {
+    var spfx = 'bill[' + slino + ']';
+    if (f[spfx+'[del]'] && f[spfx+'[del]'].checked) continue;
+    if (f[spfx+'[method]'] && f[spfx+'[method]'].value) {
+     if (f[spfx+'[method]'].value == tmp_meth) got_svc = true;
+    }
+   }
+   if (!got_svc) {
+    if (!confirm('<?php echo xl('Warning: There is no service matching the contraceptive product.'); ?>'))
+     return false;
+   }
+  }
+ }
+ // End contraception validation.
  if (!refreshing && !searching) {
   if (!f.ProviderID.value) {
    alert('<?php echo xl('Default provider is required.') ?>');
