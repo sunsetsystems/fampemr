@@ -258,7 +258,7 @@ function submitEdit(id) {
 }
 
 function submitDelete(id, code, text) {
- if (!confirm('<?php echo addslashes(xl('Do you really want to delete code')); ?> ' + code + ' "' + text + '"?')) return;
+ if (!confirm('<?php echo addslashes(xl('Do you really want to delete service')); ?> ' + code + ' "' + text + '"?')) return;
  var f = document.forms[0];
  f.mode.value = 'delete';
  f.code_id.value = id;

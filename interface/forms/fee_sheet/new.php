@@ -520,8 +520,8 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   } // end for
   if ($insufficient) {
     $drow = sqlQuery("SELECT name FROM drugs WHERE drug_id = '$insufficient'");
-    $alertmsg = xl('Insufficient inventory for product') . ' "' . $drow['name'] . '"';
-    if ($expiredlots) $alertmsg .= ": " . xl('Check expiration dates');
+    $alertmsg = xl('Insufficient inventory for product') . ' "' . $drow['name'] . '".';
+    if ($expiredlots) $alertmsg .= " " . xl('Check expiration dates.');
   }
 }
 
