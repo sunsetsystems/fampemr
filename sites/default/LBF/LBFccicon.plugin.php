@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2012 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2012-2013 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -11,6 +11,16 @@
 
 require_once("../../../custom/code_types.inc.php");
 require_once("../../../library/contraception_billing_scan.inc.php");
+
+if (!$formid) {
+  $row = sqlQuery("SELECT form_id FROM forms WHERE " .
+    "pid = '$pid' AND encounter = '$encounter' AND formdir = '$formname' " .
+    "AND deleted = 0 ORDER BY id DESC LIMIT 1");
+  if (!empty($row)) {
+    $GLOBALS['DUPLICATE_FORM_HANDLED'] = true;
+    $formid = $row['form_id'];
+  }
+}
 
 // The purpose of this function is to create JavaScript for the <head>
 // section of the page.  This defines desired javaScript functions.
@@ -219,6 +229,12 @@ f.form_curmethod.onchange = function () { current_method_changed(); };
 f.form_newmethod.onchange = function () { current_method_changed(); };
 f.onsubmit = function () { return mysubmit(); };
 ";
+
+  if (!empty($GLOBALS['DUPLICATE_FORM_HANDLED'])) {
+    echo "
+alert('" . xl('A Contraception form already exists for this visit and has been opened here.') . "');
+";
+  }
 
 // Generate alert if method from services is different from a non-empty method in this form.
   $csrow = sqlQuery("SELECT field_value FROM lbf_data WHERE " .

@@ -624,7 +624,7 @@ function calctotal() {
   // If no billing was entered yet for today and we are not omitting anything,
   // then generate a line for entering today's co-pay.
   //
-  if (!$gottoday && !$omitenc) {
+  if (!$gottoday && $omitenc <= 0) {
     echoLine(0, 0, xl('Today'), 0, 0, 0, getCopay($pid, $today));
   }
 
