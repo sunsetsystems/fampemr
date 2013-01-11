@@ -253,23 +253,34 @@ if ($_POST['form_save'] || $_POST['form_delete']) {
         $info_msg = xl('Transaction failed, quantity is less than zero');
       }
       else {
-        $lot_id = sqlInsert("INSERT INTO drug_inventory ( " .
-          "drug_id, lot_number, manufacturer, expiration, " .
-          "vendor_id, warehouse_id, on_hand " .
-          ") VALUES ( " .
-          "'$drug_id', "                            .
-          "'" . formData('form_lot_number')   . "', " .
-          "'" . formData('form_manufacturer') . "', " .
-          QuotedOrNull($form_expiration)      . ", "  .
-          "'" . formData('form_vendor_id')    . "', " .
-          "'" . formData('form_warehouse_id') . "', " .
-          "'" . $form_quantity                . "' "  .
-          ")");
+        $exptest = $form_expiration ? "expiration = '$form_expiration'" : "expiration IS NULL";
+        $crow = sqlQuery("SELECT count(*) AS count from drug_inventory " .
+          "WHERE lot_number = '" . formData('form_lot_number') . "' " .
+          "AND warehouse_id = '" . formData('form_warehouse_id') . "' " .
+          "AND $exptest " .
+          "AND destroy_date IS NULL");
+        if ($crow['count']) {
+          $info_msg = xl('Transaction failed, duplicate lot');
+        }
+        else {
+          $lot_id = sqlInsert("INSERT INTO drug_inventory ( " .
+            "drug_id, lot_number, manufacturer, expiration, " .
+            "vendor_id, warehouse_id, on_hand " .
+            ") VALUES ( " .
+            "'$drug_id', "                            .
+            "'" . formData('form_lot_number')   . "', " .
+            "'" . formData('form_manufacturer') . "', " .
+            QuotedOrNull($form_expiration)      . ", "  .
+            "'" . formData('form_vendor_id')    . "', " .
+            "'" . formData('form_warehouse_id') . "', " .
+            "'" . $form_quantity                . "' "  .
+            ")");
+        }
       }
     }
 
     // Create the corresponding drug_sales transaction.
-    if ($_POST['form_save'] && $form_quantity && $form_trans_type) {
+    if ($_POST['form_save'] && $form_quantity && $form_trans_type && !$info_msg) {
       $form_notes = formData('form_notes');
       $form_sale_date = formData('form_sale_date');
       if (empty($form_sale_date)) $form_sale_date = date('Y-m-d');
