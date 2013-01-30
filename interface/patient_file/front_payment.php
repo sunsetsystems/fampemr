@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2006-2012 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2006-2013 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -305,7 +305,7 @@ if ($_POST['form_save_pr'] || $_REQUEST['receipt']) {
   topframe.restoreSession();
 <?php if ($GLOBALS['concurrent_layout']) { ?>
   // Hard-coding of RBot for this purpose is awkward, but since this is a
-  // pop-up and our openemr is left_nav, we have no good clue as to whether
+  // pop-up and our opener is left_nav, we have no good clue as to whether
   // the top frame is more appropriate.
   topframe.left_nav.forceDual();
   topframe.left_nav.setEncounter(datestr, enc, '');
@@ -421,8 +421,27 @@ if ($_POST['form_save_pr'] || $_REQUEST['receipt']) {
 // Otherwise if a new visit is to be opened...
 //
 else if ($_POST['form_save_op']) {
+  $todaysenc = todaysEncounterIf($_POST['form_pid']);
   echo "</head>\n<body>\n<script language='JavaScript'>\n";
-  echo "opener.parent.left_nav.loadFrame2('nen1','RBot','forms/newpatient/new.php?autoloaded=1&calenc=');\n";
+  if ($todaysenc) {
+    // Today's visit already exists so open that.
+    // Might be good to move this logic to a function in the top frame.
+    echo "opener.top.restoreSession();\n";
+    if ($GLOBALS['concurrent_layout']) {
+      echo "opener.parent.left_nav.forceDual();\n";
+      echo "opener.parent.left_nav.setEncounter('$today', $todaysenc, '');\n";
+      echo "opener.parent.left_nav.setRadio('RBot', 'enc');\n";
+      echo "opener.parent.left_nav.loadFrame('enc2', 'RBot', 'patient_file/encounter/encounter_top.php?set_encounter=$todaysenc');\n";
+    }
+    else {
+      echo "opener.top.Title.location.href = 'encounter/encounter_title.php?set_encounter=$todaysenc';\n";
+      echo "opener.top.Main.location.href  = 'encounter/patient_encounter.php?set_encounter=$todaysenc';\n";
+    }
+  }
+  else {
+    // Today's visit does not exist so open the form used to create it.
+    echo "opener.parent.left_nav.loadFrame2('nen1','RBot','forms/newpatient/new.php?autoloaded=1&calenc=');\n";
+  }
   echo "window.close();\n";
   echo "</script>\n</body>\n";
 }
@@ -649,7 +668,9 @@ function calctotal() {
 <p>
 <input type='submit' name='form_save_pr' value='<?php xl('Save and Print Receipt','e'); ?>' /> &nbsp;
 <input type='submit' name='form_save_op' value='<?php xl('Save and Open a Visit','e');  ?>' /> &nbsp;
+<?php if (!empty($_GET['omitenc'])) { // indicates we got here from the checkout form ?>
 <input type='submit' name='form_save_co' value='<?php xl('Save and Check Out','e');     ?>' /> &nbsp;
+<?php } ?>
 <input type='submit' name='form_save_cl' value='<?php xl('Save and Close','e');         ?>' /> &nbsp;
 <input type='button' value='<?php xl('Cancel','e'); ?>' onclick='window.close()' />
 

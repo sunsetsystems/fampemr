@@ -195,11 +195,15 @@ function sellDrug($drug_id, $quantity, $fee, $patient_id=0, $encounter_id=0,
       "'$encounter_id', '$user', '$sale_date', '$thisqty', '$thisfee' )");
   }
 
+  /*******************************************************************
   // If appropriate, generate email to notify that re-order is due.
   if (($total_on_hand - $quantity) <= $rowdrug['reorder_point']) {
     send_drug_email("Product re-order required",
       "Product '" . $rowdrug['name'] . "' has reached its reorder point.\n");
   }
+  // TBD: If the above is un-commented, fix it to handle the case of
+  // $GLOBALS['gbl_min_max_months'] being true.
+  *******************************************************************/
 
   // If combining is allowed then $sale_id will be just the last inserted ID,
   // and it serves only to indicate that everything worked.  Otherwise there

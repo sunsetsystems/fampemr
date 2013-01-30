@@ -1,5 +1,5 @@
 <?php
- // Copyright (C) 2008-2012 Rod Roark <rod@sunsetsystems.com>
+ // Copyright (C) 2008-2013 Rod Roark <rod@sunsetsystems.com>
  //
  // This program is free software; you can redistribute it and/or
  // modify it under the terms of the GNU General Public License
@@ -19,6 +19,55 @@ function addWarning($msg) {
   global $warnings;
   if ($warnings) $warnings .= '<br />';
   $warnings .= $msg;
+}
+
+// Check if a product needs to be re-ordered, optionally for a given warehouse.
+//
+function checkReorder($drug_id, $min, $warehouse='') {
+  if (!$min) return false;
+
+  // echo "<!-- Drug/min/warehouse = '$drug_id' '$min' '$warehouse' -->\n"; // debugging
+
+  $query = "SELECT " .
+    "SUM(s.quantity) AS sale_quantity " .
+    "FROM drug_sales AS s " .
+    "LEFT JOIN drug_inventory AS di ON di.inventory_id = s.inventory_id " .
+    "WHERE " .
+    "s.drug_id = '$drug_id' AND " .
+    "s.sale_date > DATE_SUB(NOW(), INTERVAL 90 DAY) " .
+    "AND s.pid != 0";
+  if ($warehouse !== '') {
+    $query .= " AND di.warehouse_id = '$warehouse'";
+  }
+  $srow = sqlQuery($query);
+  $sales = 0 + $srow['sale_quantity'];
+
+  $query = "SELECT SUM(on_hand) AS on_hand " .
+    "FROM drug_inventory AS di WHERE " .
+    "di.drug_id = '$drug_id' AND " .
+    "di.expiration > NOW() AND " .
+    "di.destroy_date IS NULL";
+  if ($warehouse !== '') {
+    $query .= " AND di.warehouse_id = '$warehouse'";
+  }
+  $ohrow = sqlQuery($query);
+  $onhand = intval($ohrow['on_hand']);
+
+  if (empty($GLOBALS['gbl_min_max_months'])) {
+    if ($onhand <= $min) {
+      return true;
+    }
+  }
+  else {
+    if ($sales != 0) {
+      $stock_months = sprintf('%0.1f', $onhand * 3 / $sales);
+      if ($stock_months <= $min) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 if (!empty($_POST['form_days'])) {
@@ -58,8 +107,7 @@ if ($form_details) {
     "lo.option_id = di.warehouse_id " .
     "LEFT JOIN product_warehouse AS pw ON pw.pw_drug_id = d.drug_id AND " .
     "pw.pw_warehouse = di.warehouse_id " .
-    "WHERE d.active = 1 $fwcond " .
-    "ORDER BY d.name, d.drug_id";
+    "ORDER BY d.name, d.drug_id, lo.title, di.warehouse_id, di.lot_number, di.inventory_id";
 }
 else {
   // Query for the main loop if summary report.
@@ -67,6 +115,7 @@ else {
     "FROM drugs AS d " .
     "LEFT JOIN drug_inventory AS di ON di.drug_id = d.drug_id " .
     "AND di.on_hand != 0 AND di.destroy_date IS NULL " .
+    // Join with list_options needed to support facility filter ($fwcond).
     "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
     "lo.option_id = di.warehouse_id " .
     "WHERE d.active = 1 $fwcond " .
@@ -190,6 +239,9 @@ while ($row = sqlFetchArray($res)) {
   $inventory_id = 0 + empty($row['inventory_id']) ? 0 : $row['inventory_id'];
   $warnings = '';
 
+  if ($drug_id != $last_drug_id) ++$encount;
+  $bgcolor = "#" . (($encount & 1) ? "ddddff" : "ffdddd");
+
   // Get sales in the date range for this lot (if details) or drug.
   if ($form_details) {
     $srow = sqlQuery("SELECT " .
@@ -215,9 +267,6 @@ while ($row = sqlFetchArray($res)) {
   }
   $sale_quantity = $srow['sale_quantity'];
 
-  if ($drug_id != $last_drug_id) ++$encount;
-  $bgcolor = "#" . (($encount & 1) ? "ddddff" : "ffdddd");
-
   $months = $form_days / 30.5;
 
   $monthly = ($months && $sale_quantity) ?
@@ -231,9 +280,25 @@ while ($row = sqlFetchArray($res)) {
     }
   }
 
-  // Check for reorder point reached.
-  if (!empty($row['reorder_point']) && $on_hand <= $row['reorder_point']) {
-    addWarning(xl('Reorder point has been reached'));
+  // Check for reorder point reached, once per product.
+  if ($drug_id != $last_drug_id) {
+    if (checkReorder($drug_id, $row['reorder_point'])) {
+      addWarning(xl('Product-level reorder point has been reached'));
+    }
+    // Same check for each warehouse.
+    $pwres = sqlStatement("SELECT " .
+      "pw.pw_warehouse, pw.pw_min_level, lo.title " .
+      "FROM product_warehouse AS pw " .
+      "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
+      "lo.option_id = pw.pw_warehouse " .
+      "WHERE pw.pw_drug_id = '$drug_id' AND pw.pw_min_level != 0 " .
+      "ORDER BY lo.title");
+    while ($pwrow = sqlFetchArray($pwres)) {
+      if (checkReorder($drug_id, $pwrow['pw_min_level'], $pwrow['pw_warehouse'])) {
+        addWarning(xl("Reorder point has been reached for warehouse") .
+          " '" . $pwrow['title'] . "'");
+      }
+    }
   }
 
   if ($form_details) {
