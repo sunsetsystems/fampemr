@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2005-2012 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2005-2013 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -17,6 +17,8 @@ require_once("$srcdir/formatting.inc.php");
 require_once("$srcdir/options.inc.php");
 require_once("$srcdir/calendar_events.inc.php");
 require_once("$srcdir/classes/Prescription.class.php");
+
+// $gbl_tabbed_fee_sheet = $pid == 4 ? 3 : 0; // for debugging only!
 
 // Some table cells will not be displayed unless insurance billing is used.
 $usbillstyle = $GLOBALS['ippf_specific'] ? " style='display:none'" : "";
@@ -797,6 +799,8 @@ $billresult = getBillingByEncounter($pid, $encounter, "*");
 <script type="text/javascript" src="../../../library/dynarch_calendar.js"></script>
 <script type="text/javascript" src="../../../library/dynarch_calendar_en.js"></script>
 <script type="text/javascript" src="../../../library/dynarch_calendar_setup.js"></script>
+<script type="text/javascript" src="../../../library/js/jquery.1.3.2.js"></script>
+<script type="text/javascript" src="../../../library/js/common.js"></script>
 <script language="JavaScript">
 
 var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
@@ -1063,17 +1067,83 @@ function warehouse_changed(sel) {
 <span class="title"><?php xl('Fee Sheet','e'); ?></span><br>
 <input type='hidden' name='newcodes' value=''>
 
-<center>
-
 <?php
 $isBilled = isEncounterBilled($pid, $encounter);
+
 if ($isBilled) {
   echo "<p><font color='green'>This encounter has been billed. If you " .
     "need to change it, it must be re-opened.</font></p>\n";
 }
-else { // the encounter is not yet billed
+
+else { // encounter is not billed
+
+  if (!empty($gbl_tabbed_fee_sheet)) {
+
+    // TBD: This is work in progress and is not enabled yet.
+
+    // We are doing tabs and checkboxes instead of drop-lists.
+    $fscatarr = array();
+    echo "<ul class='tabNav'>\n";
+
+    // Create drop-lists based on the fee_sheet_options table.
+    $res = sqlStatement("SELECT DISTINCT fs_category " .
+      "FROM fee_sheet_options ORDER BY fs_category");
+    while ($row = sqlFetchArray($res)) {
+      echo " <li" . (!empty($fscatarr) ? "" : " class='current'") .
+        // TBD: Handle currently selected tab.
+        "><a href='/play/javascript-tabbed-navigation/'>" .
+        substr($row['fs_category'], 1) . "</a></li>\n";
+      $fscatarr[] = $row['fs_category'];
+    }
+
+    // TBD: Add categories defined within the codes.
+
+    echo "</ul>\n"; // end tabNav
+
+    echo "<div class='tabContainer'>\n";
+    // For each group (tab)...
+    foreach ($fscatarr as $key => $value) {
+      echo " <div class='tab" . ($key ? "" : " current") .
+        // TBD: Handle currently selected tab.
+        "' style='height:auto;width:97%;'>\n";
+      echo "  <table>\n";
+      $res = sqlStatement("SELECT * FROM fee_sheet_options WHERE " .
+        "fs_category = '" . add_escape_custom($value) . "' " .
+        "ORDER BY fs_option");
+      $i = 0;
+      // For each checkbox in the group...
+      while ($row = sqlFetchArray($res)) {
+        if ($i % $gbl_tabbed_fee_sheet == 0) {
+          if ($i) echo "</tr>\n";
+          echo "   <tr>";
+        }
+        // POST variable form_cb will be keyed on group index and item index.
+        echo "<td><input type='checkbox' name='form_cb[$key][$i]' " .
+          "value='" . add_escape_custom($row['fs_codes']) . "' " .
+          "onclick='itemClicked(this)' />" .
+          // TBD: Got a couple things to handle here.
+          // 1. Look at database to decide if the item should be initially checked.
+          // 2. itemClicked() is to set a hidden field with the checkbox info and
+          //    then submit the form.
+          // 3. Deleting *could* be just setting the DEL flag without a submit, but
+          //    we probably won't because it seems confusing to the user.
+          htmlspecialchars(substr($row['fs_option'], 1)) . "</td>";
+        ++$i;
+      }
+      if ($i) echo "</tr>\n";
+      echo "  </table>\n";
+      echo " </div>\n"; // end tab
+    }
+    echo "</div>\n"; // end tabContainer
+    echo "<center>\n";
+
+    // End work in progress.
+  }
+
+  else {
 ?>
 
+<center>
 <table width='95%'>
 <?php
 $i = 0;
@@ -1150,6 +1220,8 @@ if ($GLOBALS['sell_non_drug_products']) {
     $i = 0;
   }
 }
+
+} // end not tabbed shortcuts
 
 $search_type = $default_search_type;
 if ($_POST['search_type']) $search_type = $_POST['search_type'];
@@ -1578,6 +1650,11 @@ var required_code_count = <?php echo $required_code_count; ?>;
 setSaveAndClose();
 
 <?php
+if ($gbl_tabbed_fee_sheet) {
+  // Enable tabs.
+  echo "tabbify();\n";
+}
+
 echo $justinit;
 if ($alertmsg) {
   echo "alert('" . addslashes($alertmsg) . "');\n";
