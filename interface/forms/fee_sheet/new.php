@@ -18,6 +18,10 @@ require_once("$srcdir/options.inc.php");
 require_once("$srcdir/calendar_events.inc.php");
 require_once("$srcdir/classes/Prescription.class.php");
 
+// IPPF doesn't want any payments to be made or displayed in the Fee Sheet,
+// but we'll use this switch and keep the code in case someone wants it.
+$ALLOW_COPAYS = false;
+
 // $gbl_tabbed_fee_sheet = $pid == 4 ? 3 : 0; // for debugging only!
 
 // Some table cells will not be displayed unless insurance billing is used.
@@ -1271,10 +1275,12 @@ echo " </tr>\n";
 <p style='margin-top:8px;margin-bottom:8px'>
 <table>
  <tr>
+<?php if ($ALLOW_COPAYS) { ?>
   <td>
    <input type='button' value='<?php xl('Add Copay','e');?>'
     onclick="copayselect()" />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   </td>
+<?php } ?>
   <td>
    <?php xl('Search','e'); ?>&nbsp;
 <?php
@@ -1336,6 +1342,7 @@ $required_code_count = 0;
 $bill_lino = 0;
 if ($billresult) {
   foreach ($billresult as $iter) {
+    if (!$ALLOW_COPAYS && $iter["code_type"] == 'COPAY') continue;
     ++$bill_lino;
     $bline = $_POST['bill']["$bill_lino"];
     $del = $bline['del']; // preserve Delete if checked
