@@ -335,7 +335,7 @@ if ($_POST['form_save_pr'] || $_REQUEST['receipt']) {
 <table border='0' cellspacing='8'>
  <tr>
   <td><?php xl('Date','e'); ?>:</td>
-  <td><?php echo oeFormatSDFT(strtotime($payrow['dtime'])) ?></td>
+  <td><?php echo oeFormatSDFT(strtotime($timestamp)) ?></td>
  </tr>
  <tr>
   <td><?php xl('Patient','e'); ?>:</td>
@@ -402,6 +402,9 @@ if ($_POST['form_save_pr'] || $_REQUEST['receipt']) {
       "onclick='toencounter($todaysenc,\"$today\",opener.top)' />\n";
   }
 ?>
+
+&nbsp;
+<input type='button' value='<?php echo xl('Cancel'); ?>' onclick='window.close()' />
 
 <?php if (acl_check('admin', 'super')) { ?>
 &nbsp;

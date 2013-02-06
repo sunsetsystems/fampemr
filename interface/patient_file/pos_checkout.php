@@ -735,7 +735,7 @@ $aCellHTML = array();
 if ($GLOBALS['gbl_checkout_line_adjustments']) {
   $aCellHTML[] = "&nbsp;";
 }
-$aCellHTML[] = htmlspecialchars(xl('New Payment'));
+$aCellHTML[] = "<span id='paytitle_%d'>" . htmlspecialchars(xl('New Payment')) . "</span>";
 $aCellHTML[] = strtr(generate_select_list('payment[%d][method]', 'paymethod', '', '', ''), array("\n" => ""));
 $aCellHTML[] = "<input type='text' name='payment[%d][refno]' size='10' />";
 $aCellHTML[] = "<input type='text' name='payment[%d][amount]' size='6' style='text-align:right' onkeyup='setComputedValues()' />";
@@ -1104,9 +1104,13 @@ while ($urow = sqlFetchArray($ures)) {
   }
   for (var lino = 0; ('payment[' + lino + '][amount]') in f; ++lino) {
    var amount = parseFloat(f['payment[' + lino + '][amount]'].value);
-   if (isNaN(amount)) continue;
+   if (isNaN(amount)) amount = parseFloat(0);
    amount = parseFloat(amount.toFixed(<?php echo $currdecimals ?>));
    total += amount;
+   // Set payment row's description to Refund if the amount is negative.
+   var title = amount < 0 ? '<?php echo xl('Refund'); ?>' : '<?php echo xl('New payment'); ?>';
+   var span = document.getElementById('paytitle_' + lino);
+   span.innerHTML = title;
   }
   return total;
  }
@@ -1431,7 +1435,7 @@ while ($arow = sqlFetchArray($ares)) {
     $memo = $atmp[0];
     $reference = $atmp[1];
   }
-  $rowtype = $arow['payer_type'] ? xl('Insurance payment') : xl('Patient payment');
+  $rowtype = $arow['payer_type'] ? xl('Insurance payment') : xl('Prepayment');
   write_old_payment_line($rowtype, $thisdate, $memo, $reference, $arow['pay_amount']);
 }
 
