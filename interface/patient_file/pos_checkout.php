@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2006-2012 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2006-2013 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -634,7 +634,8 @@ function write_form_line($code_type, $code, $id, $date, $description,
   write_form_headers();
   $amount = sprintf("%01.2f", $amount);
   if (empty($units)) $units = 1;
-  $price = $amount / $units; // should be even cents, but ok here if not
+  $price = sprintf("%01.4f", $amount / $units); // should be even cents, but...
+  if (substr($price, -2) === '00') $price = sprintf("%01.2f", $price);
   // if ($code_type == 'COPAY' && !$description) $description = xl('Payment');
 
   // Total and clear adjustments in aAdjusts matching this line item.
@@ -647,7 +648,7 @@ function write_form_line($code_type, $code, $id, $date, $description,
       }
     }
   }
-  $total = $amount - $adjust;
+  $total = sprintf("%01.2f", $amount - $adjust);
   if (empty($GLOBALS['discount_by_money'])) {
     // Convert $adjust to a percentage of the amount, up to 4 decimal places.
     $adjust = round(100 * $adjust / $amount, 4);
