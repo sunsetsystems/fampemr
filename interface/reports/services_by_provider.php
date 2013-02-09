@@ -126,6 +126,8 @@ if (! acl_check('acct', 'rep')) die(xl("Unauthorized access."));
 $form_from_date = fixDate($_POST['form_from_date'], date('Y-m-d'));
 $form_to_date   = fixDate($_POST['form_to_date']  , date('Y-m-d'));
 $form_facility  = $_POST['form_facility'];
+$form_provider  = $_POST['form_provider'];
+$form_related_code = $_POST['form_related_code'];
 
 if ($_POST['form_csvexport']) {
   header("Pragma: public");
@@ -166,6 +168,32 @@ else {
 function doinvopen(ptid,encid) {
  dlgopen('../patient_file/pos_checkout.php?ptid=' + ptid + '&enc=' + encid, '_blank', 750, 550);
 }
+
+// This is for callback by the find-code popup.
+// Appends to or erases the current list of related codes.
+function set_related(codetype, code, selector, codedesc) {
+ var f = document.forms[0];
+ var s = f.form_related_code.value;
+ var t = '';
+ if (code) {
+  if (s.length > 0) {
+   s += ';';
+   t = f.form_related_code.title + '; ';
+  }
+  s += codetype + ':' + code;
+  t += codedesc;
+ } else {
+  s = '';
+ }
+ f.form_related_code.value = s;
+ f.form_related_code.title = t;
+}
+
+// This invokes the find-code popup.
+function sel_related() {
+ dlgopen('../patient_file/encounter/find_code_popup.php', '_blank', 500, 400);
+}
+
 </script>
 
 </head>
@@ -180,7 +208,7 @@ function doinvopen(ptid,encid) {
 <table border='0' cellpadding='3'>
 
  <tr>
-  <td>
+  <td align='center'>
 <?php
 // Build a drop-down list of facilities.
 //
@@ -208,7 +236,36 @@ echo "   </select>\n";
    <img src='../pic/show_calendar.gif' align='absbottom' width='24' height='22'
     id='img_to_date' border='0' alt='[?]' style='cursor:pointer'
     title='<?php xl('Click here to choose a date','e'); ?>'>
+  </td>
+ </tr>
+ <tr>
+  <td align='center'>
+<?php
+// Build a drop-down list of providers.
+//
+echo xl('Provider') . ':';
+$query = "SELECT id, lname, fname FROM users WHERE " .
+  "active = 1 AND authorized = 1 ORDER BY lname, fname";
+$ures = sqlStatement($query);
+echo "   <select name='form_provider'>\n";
+echo "    <option value=''>-- " . xl('All') . " --\n";
+while ($urow = sqlFetchArray($ures)) {
+  $provid = $urow['id'];
+  echo "    <option value='$provid'";
+  if ($provid == $_POST['form_provider']) echo " selected";
+  echo ">" . $urow['lname'] . ", " . $urow['fname'] . "\n";
+}
+echo "   </select>\n";
+?>
    &nbsp;
+   <?php echo xl('Service Filter'); ?>:
+   <input type='text' size='30' name='form_related_code'
+    value='<?php echo $form_related_code ?>' onclick="sel_related()"
+    title='<?php xl('Click to select a code for filtering','e'); ?>' readonly />
+  </td>
+ </tr>
+ <tr>
+  <td align='center'>
    <input type='submit' name='form_refresh' value="<?php xl('Refresh','e') ?>">
    &nbsp;
    <input type='submit' name='form_csvexport' value="<?php xl('Export to CSV','e') ?>">
@@ -281,6 +338,24 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
   // If a facility was specified.
   if ($form_facility) {
     $query .= " AND fe.facility_id = '$form_facility'";
+  }
+
+  // If a provider was specified.
+  if ($form_provider) {
+    $query .= " AND u.id = '$form_provider'";
+  }
+
+  // If one or more service codes were specified.
+  if ($form_related_code) {
+    $qsvc = "";
+    $arel = explode(';', $form_related_code);
+    foreach ($arel as $tmp) {
+      list($reltype, $relcode) = explode(':', $tmp);
+      if (empty($relcode) || empty($reltype)) continue;
+      if ($qsvc) $qsvc .= " OR ";
+      $qsvc .= "( b.code_type = '$reltype' AND b.code = '$relcode' )";
+    }
+    if ($qsvc) $query .= "AND ( $qsvc )";
   }
 
   $query .= " ORDER BY u.lname, u.fname, u.mname, u.id, lo.title, b.code, fe.date, fe.id";
