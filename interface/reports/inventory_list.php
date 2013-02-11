@@ -75,7 +75,7 @@ function write_report_line(&$row) {
 
   $drug_id = 0 + $row['drug_id'];
   $on_hand = 0 + $row['on_hand'];
-  $inventory_id = 0 + empty($row['inventory_id']) ? 0 : $row['inventory_id'];
+  $inventory_id = 0 + (empty($row['inventory_id']) ? 0 : $row['inventory_id']);
   $warehouse_id = isset($row['warehouse_id']) ? $row['warehouse_id'] : '';
   $warnings = '';
 
@@ -84,21 +84,23 @@ function write_report_line(&$row) {
 
   // Get sales in the date range for this drug (and warehouse if details).
   if ($form_details) {
-    $srow = sqlQuery("SELECT " .
+    $query = "SELECT " .
       "SUM(s.quantity) AS sale_quantity " .
       "FROM drug_sales AS s " .
-      "LEFT JOIN drug_inventory AS di ON di.drug_id = s.drug_id " .
+      "LEFT JOIN drug_inventory AS di ON di.inventory_id = s.inventory_id " .
       "WHERE " .
       "s.drug_id = '$drug_id' AND " .
       "di.warehouse_id = '$warehouse_id' AND " .
       "s.sale_date > DATE_SUB(NOW(), INTERVAL $form_days DAY) " .
-      "AND s.pid != 0");
+      "AND s.pid != 0";
+    $srow = sqlQuery($query);
+    // echo "\n<!-- " . $srow['sale_quantity'] . " $query -->\n"; // debugging
   }
   else {
     $srow = sqlQuery("SELECT " .
       "SUM(s.quantity) AS sale_quantity " .
       "FROM drug_sales AS s " .
-      "LEFT JOIN drug_inventory AS di ON di.drug_id = s.drug_id " .
+      "LEFT JOIN drug_inventory AS di ON di.inventory_id = s.inventory_id " .
       "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
       "lo.option_id = di.warehouse_id " .
       "WHERE " .

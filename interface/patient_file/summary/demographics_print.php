@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2009-2012 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2009-2013 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -247,6 +247,8 @@ while ($frow = sqlFetchArray($fres)) {
     echo "<p class='grpheader'>" . xl_layout_label($group_name) . "</p>\n";
     echo "<div class='section'>\n";
     echo " <table border='0' cellpadding='0'>\n";
+
+    echo "  <tr><td class='lcols1'></td><td class='dcols1'></td><td class='lcols1'></td><td class='dcols1'></td></tr>\n";
   }
 
   // Handle starting of a new row.
@@ -261,7 +263,7 @@ while ($frow = sqlFetchArray($fres)) {
   if ($titlecols > 0) {
     end_cell();
     echo "<td colspan='$titlecols' ";
-    echo "class='lcols$titlecols stuff " . (($frow['uor'] == 2) ? " required'" : " bold'");
+    echo "class='lcols$titlecols stuff " . (($frow['uor'] == 2) ? "required'" : "bold'");
     if ($cell_count == 2) echo " style='padding-left:10pt'";
     echo " nowrap>";
     $cell_count += $titlecols;
@@ -295,7 +297,9 @@ while ($frow = sqlFetchArray($fres)) {
     generate_print_field($frow, $currvalue);
   }
   else {
-    echo generate_display_field($frow, $currvalue);
+    $s = generate_display_field($frow, $currvalue);
+    if ($s === '') $s = '&nbsp;';
+    echo $s;
   }
 }
 
@@ -309,7 +313,7 @@ if ($PDF_OUTPUT) {
   $content = getContent();
   // $pdf->setDefaultFont('Arial');
   $pdf->writeHTML($content, false);
-  $pdf->Output('report.pdf', 'D'); // D = Download, I = Inline
+  $pdf->Output('Demographics_form.pdf', 'D'); // D = Download, I = Inline
 }
 else {
 ?>
