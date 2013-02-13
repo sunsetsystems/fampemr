@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2010-2012 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2010-2013 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -35,6 +35,14 @@ function esc4Export($str) {
 
 function thisLineItem($row, $xfer=false) {
   global $grandtotal, $grandqty, $encount;
+
+  // In this row is for the target lot of a transfer, invert quantity and fee.
+  if (!empty($row['xfer_inventory_id'])) {
+    if ($row['di_inventory_id'] == $row['xfer_inventory_id']) {
+      $row['quantity'] = 0 - $row['quantity'];
+      $row['fee'] = 0 - $row['fee'];
+    }
+  }
 
   $invnumber = '';
   $dpname = '';
@@ -133,18 +141,6 @@ function thisLineItem($row, $xfer=false) {
 
   $grandtotal   += $row['fee'];
   $grandqty     -= $row['quantity'];
-
-  // In the special case of a transfer, generate a second line item for
-  // the source lot.
-  if (!empty($row['xfer_inventory_id'])) {
-    $row['xfer_inventory_id'] = 0;
-    $row['lot_number'] = $row['lot_number_2'];
-    $row['warehouse'] = $row['warehouse_2'];
-    $row['quantity'] = 0 - $row['quantity'];
-    $row['fee'] = 0 - $row['fee'];
-    thisLineItem($row, true);
-  }
-
 } // end function
 
 if (! acl_check('acct', 'rep')) die(xl("Unauthorized access."));
@@ -349,18 +345,13 @@ if ($form_from_date) {
     "p.fname AS pfname, p.mname AS pmname, p.lname AS plname, " .
     // "u.fname AS dfname, u.mname AS dmname, u.lname AS dlname, u.organization, " .
     "d.name, fe.date, fe.invoice_refno, " .
-    "i1.lot_number, i2.lot_number AS lot_number_2, " .
-    "lo1.title AS warehouse, lo2.title AS warehouse_2 " .
+    "di.lot_number, di.inventory_id AS di_inventory_id, " .
+    "lo.title AS warehouse " .
     "FROM drug_sales AS s " .
     "JOIN drugs AS d ON d.drug_id = s.drug_id " .
-    "LEFT JOIN drug_inventory AS i1 ON i1.inventory_id = s.inventory_id " .
-    "LEFT JOIN drug_inventory AS i2 ON i2.inventory_id = s.xfer_inventory_id " .
     "LEFT JOIN patient_data AS p ON p.pid = s.pid " .
-    // "LEFT JOIN users AS u ON u.id = s.distributor_id " .
-    "LEFT JOIN list_options AS lo1 ON lo1.list_id = 'warehouse' AND " .
-    "lo1.option_id = i1.warehouse_id " .
-    "LEFT JOIN list_options AS lo2 ON lo2.list_id = 'warehouse' AND " .
-    "lo2.option_id = i2.warehouse_id " .
+    "LEFT JOIN drug_inventory AS di ON di.inventory_id = s.inventory_id OR di.inventory_id = s.xfer_inventory_id " .
+    "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND lo.option_id = di.warehouse_id " .
     "LEFT JOIN form_encounter AS fe ON fe.pid = s.pid AND fe.encounter = s.encounter " .
     "WHERE s.sale_date >= '$from_date' AND s.sale_date <= '$to_date' AND " .
     "( s.pid = 0 OR s.inventory_id != 0 ) ";
@@ -392,8 +383,7 @@ if ($form_from_date) {
 
   // If a facility was specified.
   if ($form_facility) {
-    $query .= "AND ((lo1.option_value IS NOT NULL AND lo1.option_value = '$form_facility') " .
-      "OR (lo2.option_value IS NOT NULL AND lo2.option_value = '$form_facility')) ";
+    $query .= "AND ((lo.option_value IS NOT NULL AND lo.option_value = '$form_facility')) ";
   }
 
   $query .= "ORDER BY $orderby";
