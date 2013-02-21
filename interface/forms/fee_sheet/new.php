@@ -72,9 +72,11 @@ function getAge($dob, $asof='') {
 }
 
 function checkRelatedForContraception($related_code) {
-  global $line_contra_code, $line_contra_cyp;
+  global $line_contra_code, $line_contra_cyp, $line_contra_methtype;
 
-  // echo "<!-- checkRelatedForContraception: '$related_code' '$line_contra_code' '$line_contra_cyp' -->\n"; // debugging
+  $line_contra_code     = '';
+  $line_contra_cyp      = 0;
+  $line_contra_methtype = 0; // 0 = None, 1 = Not initial, 2 = Initial consult
 
   if (!empty($related_code)) {
     $relcodes = explode(';', $related_code);
@@ -82,6 +84,7 @@ function checkRelatedForContraception($related_code) {
       if ($relstring === '') continue;
       list($reltype, $relcode) = explode(':', $relstring);
       if ($reltype !== 'IPPF') continue;
+      $methtype = 1;
       if (
         preg_match('/^11....110/'    , $relcode) ||
         preg_match('/^11...[1-5]999/', $relcode) ||
@@ -93,27 +96,29 @@ function checkRelatedForContraception($related_code) {
         preg_match('/^145212.10/'    , $relcode) ||
         preg_match('/^14521.999/'    , $relcode)
       ) {
-        $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
-          "code_type = '11' AND code = '$relcode' LIMIT 1");
-        $cyp = 0 + $tmprow['cyp_factor'];
-        if ($cyp > $line_contra_cyp) {
-          // If surgical
-          if (preg_match('/^12/', $relcode)) {
-            // Identify the method with the IPPF code for the corresponding surgical procedure.
-            if ($relcode == '121181999') $relcode = '121181213';
-            if ($relcode == '122182999') $relcode = '122182213';
-            $relcode = substr($relcode, 0, 7) . '13';
-          }
-          else {
-            // Xavier confirms that the codes for Cervical Cap (112152010 and 112152011) are
-            // an unintended change in pattern, but at this point we have to live with it.
-            // -- Rod 2011-09-26
-            $relcode = substr($relcode, 0, 6) . '110';
-            if ($relcode == '112152110') $relcode = '112152010';
-          }
-          $line_contra_cyp  = $cyp;
-          $line_contra_code = $relcode;
+        $methtype = 2;
+      }
+      $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
+        "code_type = '11' AND code = '$relcode' LIMIT 1");
+      $cyp = 0 + $tmprow['cyp_factor'];
+      if ($cyp > $line_contra_cyp) {
+        // If surgical
+        if (preg_match('/^12/', $relcode)) {
+          // Identify the method with the IPPF code for the corresponding surgical procedure.
+          if ($relcode == '121181999') $relcode = '121181213';
+          if ($relcode == '122182999') $relcode = '122182213';
+          $relcode = substr($relcode, 0, 7) . '13';
         }
+        else {
+          // Xavier confirms that the codes for Cervical Cap (112152010 and 112152011) are
+          // an unintended change in pattern, but at this point we have to live with it.
+          // -- Rod 2011-09-26
+          $relcode = substr($relcode, 0, 6) . '110';
+          if ($relcode == '112152110') $relcode = '112152010';
+        }
+        $line_contra_cyp      = $cyp;
+        $line_contra_code     = $relcode;
+        $line_contra_methtype = $methtype;
       }
     }
   }
@@ -127,7 +132,8 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
 {
   global $code_types, $ndc_applies, $ndc_uom_choices, $justinit, $pid;
   global $usbillstyle, $justifystyle, $hasCharges, $required_code_count;
-  global $contraception_code, $contraception_cyp, $line_contra_code, $line_contra_cyp;
+  global $line_contra_code, $line_contra_cyp, $line_contra_methtype;
+  global $contraception_code, $contraception_cyp;
 
   if ($codetype == 'COPAY') {
     if (!$code_text) $code_text = 'Cash';
@@ -171,26 +177,26 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
   echo "  <td class='billcell'>$strike1" .
     ($codetype == 'COPAY' ? xl($codetype) : $codetype) . $strike2;
   if ($id) {
-    echo "<input type='hidden' name='bill[$lino][id]' value='$id'>";
+    echo "<input type='hidden' name='bill[$lino][id]' value='$id' />";
   }
-  echo "<input type='hidden' name='bill[$lino][code_type]' value='$codetype'>";
-  echo "<input type='hidden' name='bill[$lino][code]' value='$code'>";
-  echo "<input type='hidden' name='bill[$lino][billed]' value='$billed'>";
+  echo "<input type='hidden' name='bill[$lino][code_type]' value='$codetype' />";
+  echo "<input type='hidden' name='bill[$lino][code]' value='$code' />";
+  echo "<input type='hidden' name='bill[$lino][billed]' value='$billed' />";
 
   // This logic is only used for family planning clinics, and then only when
   // the option is chosen to use or auto-generate Contraception forms.
   // It adds contraceptive method and effectiveness to relevant lines.
   if ($GLOBALS['ippf_specific'] && $GLOBALS['gbl_new_acceptor_policy'] && $codetype == 'MA') {
-    $line_contra_code = '';
-    $line_contra_cyp  = 0;
     $codesrow = sqlQuery("SELECT related_code FROM codes WHERE " .
       "code_type = '" . $code_types[$codetype]['id'] .
       "' AND code = '$code' LIMIT 1");
     checkRelatedForContraception($codesrow['related_code']);
     if ($line_contra_code) {
-      echo "<input type='hidden' name='bill[$lino][method]' value='$line_contra_code'>";
-      echo "<input type='hidden' name='bill[$lino][cyp]' value='$line_contra_cyp'>";
-      if ($line_contra_cyp > $contraception_cyp) {
+      echo "<input type='hidden' name='bill[$lino][method]' value='$line_contra_code' />";
+      echo "<input type='hidden' name='bill[$lino][cyp]' value='$line_contra_cyp' />";
+      echo "<input type='hidden' name='bill[$lino][methtype]' value='$line_contra_methtype' />";
+      // $contraception_code is only concerned with initial consults.
+      if ($line_contra_cyp > $contraception_cyp && $line_contra_methtype == 2) {
         $contraception_cyp = $line_contra_cyp;
         $contraception_code = $line_contra_code;
       }
@@ -333,7 +339,7 @@ function echoProdLine($lino, $drug_id, $rx = FALSE, $del = FALSE, $units = NULL,
   $fee = NULL, $sale_id = 0, $billed = FALSE)
 {
   global $code_types, $ndc_applies, $pid, $usbillstyle, $justifystyle, $hasCharges;
-  global $required_code_count, $line_contra_code, $line_contra_cyp;
+  global $required_code_count, $line_contra_code, $line_contra_cyp, $line_contra_methtype;
 
   $drow = sqlQuery("SELECT name, related_code FROM drugs WHERE drug_id = '$drug_id'");
   $code_text = $drow['name'];
@@ -356,11 +362,10 @@ function echoProdLine($lino, $drug_id, $rx = FALSE, $del = FALSE, $units = NULL,
   // the option is chosen to use or auto-generate Contraception forms.
   // It adds contraceptive method to relevant lines.
   if ($GLOBALS['ippf_specific'] && $GLOBALS['gbl_new_acceptor_policy']) {
-    $line_contra_code = '';
-    $line_contra_cyp  = 0;
     checkRelatedForContraception($drow['related_code']);
     if ($line_contra_code) {
-      echo "<input type='hidden' name='prod[$lino][method]' value='$line_contra_code'>";
+      echo "<input type='hidden' name='prod[$lino][method]' value='$line_contra_code' />";
+      echo "<input type='hidden' name='prod[$lino][methtype]' value='$line_contra_methtype' />";
     }
   }
 
@@ -459,7 +464,7 @@ function insert_lbf_item($form_id, $field_id, $field_value) {
   return $form_id;
 }
 
-// These variables are used to compute the service with highest CYP.
+// These variables are used to compute the initial consult service with highest CYP.
 //
 $contraception_code = '';
 $contraception_cyp  = 0;
@@ -485,11 +490,18 @@ if (!empty($_POST['pricelevel'])) {
 }
 
 // Get some info about this visit.
-$visit_row = sqlQuery("SELECT fe.date, opc.pc_catname " .
+$visit_row = sqlQuery("SELECT fe.date, opc.pc_catname, fac.pos_code " .
   "FROM form_encounter AS fe " .
   "LEFT JOIN openemr_postcalendar_categories AS opc ON opc.pc_catid = fe.pc_catid " .
+  "LEFT JOIN facility AS fac ON fac.id = fe.facility_id " .
   "WHERE fe.pid = '$pid' AND fe.encounter = '$encounter' LIMIT 1");
 $visit_date = substr($visit_row['date'], 0, 10);
+$tmp = 0 + $visit_row['pos_code'];
+// This flag is specific to IPPF validation at form submit time.
+// It indicates if the facility's COD code is one that calls for most
+// contraceptive services and products to match up on the fee sheet.
+$match_services_to_products = $GLOBALS['ippf_specific'] &&
+  ($tmp == 1 || $tmp == 2 || $tmp == 3 || $tmp == 5);
 
 if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   // Check for insufficient product inventory levels.
@@ -904,7 +916,9 @@ function validate(f) {
    // The following applies to contraception for family planning clinics.
    var tmp_cyp = parseFloat(f[pfx+'[cyp]'].value);
    var tmp_meth = f[pfx+'[method]'].value;
-   if (tmp_cyp > max_contra_cyp) {
+   var tmp_methtype = parseInt(f[pfx+'[methtype]'].value);
+   if (tmp_cyp > max_contra_cyp && tmp_methtype == 2) {
+    // max_contra_* tracks max cyp for initial consults only.
     max_contra_cyp = tmp_cyp;
     max_contra_code = tmp_meth;
    }
@@ -922,6 +936,7 @@ function validate(f) {
    if (!confirm('<?php echo xl('Warning: Contraception for a patient under 10 or over 50.'); ?>'))
     return false;
 <?php } // end if improper age ?>
+<?php if ($match_services_to_products) { ?>
    // Nonsurgical methods should normally include a corresponding product.
    if (tmp_meth.substring(0, 2) != '12') {
     var got_prod = false;
@@ -937,9 +952,11 @@ function validate(f) {
       return false;
     }
    }
+<?php } // end match services to products ?>
   }
   // End contraception validation.
  }
+<?php if ($match_services_to_products) { ?>
  // The following applies to contraception for family planning clinics.
  // Loop thru the products.
  for (var lino = 1; f['prod['+lino+'][drug_id]']; ++lino) {
@@ -962,6 +979,7 @@ function validate(f) {
    }
   }
  }
+<?php } // end match services to products ?>
  // End contraception validation.
  if (!refreshing && !searching) {
   if (!f.ProviderID.value) {
