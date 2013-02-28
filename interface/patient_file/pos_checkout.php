@@ -167,6 +167,17 @@ function generate_receipt($patient_id, $encounter=0) {
   global $css_header, $details, $rapid_data_entry, $aAdjusts;
   global $web_root, $webserver_root;
 
+
+
+  if (true) { // TBD: $GLOBALS['gbl_custom_receipt']
+    require_once($GLOBALS['srcdir'] . "/checkout_receipt_array.inc.php");
+    require_once($GLOBALS['OE_SITE_DIR'] . "/checkout_receipt.inc.php");
+    generateCheckoutReceipt(generateReceiptArray($patient_id, $encounter));
+    return;
+  }
+
+
+
   // Get the most recent invoice data or that for the specified encounter.
   if ($encounter) {
     $ferow = sqlQuery("SELECT id, date, encounter, facility_id FROM form_encounter " .

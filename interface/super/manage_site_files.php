@@ -30,6 +30,7 @@ if (!acl_check('admin', 'super')) die(xl('Not authorized','','','!'));
 
 // Prepare array of names of editable files, relative to the site directory.
 $my_files = array(
+  "checkout_receipt.inc.php",
   "clickoptions.txt",
   "config.php",
   "faxcover.txt",
