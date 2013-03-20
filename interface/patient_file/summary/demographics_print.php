@@ -97,9 +97,16 @@ p.grpheader {
 
 div.section {
  width: 98%;
+<?php
+  // html2pdf screws up the div borders when a div overflows to a second page.
+  // Our temporary solution is to turn off the borders in the case where this
+  // is likely to happen (i.e. where all form options are listed).
+  if (!$isform) {
+?>
  border-style: solid;
  border-width: 1px;
  border-color: #000000;
+<?php } ?>
  padding: 5pt;
 }
 div.section table {
@@ -241,7 +248,20 @@ while ($frow = sqlFetchArray($fres)) {
   // Handle a data category (group) change.
   if (strcmp($this_group, $last_group) != 0) {
     end_group();
-    if (strlen($last_group) > 0) echo "<br />\n";
+
+    // if (strlen($last_group) > 0) echo "<br />\n";
+
+    // This replaces the above statement and is an attempt to work around a
+    // nasty html2pdf bug. When a table overflows to the next page, vertical
+    // positioning for whatever follows it is off and can cause overlap.
+    if (strlen($last_group) > 0) {
+      echo "</nobreak><br /><div><table><tr><td>&nbsp;</td></tr></table></div><br />\n";
+    }
+
+    // This is also for html2pdf. Telling it that the following stuff should
+    // start on a new page if there is not otherwise room for it on this page.
+    echo "<nobreak>\n"; // grasping
+
     $group_name = substr($this_group, 1);
     $last_group = $this_group;
     echo "<p class='grpheader'>" . xl_layout_label($group_name) . "</p>\n";
@@ -304,6 +324,9 @@ while ($frow = sqlFetchArray($fres)) {
 }
 
 end_group();
+
+// Ending the last nobreak section for html2pdf.
+if (strlen($last_group) > 0) echo "</nobreak>\n";
 ?>
 
 </form>
