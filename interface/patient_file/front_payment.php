@@ -325,11 +325,11 @@ if ($_POST['form_save_pr'] || $_REQUEST['receipt']) {
 
 <p><h2><?php xl('Receipt for Payment','e'); ?></h2>
 
-<p><?php echo htmlentities($frow['name']) ?>
-<br><?php echo htmlentities($frow['street']) ?>
-<br><?php echo htmlentities($frow['city'] . ', ' . $frow['state']) . ' ' .
+<p><?php echo htmlspecialchars($frow['name']) ?>
+<br><?php echo htmlspecialchars($frow['street']) ?>
+<br><?php echo htmlspecialchars($frow['city'] . ', ' . $frow['state']) . ' ' .
     $frow['postal_code'] ?>
-<br><?php echo htmlentities($frow['phone']) ?>
+<br><?php echo htmlspecialchars($frow['phone']) ?>
 
 <p>
 <table border='0' cellspacing='8'>
