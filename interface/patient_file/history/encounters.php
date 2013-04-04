@@ -452,7 +452,9 @@ if ($result = getEncounters($pid)) {
               }
             }
 
-            if ($subresult2) { // if there is at least one billing item
+            // Condition removed 2013-04-04 by Rod - it seems pointless and wrong.
+            //
+            // if ($subresult2) { // if there is at least one billing item
 
                 // Get A/R info, if available, for this encounter.
                 $arinvoice = array();
@@ -534,16 +536,21 @@ if ($result = getEncounters($pid)) {
                         if ($binfo[0]) {
                             for ($i = 0; $i < 5; ++$i) $binfo[$i] .= '<br>';
                         }
-                        for ($i = 0; $i < 5; ++$i) $binfo[$i] .= "<font color='red'>";
-                        $binfo[0] .= $codekey;
+                        // for ($i = 0; $i < 5; ++$i) $binfo[$i] .= "<font color='red'>";
+                        if ($codekey == 'Unknown') {
+                          if ($val['adj']) $codekey = xl('Adjustment');
+                          else $codekey = xl('Payment');
+                        }
+                        $binfo[0] .= $arlinkbeg . $codekey . $arlinkend;
                         $binfo[1] .= oeFormatMoney($val['chg'] + $val['adj']);
                         $binfo[2] .= oeFormatMoney($val['chg'] - $val['bal']);
                         $binfo[3] .= oeFormatMoney($val['adj']);
                         $binfo[4] .= oeFormatMoney($val['bal']);
-                        for ($i = 0; $i < 5; ++$i) $binfo[$i] .= "</font>";
+                        // for ($i = 0; $i < 5; ++$i) $binfo[$i] .= "</font>";
                     }
                 }
-            } // end if there is billing
+
+            // } // end if there is billing
 
             // echo "<td class='text'>".$binfo[0]."</td>\n";
             $hcodes .= "<td class='text'>" . $binfo[0] . "</td>\n";
