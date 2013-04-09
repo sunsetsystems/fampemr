@@ -51,15 +51,15 @@ function receiptArrayDetailLine(&$aReceipt, $code_type, $code, $description, $qu
     'price'       => $price,
     'quantity'    => $quantity,
     'charge'      => $charge,
-    'adjustment'  => $adjust,
+    'adjustment'  => sprintf('%01.2f', $adjust),
     'total'       => $total,
   );
 
-  $aReceipt['total_price']       += $price;
-  $aReceipt['total_quantity']    += $quantity;
-  $aReceipt['total_charges']     += $charge;
-  $aReceipt['total_adjustments'] += $adjust;
-  $aReceipt['total_totals']      += $total;
+  $aReceipt['total_price']       = sprintf('%01.2f', $aReceipt['total_price'      ] + $price   );
+  $aReceipt['total_quantity']    = sprintf('%01.2f', $aReceipt['total_quantity'   ] + $quantity);
+  $aReceipt['total_charges']     = sprintf('%01.2f', $aReceipt['total_charge'     ] + $charge  );
+  $aReceipt['total_adjustments'] = sprintf('%01.2f', $aReceipt['total_adjustments'] + $adjust  );
+  $aReceipt['total_totals']      = sprintf('%01.2f', $aReceipt['total_totals'     ] + $total   );
 }
 
 // Store a receipt payment line.
@@ -102,6 +102,22 @@ function generateReceiptArray($patient_id, $encounter=0) {
 
   $patdata = getPatientData($patient_id, 'fname,mname,lname,pubpid,street,city,state,postal_code');
 
+  // Get text for the logged-in user's name (first middle last).
+  $username = "UID: " . $_SESSION["authUserID"];
+  $userrow = sqlQuery("SELECT id, fname, mname, lname FROM users " .
+    "WHERE id = '" . $_SESSION["authUserID"] . "'");
+  if ($userrow['id']) {
+    if (!empty($userrow['fname'])) $username = $userrow['fname'];
+    if (!empty($userrow['mname'])) {
+      if (!empty($username)) $username .= ' ';
+      $username .= $userrow['mname'];
+    }
+    if (!empty($userrow['lname'])) {
+      if (!empty($username)) $username .= ' ';
+      $username .= $userrow['lname'];
+    }
+  }
+
   // Compute numbers for summary on right side of page.
   $head_begbal = get_patient_balance($patient_id, $encounter);
   $row = sqlQuery("SELECT SUM(fee) AS amount FROM billing WHERE " .
@@ -142,6 +158,7 @@ function generateReceiptArray($patient_id, $encounter=0) {
     'facility_state'    => $frow['state'],
     'facility_zip'      => $frow['postal_code'],
     'facility_phone'    => $frow['phone'],
+    'username'          => $username,
     'starting_balance'  => $head_begbal,
     'ending_balance'    => $head_endbal,
     'items'             => array(),

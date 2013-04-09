@@ -14,10 +14,24 @@ require_once($GLOBALS['fileroot'] . '/library/html2pdf/_tcpdf_5.0.002/tcpdf.php'
 
 // Global statement here because we're invoked within a function.
 global $GCR_PAGE_WIDTH, $GCR_PAGE_HEIGHT, $GCR_LINE_HEIGHT, $GCR_ITEMS_PER_PAGE;
+global $DETAIL_WIDTH_1, $DETAIL_WIDTH_2, $DETAIL_WIDTH_3, $DETAIL_WIDTH_4, $DETAIL_WIDTH_5;
+global $DETAIL_POS_1, $DETAIL_POS_2, $DETAIL_POS_3, $DETAIL_POS_4, $DETAIL_POS_5;
+
 $GCR_PAGE_WIDTH     = 504;
 $GCR_PAGE_HEIGHT    = 396;
 $GCR_LINE_HEIGHT    =  10;
 $GCR_ITEMS_PER_PAGE =   8;
+
+$DETAIL_POS_1 =  18;
+$DETAIL_POS_2 =  99;
+$DETAIL_POS_3 = 306;
+$DETAIL_POS_4 = 368;
+$DETAIL_POS_5 = 442;
+$DETAIL_WIDTH_1 = $DETAIL_POS_2 - $DETAIL_POS_1 - 9;
+$DETAIL_WIDTH_2 = $DETAIL_POS_3 - $DETAIL_POS_2 - 9;
+$DETAIL_WIDTH_3 = $DETAIL_POS_4 - $DETAIL_POS_3 - 18;
+$DETAIL_WIDTH_4 = $DETAIL_POS_5 - $DETAIL_POS_4 - 18;
+$DETAIL_WIDTH_5 = $GCR_PAGE_WIDTH - $DETAIL_POS_5 - 9;
 
 function gcrHeader(&$aReceipt, &$pdf) {
   global $GCR_PAGE_WIDTH, $GCR_LINE_HEIGHT;
@@ -81,21 +95,53 @@ function gcrFooter(&$aReceipt, &$pdf, $xpos, $width) {
   $pdf->MultiCell($width, $GCR_LINE_HEIGHT,
     sprintf("%01.2f", $aReceipt['total_totals']),
     0, 'R', 0, 1, $xpos, $ypos, true, 0, false, true, 0);
+
+  // Write line for cashier (user) name.
+  $ypos += $GCR_LINE_HEIGHT * 2;
+  $sigwidth = intval($GCR_PAGE_WIDTH * 0.4);
+  $xpos = $GCR_PAGE_WIDTH - $sigwidth;
+  $pdf->MultiCell($sigwidth, $GCR_LINE_HEIGHT,
+    $aReceipt['username'],
+    0, 'L', 0, 1, $xpos, $ypos, true, 0, false, true, 0);
+}
+
+function gcrLine(&$aReceipt, &$pdf, $code, $description, $quantity, $price, $total) {
+  global $lino, $GCR_LINE_HEIGHT, $GCR_ITEMS_PER_PAGE;
+  global $DETAIL_WIDTH_1, $DETAIL_WIDTH_2, $DETAIL_WIDTH_3, $DETAIL_WIDTH_4, $DETAIL_WIDTH_5;
+  global $DETAIL_POS_1, $DETAIL_POS_2, $DETAIL_POS_3, $DETAIL_POS_4, $DETAIL_POS_5;
+
+  // If overflow, start a new page.
+  if ((($lino % $GCR_ITEMS_PER_PAGE) == 0) && $lino) {
+    gcrHeader($aReceipt, $pdf);
+  }
+
+  // Write product/service code.
+  $pdf->MultiCell($DETAIL_WIDTH_1, $GCR_LINE_HEIGHT, $code,
+    0, 'L', 0, 0, $DETAIL_POS_1, '', true, 0, false, true, 0);
+
+  // Write product/service description, truncating if needed.
+  $pdf->MultiCell($DETAIL_WIDTH_2, $GCR_LINE_HEIGHT,
+    substr($description, 0, 32),
+    0, 'L', 0, 0, $DETAIL_POS_2, '', true, 0, false, true, 0);
+
+  // Write unit price.
+  $pdf->MultiCell($DETAIL_WIDTH_3, $GCR_LINE_HEIGHT, $quantity,
+    0, 'R', 0, 0, $DETAIL_POS_3, '', true, 0, false, true, 0);
+
+  // Write number of units.
+  $pdf->MultiCell($DETAIL_WIDTH_4, $GCR_LINE_HEIGHT, $price,
+    0, 'R', 0, 0, $DETAIL_POS_4, '', true, 0, false, true, 0);
+
+  // Write extended amount.
+  $pdf->MultiCell($DETAIL_WIDTH_5, $GCR_LINE_HEIGHT, $total,
+    0, 'R', 0, 1, $DETAIL_POS_5, '', true, 0, false, true, 0);
+
+  ++$lino;
 }
 
 function generateCheckoutReceipt(&$aReceipt) {
-  global $GCR_PAGE_WIDTH, $GCR_PAGE_HEIGHT, $GCR_LINE_HEIGHT, $GCR_ITEMS_PER_PAGE;
-
-  $DETAIL_POS_1 =  18;
-  $DETAIL_POS_2 =  99;
-  $DETAIL_POS_3 = 306;
-  $DETAIL_POS_4 = 368;
-  $DETAIL_POS_5 = 442;
-  $DETAIL_WIDTH_1 = $DETAIL_POS_2 - $DETAIL_POS_1 - 9;
-  $DETAIL_WIDTH_2 = $DETAIL_POS_3 - $DETAIL_POS_2 - 9;
-  $DETAIL_WIDTH_3 = $DETAIL_POS_4 - $DETAIL_POS_3 - 18;
-  $DETAIL_WIDTH_4 = $DETAIL_POS_5 - $DETAIL_POS_4 - 18;
-  $DETAIL_WIDTH_5 = $GCR_PAGE_WIDTH - $DETAIL_POS_5 - 9;
+  global $GCR_PAGE_WIDTH, $GCR_PAGE_HEIGHT, $GCR_LINE_HEIGHT;
+  global $DETAIL_WIDTH_5, $DETAIL_POS_5;
 
   // $pdf = new TCPDF('P', 'pt', 'A4', true, 'UTF-8', false);
   $pdf = new TCPDF('L', 'pt', array($GCR_PAGE_WIDTH, $GCR_PAGE_HEIGHT), true, 'UTF-8', false);
@@ -125,38 +171,16 @@ function generateCheckoutReceipt(&$aReceipt) {
   // Loop for detail lines.
   $lino = 0;
   foreach ($aReceipt['items'] as $item) {
-
-    // If overflow, start a new page.
-    if ((($lino % $GCR_ITEMS_PER_PAGE) == 0) && $lino) {
-      gcrHeader($aReceipt, $pdf);
+    // Insert a charge line unless this is only an adjustment.
+    if ($item['adjustment'] == 0.00 || $item['charge'] != 0.00) {
+      gcrLine($aReceipt, $pdf, $item['code'], $item['description'],
+        $item['quantity'], $item['price'], $item['charge']);
     }
-
-    // Write product/service code.
-	  $pdf->MultiCell($DETAIL_WIDTH_1, $GCR_LINE_HEIGHT,
-      $item['code'],
-      0, 'L', 0, 0, $DETAIL_POS_1, '', true, 0, false, true, 0);
-
-    // Write product/service description, truncating if needed.
-	  $pdf->MultiCell($DETAIL_WIDTH_2, $GCR_LINE_HEIGHT,
-      substr($item['description'], 0, 32),
-      0, 'L', 0, 0, $DETAIL_POS_2, '', true, 0, false, true, 0);
-
-    // Write unit price.
-	  $pdf->MultiCell($DETAIL_WIDTH_3, $GCR_LINE_HEIGHT,
-      $item['quantity'],
-      0, 'R', 0, 0, $DETAIL_POS_3, '', true, 0, false, true, 0);
-
-    // Write number of units.
-	  $pdf->MultiCell($DETAIL_WIDTH_4, $GCR_LINE_HEIGHT,
-      $item['price'],
-      0, 'R', 0, 0, $DETAIL_POS_4, '', true, 0, false, true, 0);
-
-    // Write extended amount.
-	  $pdf->MultiCell($DETAIL_WIDTH_5, $GCR_LINE_HEIGHT,
-      $item['total'],
-      0, 'R', 0, 1, $DETAIL_POS_5, '', true, 0, false, true, 0);
-
-    ++$lino;
+    // If there is an adjustment insert a line for it.
+    if ($item['adjustment'] != 0.00) {
+      gcrLine($aReceipt, $pdf, $item['code'], xl('Adjustment'),
+        '', '', $item['adjustment']);
+    }
   }
 
   gcrFooter($aReceipt, $pdf, $DETAIL_POS_5, $DETAIL_WIDTH_5);

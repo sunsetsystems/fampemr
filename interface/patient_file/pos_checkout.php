@@ -167,17 +167,6 @@ function generate_receipt($patient_id, $encounter=0) {
   global $css_header, $details, $rapid_data_entry, $aAdjusts;
   global $web_root, $webserver_root;
 
-
-
-  if (true) { // TBD: $GLOBALS['gbl_custom_receipt']
-    require_once($GLOBALS['srcdir'] . "/checkout_receipt_array.inc.php");
-    require_once($GLOBALS['OE_SITE_DIR'] . "/checkout_receipt.inc.php");
-    generateCheckoutReceipt(generateReceiptArray($patient_id, $encounter));
-    return;
-  }
-
-
-
   // Get the most recent invoice data or that for the specified encounter.
   if ($encounter) {
     $ferow = sqlQuery("SELECT id, date, encounter, facility_id FROM form_encounter " .
@@ -555,13 +544,21 @@ body, td {
 </p>
 </div>
 
-<?php if ($rapid_data_entry && $GLOBALS['concurrent_layout']) { ?>
 <script language="JavaScript">
  top.restoreSession();
+
+<?php if ($rapid_data_entry && $GLOBALS['concurrent_layout']) { ?>
  parent.left_nav.setRadio('RTop', 'new');
  parent.left_nav.loadFrame('new1', 'RTop', 'new/new.php');
-</script>
 <?php } ?>
+
+<?php if (is_file($GLOBALS['OE_SITE_DIR'] . "/checkout_receipt.inc.php")) { ?>
+ // Custom checkout receipt exists so needs to be sent as a PDF in a new window or tab.
+ window.open('pos_checkout.php?<?php echo "ptid=$patient_id&enc=$encounter&pdf=1"; ?>',
+  '_blank', 'width=750,height=550,resizable=1,scrollbars=1');
+<?php } ?>
+
+</script>
 
 </body>
 </html>
@@ -966,10 +963,18 @@ if ($_POST['form_save']) {
   exit();
 }
 
-// If an encounter ID was given, then we must generate a receipt.
+// If an encounter ID was given, then we must generate a receipt and exit.
 //
 if (!empty($_GET['enc'])) {
-  generate_receipt($patient_id, $_GET['enc']);
+  if (empty($_GET['pdf'])) {
+    generate_receipt($patient_id, $_GET['enc']);
+  }
+  else {
+    // PDF receipt is requested. In this case we are probably in a new window.
+    require_once($GLOBALS['srcdir'] . "/checkout_receipt_array.inc.php");
+    require_once($GLOBALS['OE_SITE_DIR'] . "/checkout_receipt.inc.php");
+    generateCheckoutReceipt(generateReceiptArray($patient_id, $_GET['enc']));
+  }
   exit();
 }
 
