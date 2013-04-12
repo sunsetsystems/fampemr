@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2006-2012 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2006-2013 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -32,7 +32,7 @@ function display_desc($desc) {
 // items in proportion to their line-level remaining balances.
 //
 function ensureLineAmounts($patient_id, $encounter_id) {
-  global $aItems;
+  global $aItems, $overpayments;
 
   $invno = "$patient_id.$encounter_id";
   if (isset($aItems[$invno])) return $invno;
@@ -118,7 +118,87 @@ function ensureLineAmounts($patient_id, $encounter_id) {
     }
   }
 
+  // For each line item having (payment > charge - adjustment), move the
+  // overpayment amount to a global variable $overpayments.
+  foreach ($aItems[$invno] AS $codekey => $dummy) {
+    $diff = $aItems[$invno][$codekey][2] + $aItems[$invno][$codekey][1] - $aItems[$invno][$codekey][0];
+    $diff = sprintf('%01.2f', $diff);
+    if ($diff > 0.00) {
+      $overpayments += $diff;
+      $aItems[$invno][$codekey][2] -= $diff;
+    }
+  }
+
   return $invno;
+}
+
+function writeCatTotals($category, $catleft, $catqty, $cattotal, $catadjtotal, $catpaytotal) {
+  if ($_POST['form_csvexport']) return;
+  if (!$category) return;
+  if ($catleft == '') $catleft = '&nbsp;';
+?>
+ <tr bgcolor="#ffdddd">
+  <td class="detail">
+   <?php echo $catleft; ?>
+  </td>
+  <td class="detail" colspan="3">
+   <?php echo xl('Total for category') . ' '; echo display_desc($category); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php echo $catqty ? $catqty : ''; ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($cattotal); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($catadjtotal); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($catpaytotal); ?>
+  </td>
+ </tr>
+<?php
+}
+
+function writeProdTotals($category, $catleft, $product,
+  $productqty, $producttotal, $prodadjtotal, $prodpaytotal)
+{
+  // Print product total.
+  if ($_POST['form_csvexport']) {
+    if (! $_POST['form_details']) {
+      echo '"' . display_desc($category) . '",';
+      echo '"' . display_desc($product)  . '",';
+      echo '"' . $productqty             . '",';
+      echo '"'; bucks($producttotal); echo '",';
+      echo '"'; bucks($prodadjtotal); echo '",';
+      echo '"'; bucks($prodpaytotal); echo '"';
+      echo "\n";
+    }
+  }
+  else {
+?>
+ <tr bgcolor="#ddddff">
+  <td class="detail">
+   <?php echo display_desc($catleft); $catleft = "&nbsp;"; ?>
+  </td>
+  <td class="detail" colspan="3">
+   <?php if ($_POST['form_details']) echo xl('Total for') . ' '; echo display_desc($product); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php echo $productqty; ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($producttotal); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($prodadjtotal); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($prodpaytotal); ?>
+  </td>
+ </tr>
+<?php
+  } // End not csv export
 }
 
 function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
@@ -143,42 +223,8 @@ function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
 
   if ($product != $rowproduct || $category != $rowcat) {
     if ($product) {
-      // Print product total.
-      if ($_POST['form_csvexport']) {
-        if (! $_POST['form_details']) {
-          echo '"' . display_desc($category) . '",';
-          echo '"' . display_desc($product)  . '",';
-          echo '"' . $productqty             . '",';
-          echo '"'; bucks($producttotal); echo '",';
-          echo '"'; bucks($prodadjtotal); echo '",';
-          echo '"'; bucks($prodpaytotal); echo '"';
-          echo "\n";
-        }
-      }
-      else {
-?>
- <tr bgcolor="#ddddff">
-  <td class="detail">
-   <?php echo display_desc($catleft); $catleft = "&nbsp;"; ?>
-  </td>
-  <td class="detail" colspan="3">
-   <?php if ($_POST['form_details']) echo xl('Total for') . ' '; echo display_desc($product); ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php echo $productqty; ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php bucks($producttotal); ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php bucks($prodadjtotal); ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php bucks($prodpaytotal); ?>
-  </td>
- </tr>
-<?php
-      } // End not csv export
+      writeProdTotals($category, $catleft, $product, $productqty, $producttotal, $prodadjtotal, $prodpaytotal);
+      $catleft = "&nbsp;";
     }
     $producttotal = 0;
     $prodadjtotal = 0;
@@ -189,34 +235,7 @@ function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
   }
 
   if ($category != $rowcat) {
-    if ($category) {
-      // Print category total.
-      if (!$_POST['form_csvexport']) {
-?>
-
- <tr bgcolor="#ffdddd">
-  <td class="detail">
-   &nbsp;
-  </td>
-  <td class="detail" colspan="3">
-   <?php echo xl('Total for category') . ' '; echo display_desc($category); ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php echo $catqty; ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php bucks($cattotal); ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php bucks($catadjtotal); ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php bucks($catpaytotal); ?>
-  </td>
- </tr>
-<?php
-      } // End not csv export
-    }
+    writeCatTotals($category, '', $catqty, $cattotal, $catadjtotal, $catpaytotal);
     $cattotal = 0;
     $catadjtotal = 0;
     $catpaytotal = 0;
@@ -281,7 +300,7 @@ function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
   $productqty    += $qty;
   $catqty        += $qty;
   $grandqty      += $qty;
-} // end function
+} // end function thisLineItem
 
   if (! acl_check('acct', 'rep')) die(xl("Unauthorized access."));
 
@@ -450,6 +469,7 @@ function doinvopen(ptid,encid) {
     $grandadjtotal = 0;
     $grandpaytotal = 0;
     $grandqty = 0;
+    $overpayments = 0;
 
     $aItems = array();
 
@@ -496,61 +516,21 @@ function doinvopen(ptid,encid) {
         $row['fee'], $row['invoice_refno']);
     }
 
-    if ($_POST['form_csvexport']) {
-      if (! $_POST['form_details']) {
-        echo '"' . display_desc($product) . '",';
-        echo '"' . $productqty            . '",';
-        echo '"'; bucks($producttotal); echo '",';
-        echo '"'; bucks($prodadjtotal); echo '",';
-        echo '"'; bucks($prodpaytotal); echo '"';
-        echo "\n";
-      }
+    // Write totals for last product.
+    writeProdTotals($category, $catleft, $product, $productqty, $producttotal, $prodadjtotal, $prodpaytotal);
+
+    // Write totals for last category.
+    writeCatTotals($category, '', $catqty, $cattotal, $catadjtotal, $catpaytotal);
+
+    // Write total for overpayments if there are any.
+    if ($overpayments != 0.00) {
+      writeCatTotals(xl('Overpayments'), xl('Overpayments'), 0, 0, 0, $overpayments);
+      $grandpaytotal += $overpayments;
     }
-    else {
+
+    if (!$_POST['form_csvexport']) {
+      // Write grand totals.
 ?>
-
- <tr bgcolor="#ddddff">
-  <td class="detail">
-   <?php echo display_desc($catleft); $catleft = "&nbsp;"; ?>
-  </td>
-  <td class="detail" colspan="3">
-   <?php if ($_POST['form_details']) echo xl('Total for') . ' '; echo display_desc($product); ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php echo $productqty; ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php bucks($producttotal); ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php bucks($prodadjtotal); ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php bucks($prodpaytotal); ?>
-  </td>
- </tr>
-
- <tr bgcolor="#ffdddd">
-  <td class="detail">
-   &nbsp;
-  </td>
-  <td class="detail" colspan="3">
-   <?php echo xl('Total for category') . ' '; echo display_desc($category); ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php echo $catqty; ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php bucks($cattotal); ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php bucks($catadjtotal); ?>
-  </td>
-  <td class="dehead" align="right">
-   <?php bucks($catpaytotal); ?>
-  </td>
- </tr>
-
  <tr bgcolor="#dddddd">
   <td class="detail" colspan="4">
    <?php xl('Grand Total','e'); ?>
@@ -568,7 +548,6 @@ function doinvopen(ptid,encid) {
    <?php bucks($grandpaytotal); ?>
   </td>
  </tr>
-
 <?php
     } // End not csv export
   }
