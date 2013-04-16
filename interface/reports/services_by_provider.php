@@ -8,6 +8,10 @@
 
 // This is a report of services by provider.
 
+// Note this script does not currently report payments, but the code includes
+// some baggage for them anyway because it's easy to do so, and payments may
+// be wanted in the future.
+
 require_once("../globals.php");
 require_once("$srcdir/patient.inc");
 require_once("$srcdir/acl.inc");
@@ -20,17 +24,137 @@ function display_desc($desc) {
   return $desc;
 }
 
-function thisLineItem($rowpatientid, $rowencounterid, $rowcodetype, $rowcode, $rowcat,
-  $rowdesc, $rowqty, $rowirnumber='', $rowproviderid, $rowprovidername) {
+// For a given encounter, this gets all charges and allocates payments and
+// adjustments among them, if that has not already been done.
+// Any invoice-level adjustments and payments are allocated among the line
+// items in proportion to their line-level remaining balances.
+//
+function ensureLineAmounts($patient_id, $encounter_id) {
+  global $aItems, $overpayments;
 
-  global $productname, $productcode, $producttotal, $invoices;
-  global $providerid, $providername, $category, $provleft, $catleft;
-  global $provtotal, $cattotal, $grandtotal;
+  $invno = "$patient_id.$encounter_id";
+  if (isset($aItems[$invno])) return $invno;
 
-  $invnumber = $rowirnumber ? $rowirnumber : "$rowpatientid.$rowencounterid";
+  $adjusts = 0;  // sum of invoice level adjustments
+  $payments = 0; // sum of invoice level payments
+  $denom = 0;    // sum of adjusted line item charges
+  $aItems[$invno] = array();
+
+  // Get charges and copays from billing table.
+  $tres = sqlStatement("SELECT b.code_type, b.code, b.fee " .
+    "FROM billing AS b WHERE " .
+    "b.pid = '$patient_id' AND b.encounter = '$encounter_id' AND " .
+    "b.activity = 1 AND b.fee != 0");
+  while ($trow = sqlFetchArray($tres)) {
+    if ($trow['code_type'] == 'COPAY') {
+      $payments -= $trow['fee'];
+    }
+    else {
+      $codekey = $trow['code_type'] . ':' . $trow['code'];
+      if (!isset($aItems[$invno][$codekey])) {
+        // Charges, Adjustments, Payments
+        $aItems[$invno][$codekey] = array(0, 0, 0);
+      }
+      $aItems[$invno][$codekey][0] += $trow['fee'];
+      $denom += $trow['fee'];
+    }
+  }
+
+  // Get charges from drug_sales table.
+  $tres = sqlStatement("SELECT s.drug_id, s.fee " .
+    "FROM drug_sales AS s WHERE " .
+    "s.pid = '$patient_id' AND s.encounter = '$encounter_id' AND s.fee != 0");
+  while ($trow = sqlFetchArray($tres)) {
+    $codekey = 'PROD:' . $trow['drug_id'];
+    if (!isset($aItems[$invno][$codekey])) {
+      $aItems[$invno][$codekey] = array(0, 0, 0);
+    }
+    $aItems[$invno][$codekey][0] += $trow['fee'];
+    $denom += $trow['fee'];
+  }
+
+  // Get adjustments and other payments from ar_activity table.
+  $tres = sqlStatement("SELECT " .
+    "a.code_type, a.code, a.adj_amount, a.pay_amount " .
+    "FROM ar_activity AS a WHERE " .
+    "a.pid = '$patient_id' AND a.encounter = '$encounter_id'");
+  while ($trow = sqlFetchArray($tres)) {
+    $codekey = $trow['code_type'] . ':' . $trow['code'];
+    if (isset($aItems[$invno][$codekey])) {
+      $aItems[$invno][$codekey][1] += $trow['adj_amount'];
+      $aItems[$invno][$codekey][2] += $trow['pay_amount'];
+      $denom -= $trow['adj_amount'];
+      $denom -= $trow['pay_amount'];
+    }
+    else {
+      $adjusts  += $trow['adj_amount'];
+      $payments += $trow['pay_amount'];
+    }
+  }
+
+  // Allocate all unmatched payments and adjustments among the line items.
+  $adjrem = $adjusts;  // remaining unallocated adjustments
+  $payrem = $payments; // remaining unallocated payments
+  $nlines = count($aItems[$invno]);
+  foreach ($aItems[$invno] AS $codekey => $dummy) {
+    if (--$nlines > 0) {
+      // Avoid dividing by zero!
+      if ($denom) {
+        $factor = ($aItems[$invno][$codekey][0] - $aItems[$invno][$codekey][1] - $aItems[$invno][$codekey][2]) / $denom;
+        $tmp = sprintf('%01.2f', $adjusts * $factor);
+        $aItems[$invno][$codekey][1] += $tmp;
+        $adjrem -= $tmp;
+        $tmp = sprintf('%01.2f', $payments * $factor);
+        $aItems[$invno][$codekey][2] += $tmp;
+        $payrem -= $tmp;
+      }
+    }
+    else {
+      // Last line gets what's left to avoid rounding errors.
+      $aItems[$invno][$codekey][1] += $adjrem;
+      $aItems[$invno][$codekey][2] += $payrem;
+    }
+  }
+
+  // Next part doesn't apply because we are not doing payments, but may if we do.
+  /*******************************************************************
+  // For each line item having (payment > charge - adjustment), move the
+  // overpayment amount to a global variable $overpayments.
+  foreach ($aItems[$invno] AS $codekey => $dummy) {
+    $diff = $aItems[$invno][$codekey][2] + $aItems[$invno][$codekey][1] - $aItems[$invno][$codekey][0];
+    $diff = sprintf('%01.2f', $diff);
+    if ($diff > 0.00) {
+      $overpayments += $diff;
+      $aItems[$invno][$codekey][2] -= $diff;
+    }
+  }
+  *******************************************************************/
+
+  return $invno;
+}
+
+function thisLineItem($rowpatientid, $rowencounterid, $rowcodetype, $rowcode,
+  $rowcat, $rowdesc, $rowqty, $rowproviderid, $rowprovidername) {
+
+  global $aItems;
+  global $productname, $productcode;
+  global $productqty, $productchg, $productadj, $productpay;
+  global $category, $catleft;
+  global $catqty, $catchg, $catadj, $catpay;
+  global $providerid, $providername, $provleft;
+  global $provqty, $provchg, $provadj, $provpay;
+  global $grandqty, $grandchg, $grandadj, $grandpay;
+
   $codekey = $rowcodetype . ':' . $rowcode;
 
-  if (empty($rowcat)) $rowcat = 'None';
+  if (empty($rowcat)) $rowcat = xl('None');
+
+  if (!$rowqty) $rowqty = 1;
+  $invno = ensureLineAmounts($rowpatientid, $rowencounterid);
+  $rowchg = $aItems[$invno][$codekey][0];
+  $rowadj = $aItems[$invno][$codekey][1];
+  $rowpay = $aItems[$invno][$codekey][2];
+
   $rowproduct = $rowdesc;
   if (! $rowproduct) $rowproduct = 'Unknown';
 
@@ -43,8 +167,10 @@ function thisLineItem($rowpatientid, $rowencounterid, $rowcodetype, $rowcode, $r
           echo '"' . $category . '",';
           echo '"' . $productcode . '",';
           echo '"' . $productname . '",';
-          echo '"' . $producttotal . '",';
-          echo '"' . $invoices . '"';
+          echo '"' . $productqty . '"';
+          echo '"' . oeFormatMoney($productchg / $productqty) . '",';
+          echo '"' . oeFormatMoney($productadj) . '",';
+          echo '"' . oeFormatMoney($productchg - $productadj) . '"';
           echo "\n";
         }
       }
@@ -64,22 +190,29 @@ function thisLineItem($rowpatientid, $rowencounterid, $rowcodetype, $rowcode, $r
    <?php echo htmlspecialchars($productname); ?>
   </td>
   <td class="detail" align="right">
-   <?php echo $producttotal; ?>
+   <?php echo $productqty; ?>
   </td>
-  <td class="detail">
-   <?php echo htmlspecialchars($invoices); ?>
+  <td class="detail" align="right">
+   <?php echo oeFormatMoney($productchg / $productqty); ?>
+  </td>
+  <td class="detail" align="right">
+   <?php echo oeFormatMoney($productadj); ?>
+  </td>
+  <td class="detail" align="right">
+   <?php echo oeFormatMoney($productchg - $productadj); ?>
   </td>
  </tr>
 <?php
       } // End not csv export
     }
-    $producttotal = 0;
+    $productqty = 0;
+    $productchg = 0;
+    $productadj = 0;
+    $productpay = 0;
     $productname = $rowproduct;
     $productcode = $rowcode;
-    $invoices = '';
     if ($category != $rowcat || $providerid != $rowproviderid) {
-      $category = $rowcat;
-      $catleft = $category;
+      $catleft = $category = $rowcat;
     }
   }
 
@@ -96,10 +229,16 @@ function thisLineItem($rowpatientid, $rowencounterid, $rowcodetype, $rowcode, $r
    <?php echo xl('Total for') . ' '; echo $providername; ?>
   </td>
   <td class="dehead" align="right">
-   <?php echo $provtotal; ?>
+   <?php echo $provqty; ?>
   </td>
-  <td class="dehead">
-   &nbsp;
+  <td class="detail">
+   &nbsp; <!-- No prices at the provider level. -->
+  </td>
+  <td class="dehead" align="right">
+   <?php echo oeFormatMoney($provadj); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php echo oeFormatMoney($provchg - $provadj); ?>
   </td>
  </tr>
 <?php
@@ -108,16 +247,31 @@ function thisLineItem($rowpatientid, $rowencounterid, $rowcodetype, $rowcode, $r
     $providerid = $rowproviderid;
     $providername = $rowprovidername;
     $provleft = htmlspecialchars($providername);
-    $provtotal = 0;
+    $provqty = 0;
+    $provchg = 0;
+    $provadj = 0;
+    $provpay = 0;
   }
 
-  $producttotal  += $rowqty;
-  $cattotal      += $rowqty;
-  $provtotal     += $rowqty;
-  $grandtotal    += $rowqty;
+  $productqty  += $rowqty;
+  $productchg  += $rowchg;
+  $productadj  += $rowadj;
+  $productpay  += $rowpay;
 
-  if ($invoices !== '') $invoices .= ', ';
-  $invoices .= $invnumber;
+  $catqty      += $rowqty;
+  $catchg      += $rowchg;
+  $catadj      += $rowadj;
+  $catpay      += $rowpay;
+
+  $provqty     += $rowqty;
+  $provchg     += $rowchg;
+  $provadj     += $rowadj;
+  $provpay     += $rowpay;
+
+  $grandqty    += $rowqty;
+  $grandchg    += $rowchg;
+  $grandadj    += $rowadj;
+  $grandpay    += $rowpay;
 
 } // end function
 
@@ -142,7 +296,9 @@ if ($_POST['form_csvexport']) {
   echo '"Code",';
   echo '"Description",';
   echo '"Units",';
-  echo '"Invoices"';
+  echo '"Price",';
+  echo '"Adjustment",';
+  echo '"Payment"';
   echo "\n";
 } // end export
 else {
@@ -299,8 +455,14 @@ echo "   </select>\n";
   <td class="dehead" align="right">
    <?php xl('Units','e'); ?>
   </td>
-  <td class="dehead">
-   <?php xl('Invoices','e'); ?>
+  <td class="dehead" align="right">
+   <?php xl('Price','e'); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php xl('Adjustment','e'); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php xl('Charge','e'); ?>
   </td>
  </tr>
 
@@ -313,23 +475,37 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
 
   $productname = '';
   $productcode = '';
-  $producttotal = 0;
-  $invoices = '';
+  $productqty = 0;
+  $productchg = 0;
+  $productadj = 0;
+  $productpay = 0;
+
   $category = '';
   $catleft = '';
-  $cattotal = 0;
+  $catqty = 0;
+  $catchg = 0;
+  $catadj = 0;
+  $catpay = 0;
+
   $provider = '';
   $provleft = '';
-  $provtotal = 0;
-  $grandtotal = 0;
+  $provqty = 0;
+  $provchg = 0;
+  $provadj = 0;
+  $provpay = 0;
+
+  $grandqty = 0;
+  $grandchg = 0;
+  $grandadj = 0;
+  $grandpay = 0;
 
   $query = "SELECT b.pid, b.encounter, b.code_type, b.code, b.units, " .
-    "b.code_text, fe.date, fe.facility_id, fe.invoice_refno, lo.title, " .
+    "b.code_text, fe.date, fe.facility_id, lo.title, " .
     "u.id, CONCAT(u.lname, ', ', u.fname, ' ', u.mname) AS providername " .
     "FROM billing AS b " .
-    "JOIN code_types AS ct ON ct.ct_key = b.code_type " .
     "JOIN form_encounter AS fe ON fe.pid = b.pid AND fe.encounter = b.encounter " .
     "LEFT JOIN users AS u ON (b.provider_id = 0 AND fe.provider_id = u.id) OR (b.provider_id != 0 AND b.provider_id = u.id) " .
+    "LEFT JOIN code_types AS ct ON ct.ct_key = b.code_type " .
     "LEFT JOIN codes AS c ON c.code_type = ct.ct_id AND c.code = b.code AND c.modifier = b.modifier " .
     "LEFT JOIN list_options AS lo ON lo.list_id = 'superbill' AND lo.option_id = c.superbill " .
     "WHERE b.code_type != 'COPAY' AND b.activity = 1 AND " .
@@ -364,12 +540,37 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
 
   while ($row = sqlFetchArray($res)) {
     thisLineItem($row['pid'], $row['encounter'], $row['code_type'], $row['code'],
-      $row['title'], $row['code_text'],
-      $row['units'], $row['invoice_refno'], $row['id'], $row['providername']);
+      $row['title'], $row['code_text'], $row['units'], $row['id'], $row['providername']);
   }
 
   // Generate totals line for last provider.
-  thisLineItem(0, 0, '', '', '', '', 0 ,'', 0, '');
+  thisLineItem(0, 0, '', '', '', '', 0 , 0, '');
+
+  // Generate grand totals.
+  if (!$_POST['form_csvexport']) {
+?>
+ <tr bgcolor="#dddddd">
+  <td class="detail">
+   &nbsp;
+  </td>
+  <td class="detail" colspan="3">
+   <?php echo xl('Grand Totals'); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php echo $grandqty; ?>
+  </td>
+  <td class="detail">
+   &nbsp; <!-- No prices at the provider level. -->
+  </td>
+  <td class="dehead" align="right">
+   <?php echo oeFormatMoney($grandadj); ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php echo oeFormatMoney($grandchg - $grandadj); ?>
+  </td>
+ </tr>
+<?php
+  } // End not csv export
 }
 
 if (! $_POST['form_csvexport']) {
