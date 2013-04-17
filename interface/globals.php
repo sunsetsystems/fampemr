@@ -206,6 +206,7 @@ if (!empty($tmp)) {
     else if ($gl_name == 'specific_application') {
       if      ($gl_value == '1') $GLOBALS['athletic_team'] = true;
       else if ($gl_value == '2') $GLOBALS['ippf_specific'] = true;
+      else if ($gl_value == '4') $GLOBALS['ippf_specific'] = 'panama';
       else if ($gl_value == '3') $GLOBALS['weight_loss_clinic'] = true;
     }
     else if ($gl_name == 'inhouse_pharmacy') {

@@ -358,6 +358,7 @@ $GLOBALS_METADATA = array(
         '0' => xl('None'),
         '1' => xl('Athletic team'),
         '2' => xl('IPPF'),
+        '4' => xl('IPPF Panama'),
         '3' => xl('Weight loss clinic'),
       ),
       '0',                              // default
