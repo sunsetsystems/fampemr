@@ -347,9 +347,8 @@ function doclick(pfx, id) {
 
 </form>
 
-<p><b><? xl('Instructions:','e'); ?></b> <? xl('Choose a section and click an item within it; then in
-the other section you will see the related items highlighted, and you can click
-in that section to add and delete relationships.','e'); ?>
+<p><b><?php echo xl('Instructions'); ?>:</b>
+<?php echo xl('Choose a section and click an item within it; then in the other section you will see the related items highlighted, and you can click in that section to add and delete relationships.'); ?>
 </p>
 
 <script>

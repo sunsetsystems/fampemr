@@ -311,7 +311,7 @@ function process_result_code($row) {
  $query = "SELECT id, name FROM facility ORDER BY name";
  $fres = sqlStatement($query);
  echo "      <select name='form_facility'>\n";
- echo "       <option value=''>-- All Facilities --\n";
+ echo "       <option value=''>-- " . xl('All Facilities') . " --\n";
  while ($frow = sqlFetchArray($fres)) {
   $facid = $frow['id'];
   echo "       <option value='$facid'";

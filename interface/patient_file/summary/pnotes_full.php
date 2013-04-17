@@ -233,12 +233,12 @@ if ($noteid) {
 
 <font class='text'><?php xl('View','e'); ?>: &nbsp;
 <input type='checkbox' name='form_active' <?php if ($form_active) echo "checked"; ?> />
-Active &nbsp;
+<?php echo xl('Active'); ?> &nbsp;
 <input type='checkbox' name='form_inactive' <?php if ($form_inactive) echo "checked"; ?> />
-Inactive &nbsp;
+<?php echo xl('Inactive'); ?> &nbsp;
 <?php if ($docid) { ?>
 <input type='checkbox' name='form_doc_only' <?php if ($form_doc_only) echo "checked"; ?> />
-Linked Only &nbsp;
+<?php echo xl('Linked Only'); ?> &nbsp;
 <?php } ?>
 <input type='submit' value='Refresh' />
 </font> 
