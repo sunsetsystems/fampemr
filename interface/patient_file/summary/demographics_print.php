@@ -30,6 +30,7 @@ $PDF_OUTPUT = true; // temporarily?
 if ($PDF_OUTPUT) {
   require_once("$srcdir/html2pdf/html2pdf.class.php");
   $pdf = new HTML2PDF('P', 'Letter', 'en');
+  $pdf->setTestTdInOnePage(false); // Turn off error message for TD contents too big.
   $pdf->pdf->SetDisplayMode('real');
   ob_start();
 }
