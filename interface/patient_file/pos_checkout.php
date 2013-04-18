@@ -212,9 +212,15 @@ body, td {
 
  // Process click on Print button.
  function printme() {
+<?php if ($GLOBALS['ippf_specific'] === 'panama') { ?>
+  // Custom checkout receipt needs to be sent as a PDF in a new window or tab.
+  window.open('pos_checkout.php?<?php echo "ptid=$patient_id&enc=$encounter&pdf=1"; ?>',
+   '_blank', 'width=750,height=550,resizable=1,scrollbars=1');
+<?php } else { ?>
   var divstyle = document.getElementById('hideonprint').style;
   divstyle.display = 'none';
   window.print();
+<?php } ?>
   return false;
  }
 
@@ -552,10 +558,9 @@ body, td {
  parent.left_nav.loadFrame('new1', 'RTop', 'new/new.php');
 <?php } ?>
 
-<?php if (is_file($GLOBALS['OE_SITE_DIR'] . "/checkout_receipt.inc.php")) { ?>
- // Custom checkout receipt exists so needs to be sent as a PDF in a new window or tab.
- window.open('pos_checkout.php?<?php echo "ptid=$patient_id&enc=$encounter&pdf=1"; ?>',
-  '_blank', 'width=750,height=550,resizable=1,scrollbars=1');
+<?php if ($GLOBALS['ippf_specific'] === 'panama') { ?>
+ // Custom checkout receipt needs to be sent as a PDF in a new window or tab.
+ printme();
 <?php } ?>
 
 </script>
