@@ -13,7 +13,7 @@ require_once("$srcdir/formatting.inc.php");
 
 foreach ($_POST as $k => $var) {
   if (! is_array($var)) $_POST[$k] = mysql_escape_string($var);
-  echo "$var\n";
+  // echo "$var\n";
 }
 
 $conn = $GLOBALS['adodb']['db'];
@@ -39,6 +39,16 @@ $nexturl = $normalurl;
 
 if ($mode == 'new')
 {
+  if (empty($_POST['duplicateok']) && $date == date('Y-m-d')) {
+    $erow = sqlQuery("SELECT count(*) AS count " .
+      "FROM form_encounter AS fe, forms AS f WHERE " .
+      "fe.pid = '$pid' AND fe.date = '$date' AND " .
+      "f.formdir = 'newpatient' AND f.form_id = fe.id AND f.deleted = 0");
+    if ($erow['count'] > 0) {
+      die(xl('Save rejected! A visit already exists for today.'));
+    }
+  }
+
   $provider_id = $userauthorized ? $_SESSION['authUserID'] : 0;
   $encounter = $conn->GenID("sequences");
   addForm($encounter, "New Patient Encounter",

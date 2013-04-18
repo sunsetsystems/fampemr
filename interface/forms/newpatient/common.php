@@ -83,6 +83,18 @@ $ires = sqlStatement("SELECT id, type, title, begdate FROM lists WHERE " .
   f.submit();
  }
 
+ function duplicateVisit(enc, datestr) {
+  if (!confirm('<?php echo xl("A visit already exists for this patient today. Click Cancel to open it, or OK to proceed with creating a new one.") ?>')) {
+   top.restoreSession();
+   parent.left_nav.setEncounter(datestr, enc, window.name);
+   parent.left_nav.setRadio(window.name, 'enc');
+   parent.left_nav.loadFrame('enc2', window.name, 'patient_file/encounter/encounter_top.php?set_encounter=' + enc);
+   return;
+  }
+  // This is so the save logic will know that a duplicate encounter was approved.
+  document.forms[0].duplicateok.value = '1';
+ }
+
 </script>
 </head>
 
@@ -106,6 +118,8 @@ $ires = sqlStatement("SELECT id, type, title, begdate FROM lists WHERE " .
 <input type='hidden' name='mode' value='new'>
 <span class='title'><?php xl('New Encounter Form','e'); ?></span>
 <?php } ?>
+
+<input type='hidden' name='duplicateok' value=''>
 
 <br>
 <center>
@@ -323,12 +337,14 @@ Calendar.setup({inputField:"form_date", ifFormat:"%Y-%m-%d", button:"img_form_da
 Calendar.setup({inputField:"form_onset_date", ifFormat:"%Y-%m-%d", button:"img_form_onset_date"});
 <?php
 if (!$viewmode) {
-  $erow = sqlQuery("SELECT count(*) AS count " .
+  $erow = sqlQuery("SELECT fe.encounter, fe.date " .
     "FROM form_encounter AS fe, forms AS f WHERE " .
     "fe.pid = '$pid' AND fe.date = '" . date('Y-m-d 00:00:00') . "' AND " .
-    "f.formdir = 'newpatient' AND f.form_id = fe.id AND f.deleted = 0");
-  if ($erow['count'] > 0) {
-    echo "alert('" . xl('Warning: A visit was already created for this patient today!') . "');\n";
+    "f.formdir = 'newpatient' AND f.form_id = fe.id AND f.deleted = 0 " .
+    "ORDER BY fe.encounter DESC LIMIT 1");
+  if (!empty($erow['encounter'])) {
+    echo "duplicateVisit('" . $erow['encounter'] . "', '" .
+      oeFormatShortDate(substr($erow['date'], 0, 10)) . "');\n";
   }
 }
 ?>
