@@ -58,6 +58,15 @@ $patdata = getPatientData($patient_id, 'fname,mname,lname,pubpid,street,city,sta
 // Adjustments from the ar_activity table.
 $aAdjusts = array();
 
+// Get a list item's title, translated if appropriate.
+//
+function getListTitle($list, $option) {
+  $row = sqlQuery("SELECT title FROM list_options WHERE " .
+    "list_id = '$list' AND option_id = '$option'");
+  if (empty($row['title'])) return $option;
+  return xl_list_label($row['title']);
+}
+
 // Get the "next invoice reference number" from this user's pool.
 //
 function getInvoiceRefNumber() {
@@ -145,6 +154,12 @@ function receiptDetailLine($code_type, $code, $description, $quantity, $charge, 
 //
 function receiptPaymentLine($paydate, $amount, $description='', $method='') {
   $amount = sprintf('%01.2f', $amount); // make it negative
+  // Resolve the payment method portion of the memo to display properly.
+  if (!empty($method)) {
+    $tmp = explode(' ', $method, 2);
+    $method = getListTitle('paymethod', $tmp[0]);
+    if (isset($tmp[1])) $method .= ' ' . $tmp[1];
+  }
   echo " <tr>\n";
   echo "  <td>&nbsp;</td>\n";
   echo "  <td>" . oeFormatShortDate($paydate) . "</td>\n";
