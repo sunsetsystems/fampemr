@@ -302,8 +302,7 @@ td { font-size:10pt; }
 
 <form method='post' action='deleter.php?patient=<?php echo $patient ?>&encounterid=<?php echo $encounterid ?>&formid=<?php echo $formid ?>&issue=<?php echo $issue ?>&document=<?php echo $document ?>&payment=<?php echo $payment ?>&billing=<?php echo $billing ?>&transaction=<?php echo $transaction ?>'>
 
-<p>&nbsp;<br><?php xl('
-Do you really want to delete','e'); ?>
+<p>&nbsp;<br><?php echo xl('Do you really want to delete'); ?>
 
 <?php
  if ($patient) {
@@ -323,7 +322,7 @@ Do you really want to delete','e'); ?>
  } else if ($transaction) {
   echo xl('transaction') . " $transaction";
  }
-?> <?php xl('and all subordinate data? This action will be logged','e'); ?>!</p>
+?> <?php echo xl('and all subordinate data? This action will be logged!'); ?></p>
 
 <center>
 

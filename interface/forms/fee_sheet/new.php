@@ -1093,8 +1093,9 @@ function warehouse_changed(sel) {
 $isBilled = isEncounterBilled($pid, $encounter);
 
 if ($isBilled) {
-  echo "<p><font color='green'>This encounter has been billed. If you " .
-    "need to change it, it must be re-opened.</font></p>\n";
+  echo "<p><font color='green'>" .
+    xl('This encounter has been billed. If you need to change it, it must be re-opened.') .
+    "</font></p>\n";
 }
 
 else { // encounter is not billed

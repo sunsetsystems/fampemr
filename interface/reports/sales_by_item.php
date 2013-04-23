@@ -312,28 +312,33 @@ function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
     header("Pragma: public");
     header("Expires: 0");
     header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
-    header("Content-Type: application/force-download");
+    header("Content-Type: application/force-download; charset=utf-8");
     header("Content-Disposition: attachment; filename=sales_by_item.csv");
     header("Content-Description: File Transfer");
+    // Prepend a BOM (Byte Order Mark) header to mark the data as UTF-8.  This is
+    // said to work for Excel 2007 pl3 and up and perhaps also Excel 2003 pl3.  See:
+    // http://stackoverflow.com/questions/155097/microsoft-excel-mangles-diacritics-in-csv-files
+    // http://crashcoursing.blogspot.com/2011/05/exporting-csv-with-special-characters.html
+    echo "\xEF\xBB\xBF";
     // CSV headers:
     if ($_POST['form_details']) {
-      echo '"Category",';
-      echo '"Item",';
-      echo '"Date",';
-      echo '"Invoice",';
-      echo '"Qty",';
-      echo '"Price",';
-      echo '"Adj",';
-      echo '"Payment"';
+      echo '"' . xl('Category') . '",';
+      echo '"' . xl('Item'    ) . '",';
+      echo '"' . xl('Date'    ) . '",';
+      echo '"' . xl('Invoice' ) . '",';
+      echo '"' . xl('Qty'     ) . '",';
+      echo '"' . xl('Price'   ) . '",';
+      echo '"' . xl('Adj'     ) . '",';
+      echo '"' . xl('Payment' ) . '"';
       echo "\n";
     }
     else {
-      echo '"Category",';
-      echo '"Item",';
-      echo '"Qty",';
-      echo '"Price",';
-      echo '"Adj",';
-      echo '"Payment"';
+      echo '"' . xl('Category') . '",';
+      echo '"' . xl('Item'    ) . '",';
+      echo '"' . xl('Qty'     ) . '",';
+      echo '"' . xl('Price'   ) . '",';
+      echo '"' . xl('Adj'     ) . '",';
+      echo '"' . xl('Payment' ) . '"';
       echo "\n";
     }
   } // end export

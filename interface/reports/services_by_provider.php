@@ -149,11 +149,13 @@ function thisLineItem($rowpatientid, $rowencounterid, $rowcodetype, $rowcode,
 
   if (empty($rowcat)) $rowcat = xl('None');
 
-  if (!$rowqty) $rowqty = 1;
-  $invno = ensureLineAmounts($rowpatientid, $rowencounterid);
-  $rowchg = $aItems[$invno][$codekey][0];
-  $rowadj = $aItems[$invno][$codekey][1];
-  $rowpay = $aItems[$invno][$codekey][2];
+  if ($rowpatientid) {
+    if (!$rowqty) $rowqty = 1;
+    $invno = ensureLineAmounts($rowpatientid, $rowencounterid);
+    $rowchg = $aItems[$invno][$codekey][0];
+    $rowadj = $aItems[$invno][$codekey][1];
+    $rowpay = $aItems[$invno][$codekey][2];
+  }
 
   $rowproduct = $rowdesc;
   if (! $rowproduct) $rowproduct = 'Unknown';
@@ -167,7 +169,7 @@ function thisLineItem($rowpatientid, $rowencounterid, $rowcodetype, $rowcode,
           echo '"' . $category . '",';
           echo '"' . $productcode . '",';
           echo '"' . $productname . '",';
-          echo '"' . $productqty . '"';
+          echo '"' . $productqty . '",';
           echo '"' . oeFormatMoney($productchg / $productqty) . '",';
           echo '"' . oeFormatMoney($productadj) . '",';
           echo '"' . oeFormatMoney($productchg - $productadj) . '"';
@@ -287,18 +289,23 @@ if ($_POST['form_csvexport']) {
   header("Pragma: public");
   header("Expires: 0");
   header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
-  header("Content-Type: application/force-download");
+  header("Content-Type: application/force-download; charset=utf-8");
   header("Content-Disposition: attachment; filename=services_by_provider.csv");
   header("Content-Description: File Transfer");
+  // Prepend a BOM (Byte Order Mark) header to mark the data as UTF-8.  This is
+  // said to work for Excel 2007 pl3 and up and perhaps also Excel 2003 pl3.  See:
+  // http://stackoverflow.com/questions/155097/microsoft-excel-mangles-diacritics-in-csv-files
+  // http://crashcoursing.blogspot.com/2011/05/exporting-csv-with-special-characters.html
+  echo "\xEF\xBB\xBF";
   // CSV headers:
-  echo '"Provider",';
-  echo '"Category",';
-  echo '"Code",';
-  echo '"Description",';
-  echo '"Units",';
-  echo '"Price",';
-  echo '"Adjustment",';
-  echo '"Payment"';
+  echo '"' . xl('Provider'   ) . '",';
+  echo '"' . xl('Category'   ) . '",';
+  echo '"' . xl('Code'       ) . '",';
+  echo '"' . xl('Description') . '",';
+  echo '"' . xl('Units'      ) . '",';
+  echo '"' . xl('Price'      ) . '",';
+  echo '"' . xl('Adjustment' ) . '",';
+  echo '"' . xl('Payment'    ) . '"';
   echo "\n";
 } // end export
 else {
@@ -534,13 +541,14 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
     if ($qsvc) $query .= "AND ( $qsvc )";
   }
 
-  $query .= " ORDER BY u.lname, u.fname, u.mname, u.id, lo.title, b.code, fe.date, fe.id";
+  $query .= " ORDER BY u.lname, u.fname, u.mname, u.id, lo.seq, lo.title, b.code, fe.date, fe.id";
 
   $res = sqlStatement($query);
 
   while ($row = sqlFetchArray($res)) {
     thisLineItem($row['pid'], $row['encounter'], $row['code_type'], $row['code'],
-      $row['title'], $row['code_text'], $row['units'], $row['id'], $row['providername']);
+      xl_list_label($row['title']), $row['code_text'], $row['units'], $row['id'],
+      $row['providername']);
   }
 
   // Generate totals line for last provider.
