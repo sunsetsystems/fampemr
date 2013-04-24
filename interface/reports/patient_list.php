@@ -1,5 +1,5 @@
 <?php
- // Copyright (C) 2006-2011 Rod Roark <rod@sunsetsystems.com>
+ // Copyright (C) 2006-2013 Rod Roark <rod@sunsetsystems.com>
  //
  // This program is free software; you can redistribute it and/or
  // modify it under the terms of the GNU General Public License
@@ -12,6 +12,15 @@
  require_once("../globals.php");
  require_once("$srcdir/patient.inc");
  require_once("$srcdir/formatting.inc.php");
+ require_once("$srcdir/options.inc.php");
+
+function generate_layout_display_field($formid, $fieldid, $currvalue) {
+  $frow = sqlQuery("SELECT * FROM layout_options " .
+    "WHERE form_id = '$formid' AND field_id = '$fieldid' " .
+    "LIMIT 1");
+  if (empty($frow)) return $currvalue;
+  return generate_display_field($frow, $currvalue);
+}
 
  $form_filter_type = empty($_POST['form_filter_type']) ? 0 : 0 + $_POST['form_filter_type'];
  $form_facility = empty($_POST['form_facility']) ? 0 : 0 + $_POST['form_facility'];
@@ -263,10 +272,10 @@ if (mysql_num_rows($fres) > 1) {
    <?php echo $row['street'] ?>
   </td>
   <td>
-   <?php echo $row['city'] ?>
+   <?php echo generate_layout_display_field('DEM', 'city', $row['city']); ?>
   </td>
   <td>
-   <?php echo $row['state'] ?>
+   <?php echo generate_layout_display_field('DEM', 'state', $row['state']); ?>
   </td>
   <td>
    <?php echo $row['postal_code'] ?>
