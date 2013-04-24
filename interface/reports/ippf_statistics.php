@@ -1045,7 +1045,7 @@ function process_visit($row) {
 // Row keys are the first specified MA code, if any.
 //
 function process_referral($row) {
-  global $form_by;
+  global $form_by, $code_types;
   $key = 'Unspecified';
 
   // For followups we care about the actual service provided, otherwise
@@ -1059,10 +1059,11 @@ function process_referral($row) {
       if ($codestring === '') continue;
       list($codetype, $code) = explode(':', $codestring);
 
-      if ($codetype == 'REF') {
-        // In the case of a REF code, look up the associated IPPF code.
+      if ($codetype == 'MA' || $codetype == 'REF') {
+        // In the case of a MA or REF code, look up the associated IPPF code.
         $rrow = sqlQuery("SELECT related_code FROM codes WHERE " .
-          "code_type = '16' AND code = '$code' AND active = 1 " .
+          "code_type = '" . $code_types[$codetype]['id'] . "' AND " .
+          "code = '$code' AND active = 1 " .
           "ORDER BY id LIMIT 1");
         if (!empty($rrow['related_code'])) {
           list($codetype, $code) = explode(':', $rrow['related_code']);
