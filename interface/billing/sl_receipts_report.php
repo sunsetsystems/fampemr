@@ -347,7 +347,7 @@
           }
         }
         //
-        $docid = empty($row['encounter_id']) ? $row['docid'] : $row['encounter_id'];
+        $docid = empty($row['provider_id']) ? $row['docid'] : $row['provider_id'];
         $key = sprintf("%08u%s%08u%08u%06u", $docid, $thedate,
           $patient_id, $encounter_id, ++$irow);
         $arows[$key] = array();
