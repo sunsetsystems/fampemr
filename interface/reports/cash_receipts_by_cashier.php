@@ -280,8 +280,9 @@ function doinvopen(ptid,encid) {
       }
       //
       $cashierid = $row['cashierid'];
-      $key = sprintf("%08u%s%08u%08u%06u", $cashierid, $thedate,
-        $patient_id, $encounter_id, ++$irow);
+      $key = sprintf("%08u%s%16s%08u%08u%06u", $cashierid, $thedate,
+        $row['invoice_refno'], $patient_id, $encounter_id, ++$irow);
+      // Note invoice_refno in the above key is right-aligned.
       $arows[$key] = array();
       $arows[$key]['transdate'] = $thedate;
       $arows[$key]['amount'] = 0 - $row['pay_amount'];
