@@ -48,6 +48,13 @@ function gcrHeader(&$aReceipt, &$pdf) {
   $pdf->SetCellPadding(0);
   $pdf->setCellHeightRatio(1.00);
 
+  // Write the invoice reference number centered in the right column.
+	$pdf->MultiCell($HEADER_WIDTH_2, $GCR_LINE_HEIGHT,
+    $aReceipt['invoice_refno'],
+    0, 'C', 0, 1, $HEADER_POS_2, '', true, 0, false, true, 0);
+
+  $pdf->Ln($GCR_LINE_HEIGHT);
+
   // Format the client name as "last, first middle".
   $ptname = $aReceipt['patient_lname'];
   $tmp = trim($aReceipt['patient_fname'] . ' ' . $aReceipt['patient_mname']);
@@ -97,7 +104,7 @@ function gcrFooter(&$aReceipt, &$pdf, $xpos, $width) {
     0, 'R', 0, 1, $xpos, $ypos, true, 0, false, true, 0);
 
   // Write line for cashier (user) name.
-  $ypos += $GCR_LINE_HEIGHT * 2;
+  $ypos += $GCR_LINE_HEIGHT * 3;
   $sigwidth = intval($GCR_PAGE_WIDTH * 0.4);
   $xpos = $GCR_PAGE_WIDTH - $sigwidth;
   $pdf->MultiCell($sigwidth, $GCR_LINE_HEIGHT,
@@ -154,7 +161,7 @@ function generateCheckoutReceipt(&$aReceipt) {
   $pdf->SetDefaultMonospacedFont('courier');
 
   // Set margins. Left, top, right.
-  $pdf->SetMargins(0, 116, 0);
+  $pdf->SetMargins(0, 108, 0);
 
   // Set auto page breaks and the bottom trigger value.
   $pdf->SetAutoPageBreak(TRUE, 1);
