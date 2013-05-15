@@ -88,11 +88,13 @@ function write_report_line(&$row) {
       "SUM(s.quantity) AS sale_quantity " .
       "FROM drug_sales AS s " .
       "LEFT JOIN drug_inventory AS di ON di.inventory_id = s.inventory_id " .
+      "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
+      "lo.option_id = di.warehouse_id " .
       "WHERE " .
       "s.drug_id = '$drug_id' AND " .
       "di.warehouse_id = '$warehouse_id' AND " .
       "s.sale_date > DATE_SUB(NOW(), INTERVAL $form_days DAY) " .
-      "AND s.pid != 0";
+      "AND s.pid != 0 $fwcond";
     $srow = sqlQuery($query);
     // echo "\n<!-- " . $srow['sale_quantity'] . " $query -->\n"; // debugging
   }
@@ -199,8 +201,8 @@ function write_report_line(&$row) {
     echo "  <td colspan='5'>&nbsp;</td>\n";
   }
   else {
-    echo "  <td>" . htmlentities($row['name']) . "</td>\n";
-    echo "  <td>" . htmlentities($row['ndc_number']) . "</td>\n";
+    echo "  <td>" . htmlspecialchars($row['name']) . "</td>\n";
+    echo "  <td>" . htmlspecialchars($row['ndc_number']) . "</td>\n";
     echo "  <td>" . ($row['active'] ? xl('Yes') : xl('No')) . "</td>\n";
     echo "  <td>" .
          generate_display_field(array('data_type'=>'1','list_id'=>'drug_form'), $row['form']) .
@@ -208,9 +210,9 @@ function write_report_line(&$row) {
     echo "  <td align='right'>" . $row['reorder_point'] . "</td>\n";
   }
   if ($form_details) {
-    echo "  <td>" . htmlentities($row['title']) . "</td>\n";
-    echo "  <td align='right'>" . htmlentities($row['pw_min_level']) . "</td>\n";
-    echo "  <td align='right'>" . htmlentities($row['pw_max_level']) . "</td>\n";
+    echo "  <td>" . htmlspecialchars($row['title']) . "</td>\n";
+    echo "  <td align='right'>" . htmlspecialchars($row['pw_min_level']) . "</td>\n";
+    echo "  <td align='right'>" . htmlspecialchars($row['pw_max_level']) . "</td>\n";
   }
   echo "  <td align='right'>" . $row['on_hand'] . "</td>\n";
   echo "  <td align='right'>$monthly</td>\n";
@@ -227,6 +229,8 @@ if (!empty($_POST['form_days'])) {
 else {
   $form_days = sprintf('%d', (strtotime(date('Y-m-d')) - strtotime(date('Y-01-01'))) / (60 * 60 * 24) + 1);
 }
+
+$form_inactive = empty($_REQUEST['form_inactive']) ? 0 : 1;
 
 $form_details = empty($_REQUEST['form_details']) ? 0 : 1;
 
@@ -247,6 +251,11 @@ if ($form_facility) $fwcond .=
 if ($form_warehouse) $fwcond .=
   " AND di.warehouse_id IS NOT NULL AND di.warehouse_id = '$form_warehouse'";
 
+// Compute WHERE condition for filtering on activity.
+$actcond = '';
+if (!$form_inactive) $actcond .=
+  " AND d.active = 1";
+
 if ($form_details) {
   // Query for the main loop if lot details are wanted.
   $query = "SELECT d.*, di.on_hand, di.inventory_id, di.lot_number, " .
@@ -259,6 +268,7 @@ if ($form_details) {
     "lo.option_id = di.warehouse_id " .
     "LEFT JOIN product_warehouse AS pw ON pw.pw_drug_id = d.drug_id AND " .
     "pw.pw_warehouse = di.warehouse_id " .
+    "WHERE 1 = 1 $fwcond$actcond " .
     "ORDER BY d.name, d.drug_id, lo.title, di.warehouse_id, di.lot_number, di.inventory_id";
 }
 else {
@@ -270,7 +280,7 @@ else {
     // Join with list_options needed to support facility filter ($fwcond).
     "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
     "lo.option_id = di.warehouse_id " .
-    "WHERE d.active = 1 $fwcond " .
+    "WHERE 1 = 1 $fwcond$actcond " .
     "GROUP BY d.name, d.drug_id ORDER BY d.name, d.drug_id";
 }
 
@@ -353,6 +363,8 @@ function facchanged() {
    <?php xl('For the past','e'); ?>
    <input type="input" name="form_days" size='3' value="<?php echo $form_days; ?>" />
    <?php xl('days','e'); ?>&nbsp;
+   <input type='checkbox' name='form_inactive' value='1'<?php if ($form_inactive) echo " checked"; ?>
+   /><?php xl('Include Inactive','e'); ?>&nbsp;
    <input type='checkbox' name='form_details' value='1'<?php if ($form_details) echo " checked"; ?>
    /><?php xl('Details','e'); ?>&nbsp;
    <input type="submit" value="<?php xl('Refresh','e'); ?>" />&nbsp;
@@ -577,6 +589,12 @@ while ($row = sqlFetchArray($res)) {
   *******************************************************************/
 
   $last_drug_id = $drug_id;
+}
+
+if ($form_details) {
+  if (!empty($warehouse_row['drug_id'])) {
+    write_report_line($warehouse_row);
+  }
 }
 ?>
  </tbody>
