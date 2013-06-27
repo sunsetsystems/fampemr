@@ -804,6 +804,11 @@ $billresult = getBillingByEncounter($pid, $encounter, "*");
 <head>
 <?php html_header_show(); ?>
 <link rel="stylesheet" href="<?php echo $css_header;?>" type="text/css">
+
+<!-- Support for multiselect drop lists: -->
+<link rel="stylesheet" type="text/css" href="<?php echo $GLOBALS['webroot']; ?>/library/js/multiselect/jquery.multiselect.css" />
+<link rel="stylesheet" type="text/css" href="<?php echo $GLOBALS['webroot']; ?>/library/js/jquery-ui/css/cupertino/jquery-ui.css" />
+
 <style>
 .billcell { font-family: sans-serif; font-size: 10pt }
 </style>
@@ -813,11 +818,48 @@ $billresult = getBillingByEncounter($pid, $encounter, "*");
 <script type="text/javascript" src="../../../library/dynarch_calendar.js"></script>
 <script type="text/javascript" src="../../../library/dynarch_calendar_en.js"></script>
 <script type="text/javascript" src="../../../library/dynarch_calendar_setup.js"></script>
+
+<!-- Support for multiselect drop lists: -->
+<script type="text/javascript" src="<?php echo $GLOBALS['webroot']; ?>/library/js/jquery-1.10.1.min.js"></script>
+<script type="text/javascript" src="<?php echo $GLOBALS['webroot']; ?>/library/js/jquery-ui/jquery-ui.min.js"></script>
+<script type="text/javascript" src="<?php echo $GLOBALS['webroot']; ?>/library/js/multiselect/jquery.multiselect.js"></script>
+
 <script language="JavaScript">
 
 var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
 
 var diags = new Array();
+
+// Support for multiselect drop lists:
+$(document).ready(function() {
+  // Compute a reasonable width for the dropdowns. Styling does not work for this.
+  var selwidth = Math.round($(window).width() * 0.45);
+  // Each dropdown is initialized separately because the titles are different.
+  $(".multisel").each(function(index, elem) {
+    $(this).multiselect({
+      header: false,
+      minWidth: selwidth,
+      noneSelectedText: this.title,
+      // Closing the dropdown will cause the form to be submitted.
+      close: function(event, ui) {
+        var f = document.forms[0];
+        var selobj = event.target;
+        for (var i = 0; i < selobj.options.length; ++i) {
+          if (selobj.options[i].selected) {
+            if (f.newcodes.value) f.newcodes.value += '~';
+            f.newcodes.value += selobj.options[i].value;
+          }
+        }
+        if (f.newcodes.value) {
+          top.restoreSession();
+          f.submit();
+        }
+      }
+    });
+    // The select object's title has served its purpose and is now removed.
+    this.title = '';
+  });
+});
 
 <?php
 if ($billresult) {
@@ -1114,9 +1156,9 @@ while ($row = sqlFetchArray($res)) {
     $last_category = $fs_category;
     ++$i;
     echo ($i <= 1) ? " <tr>\n" : "";
-    echo "  <td width='50%' align='center' nowrap>\n";
-    echo "   <select style='width:96%' onchange='codeselect(this)'>\n";
-    echo "    <option value=''> " . substr($fs_category, 1) . "</option>\n";
+    echo "  <td width='50%' align='center' style='font-size:10pt;' nowrap>\n";
+    echo "   <select class='multisel' multiple='multiple' " .
+         "title='" . substr($fs_category, 1) . "'>\n";
   }
   echo "    <option value='$fs_codes'>" . substr($fs_option, 1) . "</option>\n";
 }
@@ -1129,9 +1171,9 @@ while ($prow = sqlFetchArray($pres)) {
   global $code_types;
   ++$i;
   echo ($i <= 1) ? " <tr>\n" : "";
-  echo "  <td width='50%' align='center' nowrap>\n";
-  echo "   <select style='width:96%' onchange='codeselect(this)'>\n";
-  echo "    <option value=''> " . xl_list_label($prow['title']) . "\n";
+  echo "  <td width='50%' align='center' style='font-size:10pt;' nowrap>\n";
+  echo "   <select class='multisel' multiple='multiple' " .
+       "title='" . xl_list_label($prow['title']) . "'>\n";
   $res = sqlStatement("SELECT code_type, code, code_text,modifier FROM codes " .
     "WHERE superbill = '" . $prow['option_id'] . "' AND active = 1 " .
     "ORDER BY code_text");
@@ -1153,9 +1195,9 @@ while ($prow = sqlFetchArray($pres)) {
 if ($GLOBALS['sell_non_drug_products']) {
   ++$i;
   echo ($i <= 1) ? " <tr>\n" : "";
-  echo "  <td width='50%' align='center' nowrap>\n";
-  echo "   <select name='Products' style='width:96%' onchange='codeselect(this)'>\n";
-  echo "    <option value=''> " . xl('Products') . "\n";
+  echo "  <td width='50%' align='center' style='font-size:10pt;' nowrap>\n";
+  echo "   <select name='Products' class='multisel' multiple='multiple' " .
+       "title='" . xl('Products') . "'>\n";
   $tres = sqlStatement("SELECT dt.drug_id, dt.selector, d.name " .
     "FROM drug_templates AS dt, drugs AS d WHERE " .
     "d.drug_id = dt.drug_id AND d.active = 1 AND d.consumable = 0 " .
