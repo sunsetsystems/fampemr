@@ -358,7 +358,6 @@ $GLOBALS_METADATA = array(
         '0' => xl('None'),
         '1' => xl('Athletic team'),
         '2' => xl('IPPF'),
-        '4' => xl('IPPF Panama'),
         '3' => xl('Weight loss clinic'),
       ),
       '0',                              // default
@@ -788,6 +787,54 @@ $GLOBALS_METADATA = array(
 
   ),
 
+  // Menu Tab
+  //
+  'Menu' => array(
+
+    'gbl_menu_stats_ippf' => array(
+      xl('IPPF Statistics Reporting'),
+      'bool',                           // data type
+      '1',                              // default
+      xl('IPPF statistical reports.')
+    ),
+
+    'gbl_menu_stats_gcac' => array(
+      xl('GCAC Statistics Reporting'),
+      'bool',                           // data type
+      '1',                              // default
+      xl('GCAC statistical reports.')
+    ),
+
+    'gbl_menu_stats_ma' => array(
+      xl('MA Statistics Reporting'),
+      'bool',                           // data type
+      '1',                              // default
+      xl('MA statistical reports.')
+    ),
+
+    'gbl_menu_stats_cyp' => array(
+      xl('CYP Statistics Reporting'),
+      'bool',                           // data type
+      '1',                              // default
+      xl('CYP statistical reports.')
+    ),
+
+    'gbl_menu_stats_daily' => array(
+      xl('Daily Statistics Reporting'),
+      'bool',                           // data type
+      '1',                              // default
+      xl('Daily statistical reports.')
+    ),
+
+    'gbl_menu_stats_c3' => array(
+      xl('C3 Statistics Reporting'),
+      'bool',                           // data type
+      '1',                              // default
+      xl('C3 statistical reports.')
+    ),
+
+  ),
+
   // Miscellaneous Tab
   //
   'Miscellaneous' => array(
@@ -882,6 +929,13 @@ $GLOBALS_METADATA = array(
       'bool',                           // data type
       '0',                              // default = true
       xl('For Medicare only, forces the referring provider to be the same as the rendering provider.')
+    ),
+
+    'gbl_custom_receipt' => array(
+      xl('Use Custom Checkout Receipt'),
+      'bool',                           // data type
+      '0',                              // default = false
+      xl('Present an additional PDF custom receipt after checkout.')
     ),
 
   ),

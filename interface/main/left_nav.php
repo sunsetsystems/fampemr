@@ -1019,12 +1019,12 @@ if (!empty($reg)) {
 <?php if (!empty($GLOBALS['code_types']['IPPF'])) { ?>
       <li><span><?php xl('Statistics','e') ?></span>
         <ul>
-          <?php genPopLink(xl('IPPF Stats'),'ippf_statistics.php?t=i'); ?>
-          <?php if ($GLOBALS['ippf_specific'] !== 'panama') genPopLink(xl('GCAC Stats'),'ippf_statistics.php?t=g'); ?>
-          <?php genPopLink(xl('MA Stats'),'ippf_statistics.php?t=m'); ?>
-          <?php genPopLink(xl('CYP'),'ippf_cyp_report.php'); ?>
-          <?php if ($GLOBALS['ippf_specific'] !== 'panama') genPopLink(xl('Daily Record'),'ippf_daily.php'); ?>
-          <?php if ($GLOBALS['ippf_specific'] !== 'panama') genPopLink(xl('C3'),'ippf_c3.php'); ?>
+          <?php if ($GLOBALS['gbl_menu_stats_ippf' ]) genPopLink(xl('IPPF Stats'),'ippf_statistics.php?t=i'); ?>
+          <?php if ($GLOBALS['gbl_menu_stats_gcac' ]) genPopLink(xl('GCAC Stats'),'ippf_statistics.php?t=g'); ?>
+          <?php if ($GLOBALS['gbl_menu_stats_ma'   ]) genPopLink(xl('MA Stats'),'ippf_statistics.php?t=m'); ?>
+          <?php if ($GLOBALS['gbl_menu_stats_cyp'  ]) genPopLink(xl('CYP'),'ippf_cyp_report.php'); ?>
+          <?php if ($GLOBALS['gbl_menu_stats_daily']) genPopLink(xl('Daily Record'),'ippf_daily.php'); ?>
+          <?php if ($GLOBALS['gbl_menu_stats_c3'   ]) genPopLink(xl('C3'),'ippf_c3.php'); ?>
           <?php if (!empty($GLOBALS['code_types']['REPORT'])) genPopLink(xl('Visits by Item'),'famp_services_products_visits.php'); ?>
         </ul>
       </li>
