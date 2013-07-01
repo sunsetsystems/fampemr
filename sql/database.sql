@@ -414,6 +414,7 @@ CREATE TABLE `facility` (
   `facility_npi` varchar(15) default NULL,
   `latitude` varchar(255) NOT NULL DEFAULT '',
   `longitude` varchar(255) NOT NULL DEFAULT '',
+  `extra_validation` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=4 ;
 

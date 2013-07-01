@@ -20,6 +20,7 @@ if ($_POST["mode"] == "facility")
 		service_location='"  . formData('service_location','P',true) . "',
 		billing_location='"  . formData('billing_location','P',true) . "',
 		accepts_assignment='". formData('accepts_assignment','P',true) . "',
+		extra_validation='"  . formData('extra_validation','P',true) . "',
 		pos_code='"          . formData('pos_code','P',true) . "',
 		domain_identifier='" . formData('domain_identifier','P',true) . "',
 		facility_npi='"      . formData('facility_npi','P',true) . "',
@@ -101,7 +102,12 @@ if (isset($_POST["fid"])) {
   <td><input type='checkbox' name='service_location' value='1' <?php if ($facility['service_location'] == 1) echo 'checked'; ?>></td>
   <td>&nbsp;</td>
  </tr>
-<tr>
+<tr<?php if (!$GLOBALS['ippf_specific']) echo " style='display:none'"; ?>>
+  <td><span class='text'><?php echo xl('Validation'); ?>: </span></td>
+  <td colspan='3'><input type='checkbox' name='extra_validation' value='1'<?php if ($facility['extra_validation']) echo ' checked'; ?>>
+  <?php echo xl('Display warnings for service and product mismatch'); ?></td>
+</tr>
+<tr<?php if ($GLOBALS['ippf_specific']) echo " style='display:none'"; ?>>
 	<td><span class=text><?php xl('POS Code','e'); ?>: </span></td>
 	<td colspan="6">
 		<select name="pos_code">
@@ -116,7 +122,6 @@ if (isset($_POST["fid"])) {
 			echo ">" . $pos['code']  . ": ". $pos['title'];
 			echo "</option>\n";
 		}
-		
 		?>
 		</select>
 	</td>

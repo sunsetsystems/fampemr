@@ -488,18 +488,16 @@ if (!empty($_POST['pricelevel'])) {
 }
 
 // Get some info about this visit.
-$visit_row = sqlQuery("SELECT fe.date, opc.pc_catname, fac.pos_code " .
+$visit_row = sqlQuery("SELECT fe.date, opc.pc_catname, fac.extra_validation " .
   "FROM form_encounter AS fe " .
   "LEFT JOIN openemr_postcalendar_categories AS opc ON opc.pc_catid = fe.pc_catid " .
   "LEFT JOIN facility AS fac ON fac.id = fe.facility_id " .
   "WHERE fe.pid = '$pid' AND fe.encounter = '$encounter' LIMIT 1");
 $visit_date = substr($visit_row['date'], 0, 10);
-$tmp = 0 + $visit_row['pos_code'];
-// This flag is specific to IPPF validation at form submit time.
-// It indicates if the facility's COD code is one that calls for most
-// contraceptive services and products to match up on the fee sheet.
+// This flag is specific to IPPF validation at form submit time.  It indicates
+// that most contraceptive services and products should match up on the fee sheet.
 $match_services_to_products = $GLOBALS['ippf_specific'] &&
-  ($tmp == 1 || $tmp == 2 || $tmp == 3 || $tmp == 5);
+  !empty($visit_row['extra_validation']);
 
 if ($_POST['bn_save'] || $_POST['bn_save_close']) {
   // Check for insufficient product inventory levels.

@@ -508,3 +508,7 @@ ALTER TABLE drugs
   ADD consumable tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 = will not show on the fee sheet';
 #EndIf
 
+#IfMissingColumn facility extra_validation
+ALTER TABLE facility ADD extra_validation tinyint(1) NOT NULL DEFAULT '1';
+#EndIf
+
