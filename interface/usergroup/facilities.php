@@ -100,9 +100,9 @@ if (isset($_POST["mode"]) && $_POST["mode"] == "facility") {
 <tr<?php if (!$GLOBALS['ippf_specific']) echo " style='display:none'"; ?>>
   <td><span class='text'><?php echo xl('Validation'); ?>: </span></td>
   <td colspan='3'><input type='checkbox' name='extra_validation' value='1' checked>
-  <?php echo xl('Display warnings for service and product mismatch'); ?></td>
+  <span class='text'><?php echo xl('Display warnings for service and product mismatch'); ?></span></td>
 </tr>
-<tr<?php if ($GLOBALS['ippf_specific']) echo " style='display:none'"; ?>>
+<tr>
   <td><span class=text><?php xl('POS Code','e'); ?>: </span></td>
   <td colspan="3">
     <select name="pos_code">
