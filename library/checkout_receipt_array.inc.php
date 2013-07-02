@@ -81,20 +81,33 @@ function receiptArrayPaymentLine($paydate, $amount, $description='', $method='')
 function generateReceiptArray($patient_id, $encounter=0) {
 
   // Get the most recent invoice data or that for the specified encounter.
+  $query = "SELECT " .
+    "fe.id, fe.date, fe.encounter, fe.facility_id, fe.invoice_refno, " .
+    "u.fname, u.mname, u.lname " .
+    "FROM form_encounter AS fe " .
+    "LEFT JOIN users AS u ON u.id = fe.provider_id " .
+    "WHERE fe.pid = '$patient_id' ";
   if ($encounter) {
-    $ferow = sqlQuery("SELECT id, date, encounter, facility_id, invoice_refno " .
-      "FROM form_encounter " .
-      "WHERE pid = '$patient_id' AND encounter = '$encounter'");
+    $query .= "AND encounter = '$encounter'";
   } else {
-    $ferow = sqlQuery("SELECT id, date, encounter, facility_id FROM form_encounter " .
-      "WHERE pid = '$patient_id' " .
-      "ORDER BY id DESC LIMIT 1");
+    $query .= "ORDER BY id DESC LIMIT 1";
   }
+  $ferow = sqlQuery($query);
   if (empty($ferow)) die(xl("This patient has no activity."));
   $trans_id = $ferow['id'];
   $encounter = $ferow['encounter'];
   $svcdate = substr($ferow['date'], 0, 10);
   $invoice_refno = $ferow['invoice_refno'];
+  $docname = '';
+  if (!empty($ferow['fname'])) $docname = trim($ferow['fname']);
+  if (!empty($ferow['mname'])) {
+    if ($docname) $docname .= ' ';
+    $docname .= trim($ferow['fname']);
+  }
+  if (!empty($ferow['lname'])) {
+    if ($docname) $docname .= ' ';
+    $docname .= trim($ferow['lname']);
+  }
 
   // Get details for the visit's facility.
   $frow = sqlQuery("SELECT * FROM facility WHERE " .
@@ -158,6 +171,7 @@ function generateReceiptArray($patient_id, $encounter=0) {
     'facility_state'    => $frow['state'],
     'facility_zip'      => $frow['postal_code'],
     'facility_phone'    => $frow['phone'],
+    'docname'           => $docname,
     'username'          => $username,
     'starting_balance'  => $head_begbal,
     'ending_balance'    => $head_endbal,

@@ -96,6 +96,7 @@ function gcrHeader(&$aReceipt, &$pdf) {
 
 function gcrFooter(&$aReceipt, &$pdf, $xpos, $width) {
   global $GCR_PAGE_WIDTH, $GCR_LINE_HEIGHT, $GCR_ITEMS_PER_PAGE;
+  global $DETAIL_POS_1;
 
   $ypos = 316;
 
@@ -103,9 +104,15 @@ function gcrFooter(&$aReceipt, &$pdf, $xpos, $width) {
     sprintf("%01.2f", $aReceipt['total_totals']),
     0, 'R', 0, 1, $xpos, $ypos, true, 0, false, true, 0);
 
-  // Write line for cashier (user) name.
-  $ypos += $GCR_LINE_HEIGHT * 3;
   $sigwidth = intval($GCR_PAGE_WIDTH * 0.4);
+  $ypos += $GCR_LINE_HEIGHT * 3;
+
+  // Write line for default provider name.
+  $pdf->MultiCell($sigwidth, $GCR_LINE_HEIGHT,
+    $aReceipt['docname'],
+    0, 'L', 0, 1, $DETAIL_POS_1, $ypos, true, 0, false, true, 0);
+
+  // Write line for cashier (user) name.
   $xpos = $GCR_PAGE_WIDTH - $sigwidth;
   $pdf->MultiCell($sigwidth, $GCR_LINE_HEIGHT,
     $aReceipt['username'],
