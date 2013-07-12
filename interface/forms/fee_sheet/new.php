@@ -31,6 +31,13 @@ $rapid_data_entry = empty($_GET['rde']) ? 0 : 1;
 
 $alertmsg = '';
 
+// Get the user's default warehouse and an indicator if there's a choice of warehouses.
+$wrow = sqlQuery("SELECT count(*) AS count FROM list_options WHERE list_id = 'warehouse'");
+$got_warehouses = $wrow['count'] > 1;
+$wrow = sqlQuery("SELECT default_warehouse FROM users WHERE username = '" .
+  $_SESSION['authUser'] . "'");
+$default_warehouse = empty($wrow['default_warehouse']) ? '' : $wrow['default_warehouse'];
+
 function alphaCodeType($id) {
   global $code_types;
   foreach ($code_types as $key => $value) {
@@ -334,13 +341,17 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
 // This writes a product (drug_sales) line item to the output page.
 //
 function echoProdLine($lino, $drug_id, $rx = FALSE, $del = FALSE, $units = NULL,
-  $fee = NULL, $sale_id = 0, $billed = FALSE)
+  $fee = NULL, $sale_id = 0, $billed = FALSE, $warehouse_id = '')
 {
   global $code_types, $ndc_applies, $pid, $usbillstyle, $justifystyle, $hasCharges;
   global $required_code_count, $line_contra_code, $line_contra_cyp, $line_contra_methtype;
+  global $got_warehouses, $default_warehouse;
 
   $drow = sqlQuery("SELECT name, related_code FROM drugs WHERE drug_id = '$drug_id'");
   $code_text = $drow['name'];
+
+  // If no warehouse ID passed, use the logged-in user's default.
+  if ($got_warehouses && $warehouse_id === '') $warehouse_id = $default_warehouse;
 
   $fee = sprintf('%01.2f', $fee);
   if (empty($units)) $units = 1;
@@ -402,7 +413,40 @@ function echoProdLine($lino, $drug_id, $rx = FALSE, $del = FALSE, $units = NULL,
       echo "</td>\n";
       echo "  <td class='billcell'$justifystyle>&nbsp;</td>\n"; // justify
     }
-    echo "  <td class='billcell' align='center'>&nbsp;</td>\n"; // provider
+
+    // Generate warehouse selector if there is a choice of warehouses.
+    echo "  <td class='billcell' align='center'>";
+    if ($got_warehouses) {
+      // Normally would use generate_select_list() but it's not flexible enough here.
+      echo "<select name='prod[$lino][warehouse]'";
+      echo " onchange='warehouse_changed(this);'";
+      if ($sale_id) echo " disabled";
+      echo ">";
+      echo "<option value=''> </option>";
+      $lres = sqlStatement("SELECT * FROM list_options " .
+        "WHERE list_id = 'warehouse' ORDER BY seq, title");
+      while ($lrow = sqlFetchArray($lres)) {
+        $has_inventory = sellDrug($drug_id, 1, 0, 0, 0, 0, '', '', $lrow['option_id'], true);
+        echo "<option value='" . $lrow['option_id'] . "'";
+        if (((strlen($warehouse_id) == 0 && $lrow['is_default']) ||
+             (strlen($warehouse_id)  > 0 && $lrow['option_id'] == $warehouse_id)) &&
+            ($sale_id || $has_inventory))
+        {
+          echo " selected";
+        }
+        else {
+          // Disable this warehouse option if not selected and has no inventory.
+          if (!$has_inventory) echo " disabled";
+        }
+        echo ">" . xl_list_label($lrow['title']) . "</option>\n";
+      }
+      echo "</select>";
+    }
+    else {
+      echo "&nbsp;";
+    }
+    echo "</td>\n";
+
     echo "  <td class='billcell' align='center'$usbillstyle>&nbsp;</td>\n"; // auth
     if ($GLOBALS['gbl_auto_create_rx']) {
       echo "  <td class='billcell' align='center'>" .
@@ -511,6 +555,7 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
     $sale_id   = $iter['sale_id']; // present only if already saved
     $units     = max(1, intval(trim($iter['units'])));
     $del       = $iter['del'];
+    $warehouse_id = empty($iter['warehouse']) ? '' : $iter['warehouse'];
     // Deleting always works.
     if ($del) continue;
     // If the item is already in the database...
@@ -527,7 +572,7 @@ if ($_POST['bn_save'] || $_POST['bn_save_close']) {
     else {
       // This only checks for sufficient inventory, nothing is updated.
       if (!sellDrug($drug_id, $units, 0, $pid, $encounter, 0,
-        $visit_date, '', $default_warehouse, true, $expiredlots)) {
+        $visit_date, '', $warehouse_id, true, $expiredlots)) {
         $insufficient = $drug_id;
       }
     }
@@ -546,7 +591,6 @@ if (!$alertmsg && ($_POST['bn_save'] || $_POST['bn_save_close'])) {
   $main_provid = 0 + $_POST['ProviderID'];
   $main_supid  = 0 + $_POST['SupervisorID'];
   if ($main_supid == $main_provid) $main_supid = 0;
-  $default_warehouse = $_POST['default_warehouse'];
 
   $bill = $_POST['bill'];
   for ($lino = 1; $bill["$lino"]['code_type']; ++$lino) {
@@ -619,6 +663,7 @@ if (!$alertmsg && ($_POST['bn_save'] || $_POST['bn_save_close'])) {
     $fee       = sprintf('%01.2f',(0 + trim($iter['price'])) * $units);
     $del       = $iter['del'];
     $rxid      = 0;
+    $warehouse_id = empty($iter['warehouse']) ? '' : $iter['warehouse'];
 
     // If the item is already in the database...
     if ($sale_id) {
@@ -663,7 +708,7 @@ if (!$alertmsg && ($_POST['bn_save'] || $_POST['bn_save_close'])) {
     // Otherwise it's a new item...
     else if (! $del) {
       $sale_id = sellDrug($drug_id, $units, $fee, $pid, $encounter, 0,
-        $visit_date, '', $default_warehouse);
+        $visit_date, '', $warehouse_id);
       if (!$sale_id) die(xl('Insufficient inventory for product ID') . " \"$drug_id\".");
     }
 
@@ -1306,7 +1351,7 @@ echo " </tr>\n";
   <td class='billcell' align='center'><b><?php xl('Units','e');?></b></td>
   <td class='billcell' align='center'<?php echo $justifystyle; ?>><b><?php xl('Justify','e');?></b></td>
 <?php } ?>
-  <td class='billcell' align='center'><b><?php xl('Provider','e');?></b></td>
+  <td class='billcell' align='center'><b><?php xl('Provider/Warehouse','e');?></b></td>
   <td class='billcell' align='center'<?php echo $usbillstyle; ?>><b><?php xl('Auth','e');?></b></td>
 <?php if ($GLOBALS['gbl_auto_create_rx']) { ?>
   <td class='billcell' align='center'><b><?php xl('Rx','e');?></b></td>
@@ -1390,9 +1435,9 @@ if ($_POST['bill']) {
 
 // Generate lines for items already in the drug_sales table for this encounter.
 //
-$query = "SELECT * FROM drug_sales WHERE " .
-  "pid = '$pid' AND encounter = '$encounter' " .
-  "ORDER BY sale_id";
+$query = "SELECT ds.*, di.warehouse_id FROM drug_sales AS ds, drug_inventory AS di WHERE " .
+  "ds.pid = '$pid' AND ds.encounter = '$encounter' AND di.inventory_id = ds.inventory_id " .
+  "ORDER BY ds.sale_id";
 $sres = sqlStatement($query);
 $prod_lino = 0;
 while ($srow = sqlFetchArray($sres)) {
@@ -1405,6 +1450,7 @@ while ($srow = sqlFetchArray($sres)) {
   $units   = $srow['quantity'];
   $fee     = $srow['fee'];
   $billed  = $srow['billed'];
+  $warehouse_id  = $srow['warehouse_id'];
   // Also preserve other items from the form, if present and unbilled.
   if ($pline['sale_id'] && !$srow['billed']) {
     // $units      = trim($pline['units']);
@@ -1413,7 +1459,7 @@ while ($srow = sqlFetchArray($sres)) {
     $fee   = sprintf('%01.2f',(0 + trim($pline['price'])) * $units);
     $rx    = !empty($pline['rx']);
   }
-  echoProdLine($prod_lino, $drug_id, $rx, $del, $units, $fee, $sale_id, $billed);
+  echoProdLine($prod_lino, $drug_id, $rx, $del, $units, $fee, $sale_id, $billed, $warehouse_id);
 }
 
 // Echo new product items from this form here, but omit any line
@@ -1427,7 +1473,8 @@ if ($_POST['prod']) {
     $units = max(1, intval(trim($iter['units'])));
     $fee   = sprintf('%01.2f',(0 + trim($iter['price'])) * $units);
     $rx    = !empty($iter['rx']); // preserve Rx if checked
-    echoProdLine(++$prod_lino, $iter['drug_id'], $rx, FALSE, $units, $fee);
+    $warehouse_id = empty($iter['warehouse_id']) ? '' : $iter['warehouse_id'];
+    echoProdLine(++$prod_lino, $iter['drug_id'], $rx, FALSE, $units, $fee, 0, FALSE, $warehouse_id);
   }
 }
 
@@ -1569,6 +1616,9 @@ if ($contraception_code && !$isBilled) {
   }
 }
 
+// Following removed as warehouse choice is now at the line item level.
+//
+/*********************************************************************
 // If there is a choice of warehouses, allow override of user default.
 if ($prod_lino > 0) { // if any products are in this form
   $trow = sqlQuery("SELECT count(*) AS count FROM list_options WHERE list_id = 'warehouse'");
@@ -1581,6 +1631,7 @@ if ($prod_lino > 0) { // if any products are in this form
     echo "&nbsp; &nbsp; &nbsp;\n";
   }
 }
+*********************************************************************/
 
 // Allow the patient price level to be fixed here.
 $plres = sqlStatement("SELECT option_id, title FROM list_options " .

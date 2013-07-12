@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2006-2012 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2006-2013 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -11,6 +11,11 @@
 // functions in openemr/library/options.inc.php .
 // These lists are based on the constants found in the 
 // openemr/library/classes/Prescription.class.php file.
+
+// Decision was made in June 2013 that a sale line item in the Fee Sheet may
+// come only from the specified warehouse. Set this to false if the decision
+// is reversed.
+$GLOBALS['SELL_FROM_ONE_WAREHOUSE'] = true;
 
 $substitute_array = array('', xl('Allowed'), xl('Not Allowed'));
 
@@ -84,21 +89,25 @@ function sellDrug($drug_id, $quantity, $fee, $patient_id=0, $encounter_id=0,
   $orderby .= "lo.seq, di.expiration, di.lot_number, di.inventory_id";
 
   // Retrieve lots in order of expiration date within warehouse preference.
-  $res = sqlStatement("SELECT di.*, lo.option_id, lo.seq " .
+  $query = "SELECT di.*, lo.option_id, lo.seq " .
     "FROM drug_inventory AS di " .
     "LEFT JOIN list_options AS lo ON lo.list_id = 'warehouse' AND " .
     "lo.option_id = di.warehouse_id " .
     "WHERE " .
-    "di.drug_id = '$drug_id' AND di.destroy_date IS NULL " .
-    "ORDER BY $orderby");
+    "di.drug_id = '$drug_id' AND di.destroy_date IS NULL ";
+  if ($GLOBALS['SELL_FROM_ONE_WAREHOUSE'] && $default_warehouse) $query .=
+    "AND di.warehouse_id = '$default_warehouse' ";
+  $query .= "ORDER BY $orderby";
+  $res = sqlStatement($query);
 
   // First pass.  Pick out lots to be used in filling this order, figure out
   // if there is enough quantity on hand and check for lots to be destroyed.
   while ($row = sqlFetchArray($res)) {
-    // Warehouses with seq > 99 are not available.
-    $seq = empty($row['seq']) ? 0 : $row['seq'] + 0;
-    if ($seq > 99) continue;
-
+    if ($row['warehouse_id'] != $default_warehouse) {
+      // Warehouses with seq > 99 are not available.
+      $seq = empty($row['seq']) ? 0 : $row['seq'] + 0;
+      if ($seq > 99) continue;
+    }
     $on_hand = $row['on_hand'];
     $expired = (!empty($row['expiration']) && $row['expiration'] <= $sale_date);
     if ($expired || $on_hand < $quantity) {
@@ -130,6 +139,7 @@ function sellDrug($drug_id, $quantity, $fee, $patient_id=0, $encounter_id=0,
 
   if ($testonly) {
     // Just testing inventory, so return true if OK, false if insufficient.
+    // $qty_left, if positive, is the amount requested that could not be allocated.
     return $qty_left <= 0;
   }
 
