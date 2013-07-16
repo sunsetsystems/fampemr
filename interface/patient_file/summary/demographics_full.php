@@ -126,12 +126,12 @@ function auto_populate_employer_address<?php echo $i ?>(){
   f.i<?php echo $i?>subscriber_DOB.value=f.form_DOB.value;
   f.i<?php echo $i?>subscriber_ss.value=f.form_ss.value;
   f.form_i<?php echo $i?>subscriber_sex.value = f.form_sex.value;
-  f.i<?php echo $i?>subscriber_employer.value=f.form_em_name.value;
-  f.i<?php echo $i?>subscriber_employer_street.value=f.form_em_street.value;
-  f.i<?php echo $i?>subscriber_employer_city.value=f.form_em_city.value;
-  f.form_i<?php echo $i?>subscriber_employer_state.value=f.form_em_state.value;
-  f.i<?php echo $i?>subscriber_employer_postal_code.value=f.form_em_postal_code.value;
-  if (f.form_em_country)
+  if (f.form_em_name       ) f.i<?php echo $i?>subscriber_employer.value=f.form_em_name.value;
+  if (f.form_em_street     ) f.i<?php echo $i?>subscriber_employer_street.value=f.form_em_street.value;
+  if (f.form_em_city       ) f.i<?php echo $i?>subscriber_employer_city.value=f.form_em_city.value;
+  if (f.form_em_state      ) f.form_i<?php echo $i?>subscriber_employer_state.value=f.form_em_state.value;
+  if (f.form_em_postal_code) f.i<?php echo $i?>subscriber_employer_postal_code.value=f.form_em_postal_code.value;
+  if (f.form_em_country    )
     f.form_i<?php echo $i?>subscriber_employer_country.value=f.form_em_country.value;
  }
 }
