@@ -234,6 +234,19 @@ if ($fres) {
      </td>
     </tr>
 
+<?php
+  // We will show the shift selector only if the shift list is not empty.
+  $tmp = sqlQuery("SELECT COUNT(*) AS count FROM list_options WHERE list_id = 'shift'");
+?>
+    <tr<?php if (empty($tmp['count'])) echo " style='visibility:hidden;'"; ?>>
+     <td class='bold' nowrap><?php xl('Shift','e'); ?>:</td>
+     <td class='text'>
+<?php
+  echo generate_select_list('form_shift', 'shift', $viewmode ? $result['shift'] : '', '');
+?>
+     </td>
+    </tr>
+
     <tr<?php if ($GLOBALS['ippf_specific']) echo " style='visibility:hidden;'"; ?>>
      <td class='bold' nowrap><?php xl('Onset/hosp. date:','e'); ?></td>
      <td class='text' nowrap>

@@ -512,3 +512,11 @@ ALTER TABLE drugs
 ALTER TABLE facility ADD extra_validation tinyint(1) NOT NULL DEFAULT '1';
 #EndIf
 
+#IfMissingColumn form_encounter shift
+ALTER TABLE form_encounter ADD shift varchar(31) NOT NULL DEFAULT '';
+#EndIf
+
+#IfNotRow2D list_options list_id lists option_id shift
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','shift','Shifts', 1,0);
+#EndIf
+

@@ -499,6 +499,7 @@ CREATE TABLE `form_encounter` (
   `supervisor_id` INT(11) DEFAULT '0' COMMENT 'supervising provider, if any, for this visit',
   `invoice_refno` varchar(31) NOT NULL DEFAULT '',
   `referral_source` varchar(31) NOT NULL DEFAULT '',
+  `shift` varchar(31) NOT NULL DEFAULT '',
   PRIMARY KEY  (`id`),
   KEY `pid` (`pid`),
   KEY `date` (`date`)
@@ -2095,6 +2096,7 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists'   ,'irnpool','Invoice Reference Number Pools', 1,0);
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default, notes ) VALUES ('irnpool','main','Main',1,1,'000001');
 
+INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','shift','Shifts', 1,0);
 -- --------------------------------------------------------
 
 -- 
