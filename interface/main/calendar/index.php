@@ -53,10 +53,15 @@ if ($_GET['framewidth']) $_SESSION['pc_framewidth'] = $_GET['framewidth'];
 // FACILITY FILTERING (lemonsoftware) (CHEMED)
 $_SESSION['pc_facility'] = 0;
 
-/*********************************************************************
-if ($_POST['pc_facility'])  $_SESSION['pc_facility'] = $_POST['pc_facility'];
-*********************************************************************/
-if (isset($_COOKIE['pc_facility']) && $GLOBALS['set_facility_cookie']) $_SESSION['pc_facility'] = $_COOKIE['pc_facility'];
+if (isset($_COOKIE['pc_facility']) && $GLOBALS['set_facility_cookie']) {
+  // There is a cookie facility and we're supposed to use it, so default to that.
+  $_SESSION['pc_facility'] = $_COOKIE['pc_facility'];
+}
+else {
+  // If no cookie facility applies then default to the user's default facility.
+  $tmp = sqlQuery("SELECT facility_id FROM users WHERE id = '" . $_SESSION['authId'] . "'");
+  if (!empty($tmp['facility_id'])) $_SESSION['pc_facility'] = $tmp['facility_id'];
+}
 // override the cookie if the user doesn't have access to that facility any more
 if ($_SESSION['userauthorized'] != 1 && $GLOBALS['restrict_user_facility']) { 
   $facilities = getUserFacilities($_SESSION['authId']);
@@ -68,16 +73,14 @@ if ($_SESSION['userauthorized'] != 1 && $GLOBALS['restrict_user_facility']) {
       $_SESSION['pc_facility'] = $_COOKIE['pc_facility'];
   }
 }
+// Now override the session facility with the one selected, if we came here from a form that does so.
 if (isset($_POST['pc_facility']))  $_SESSION['pc_facility'] = $_POST['pc_facility'];
-/********************************************************************/
-
-if ($_GET['pc_facility'])  $_SESSION['pc_facility'] = $_GET['pc_facility'];
+if (isset($_GET['pc_facility']))  $_SESSION['pc_facility'] = $_GET['pc_facility'];
+// Set the cookie facility if applicable.
 if ($GLOBALS['set_facility_cookie'] && ($_SESSION['pc_facility'] > 0)) setcookie("pc_facility", $_SESSION['pc_facility'], time() + (3600 * 365));
 
-// allow tracking of current viewtype -- JRM
-if ($_GET['viewtype']) $_SESSION['viewtype'] = $_GET['viewtype'];
-if ($_POST['viewtype']) $_SESSION['viewtype'] = $_POST['viewtype'];
-
+// Simplifying by just using request variable instead of checking for both post and get - KHY
+if (isset($_REQUEST['viewtype'])) $_SESSION['viewtype'] = $_REQUEST['viewtype'];
 
 //if (empty($_GET['no_nav'])) {
 //        $_SESSION['last_calendar_page'] = $_SERVER['PHP_SELF'] . "?" . $_SERVER['QUERY_STRING'];
