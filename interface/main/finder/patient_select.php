@@ -12,6 +12,31 @@ require_once("$srcdir/options.inc.php");
 $fstart = $_REQUEST['fstart'] + 0;
 $popup  = empty($_REQUEST['popup']) ? 0 : 1;
 $message = strip_escape_custom($_GET['message']);
+
+// This matters only if home_facility is a mandatory demographics field:
+$form_all_facilities = empty($_POST['form_all_facilities']) ? 0 : 1;
+
+// These items apply to the alternate patient search results style.
+$use_facility_checkbox = false;
+if (!empty($GLOBALS['patient_search_results_style'])) {
+  // Alternate patient search results style; this gets address plus other
+  // fields that are mandatory, up to a limit of 5.
+  $extracols = array();
+  $tres = sqlStatement("SELECT * FROM layout_options " .
+    "WHERE form_id = 'DEM' AND ( uor > 1 AND field_id != '' " .
+    "OR uor > 0 AND field_id = 'street' ) AND " .
+    "field_id NOT LIKE '_name' AND " .
+    "field_id NOT LIKE 'phone%' AND " .
+    "field_id NOT LIKE 'title' AND " .
+    "field_id NOT LIKE 'ss' AND " .
+    "field_id NOT LIKE 'DOB' AND " .
+    "field_id NOT LIKE 'pubpid' " .
+    "ORDER BY group_name, seq LIMIT 5");
+  while ($trow = sqlFetchArray($tres)) {
+    $extracols[$trow['field_id']] = $trow;
+    if ($trow['field_id'] == 'home_facility') $use_facility_checkbox = true;
+  }
+}
 ?>
 
 <html>
@@ -115,13 +140,6 @@ $orderby = "lname ASC, fname ASC";
 
 $today = date('Y-m-d');
 if ($GLOBALS['patient_search_results_sort']) {
-  /*******************************************************************
-  $given .= ", (SELECT COUNT(*) " .
-    "FROM form_encounter AS fe, billing AS b WHERE " .
-    "fe.pid = patient_data.pid AND substring(fe.date, 1, 10) = '$today' AND " .
-    "b.pid = fe.pid AND b.encounter = fe.encounter AND " .
-    "b.activity = 1 AND b.billed = 0) AS isopen";
-  *******************************************************************/
   $given .=
     ", (SELECT COUNT(*) " .
     "FROM form_encounter AS fe WHERE " .
@@ -139,7 +157,18 @@ if ($GLOBALS['patient_search_results_sort']) {
 
 $search_service_code = strip_escape_custom(trim($_POST['search_service_code']));
 echo "<input type='hidden' name='search_service_code' value='" .
-  htmlentities($search_service_code) . "' />\n";
+  addslashes($search_service_code) . "' />\n";
+
+$condition = '';
+if ($use_facility_checkbox && !$form_all_facilities) {
+  $tmp = sqlQuery("SELECT facility_id FROM users WHERE id = '" . $_SESSION['authUserID'] . "'");
+  if (!empty($tmp['facility_id'])) {
+    $condition = "home_facility = '" . $tmp['facility_id'] . "'";
+  }
+  else {
+    $use_facility_checkbox = false;
+  }
+}
 
 if ($popup) {
   echo "<input type='hidden' name='popup' value='1' />\n";
@@ -179,6 +208,8 @@ if ($popup) {
     "b.code LIKE '" . add_escape_custom($search_service_code) . "' " .
     ") > 0";
 
+  if ($condition) $where .= " AND $condition";
+
   // $sql = "SELECT $given FROM patient_data AS p " .
   $sql = "SELECT $given FROM patient_data " .
     "WHERE $where ORDER BY $orderby LIMIT $fstart, $sqllimit";
@@ -191,32 +222,32 @@ if ($popup) {
 else {
   $patient = formData("patient","R");
   $findBy  = $_REQUEST['findBy'];
-  $searchFields = $_REQUEST['searchFields'];
+  $searchFields = strip_escape_custom($_REQUEST['searchFields']);
   $exact = !empty($_REQUEST['find_exact']);
 
   echo "<input type='hidden' name='patient' value='$patient' />\n";
   echo "<input type='hidden' name='findBy'  value='$findBy' />\n";
+  echo "<input type='hidden' name='searchFields' value='" .
+    addslashes($searchFields) . "' />\n";
 
   if ($findBy == "Last")
-      $result = getPatientLnames("$patient", $given, $orderby, $sqllimit, $fstart, $exact);
+      $result = getPatientLnames("$patient", $given, $orderby, $sqllimit, $fstart, $exact, $condition);
   else if ($findBy == "ID")
-      $result = getPatientId("$patient", $given, "id ASC, ".$orderby, $sqllimit, $fstart, $exact);
+      $result = getPatientId("$patient", $given, "id ASC, ".$orderby, $sqllimit, $fstart, $exact, $condition);
   else if ($findBy == "DOB")
-      $result = getPatientDOB("$patient", $given, "DOB ASC, ".$orderby, $sqllimit, $fstart, $exact);
+      $result = getPatientDOB("$patient", $given, "DOB ASC, ".$orderby, $sqllimit, $fstart, $exact, $condition);
   else if ($findBy == "SSN")
-      $result = getPatientSSN("$patient", $given, "ss ASC, ".$orderby, $sqllimit, $fstart, $exact);
+      $result = getPatientSSN("$patient", $given, "ss ASC, ".$orderby, $sqllimit, $fstart, $exact, $condition);
   elseif ($findBy == "Phone")                  //(CHEMED) Search by phone number
-      $result = getPatientPhone("$patient", $given, $orderby, $sqllimit, $fstart, $exact);
+      $result = getPatientPhone("$patient", $given, $orderby, $sqllimit, $fstart, $exact, $condition);
   else if ($findBy == "Any")
-      $result = getByPatientDemographics("$patient", $given, $orderby, $sqllimit, $fstart, $exact);
+      $result = getByPatientDemographics("$patient", $given, $orderby, $sqllimit, $fstart, $exact, $condition);
   else if ($findBy == "Filter") {
     $result = getByPatientDemographicsFilter($searchFields, "$patient",
-    $given, $orderby, $sqllimit, $fstart, $search_service_code, $exact);
+    $given, $orderby, $sqllimit, $fstart, $search_service_code, $exact, $condition);
   }
 }
 ?>
-
-</form>
 
 <table border='0' cellpadding='5' cellspacing='0' width='100%'>
  <tr>
@@ -224,7 +255,17 @@ else {
    <a href="./patient_select_help.php" target=_new>[<?php xl('Help','e'); ?>]&nbsp</a>
   </td>
   <td class='text' align='center'>
-<?php if ($message) echo "<font color='red'><b>$message</b></font>\n"; ?>
+<?php
+
+if ($use_facility_checkbox) {
+  // Checkbox to include all facilities. Resubmit when clicked.
+  echo "<input type='checkbox' name='form_all_facilities' value='1' onclick='submitList(0);'";
+  if ($form_all_facilities) echo " checked";
+  echo " />" . xl('All Facilities') . '&nbsp;';
+}
+
+if ($message) echo "<font color='red'><b>$message</b></font>\n";
+?>
   </td>
   <td class='text' align='right'>
 <?php
@@ -251,6 +292,8 @@ if ($fend > $count) $fend = $count;
   </td>
  </tr>
 </table>
+
+</form>
 
 <div id="searchResultsHeader">
 <table>
@@ -280,21 +323,8 @@ if (!$popup && preg_match('/^(\d+)\s*(.*)/',$patient,$matches) > 0) {
 <?php
 }
 else {
-  // Alternate patient search results style; this gets address plus other
-  // fields that are mandatory, up to a limit of 5.
-  $extracols = array();
-  $tres = sqlStatement("SELECT * FROM layout_options " .
-    "WHERE form_id = 'DEM' AND ( uor > 1 AND field_id != '' " .
-    "OR uor > 0 AND field_id = 'street' ) AND " .
-    "field_id NOT LIKE '_name' AND " .
-    "field_id NOT LIKE 'phone%' AND " .
-    "field_id NOT LIKE 'title' AND " .
-    "field_id NOT LIKE 'ss' AND " .
-    "field_id NOT LIKE 'DOB' AND " .
-    "field_id NOT LIKE 'pubpid' " .
-    "ORDER BY group_name, seq LIMIT 5");
-  while ($trow = sqlFetchArray($tres)) {
-    $extracols[$trow['field_id']] = $trow;
+  // Altrernate patient search results style.
+  foreach ($extracols as $trow) {
     echo "<th class='srMisc'>" . xl($trow['title']) . "</th>\n";
   }
 }

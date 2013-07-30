@@ -520,3 +520,12 @@ ALTER TABLE form_encounter ADD shift varchar(31) NOT NULL DEFAULT '';
 INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES ('lists','shift','Shifts', 1,0);
 #EndIf
 
+#IfMissingColumn patient_data home_facility
+ALTER TABLE patient_data
+  ADD home_facility int(11) NOT NULL DEFAULT 0;
+#EndIf
+
+#IfNotRow2D layout_options form_id DEM field_id home_facility
+INSERT INTO `layout_options` VALUES ('DEM', 'home_facility', '3Choices', 'Default Facility',7, 35, 1, 0, 0, '', 1, 1, '0', '', 'Default facility');
+#EndIf
+

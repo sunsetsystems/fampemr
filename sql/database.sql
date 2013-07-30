@@ -1614,6 +1614,7 @@ INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_notice', '3Choices', 'HIPAA N
 INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_voice', '3Choices', 'Allow Voice Message', 4, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Allow telephone messages?');
 INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_mail', '3Choices', 'Allow Mail Message', 5, 1, 1, 0, 0, 'yesno', 1, 1, '', '', 'Allow email messages?');
 INSERT INTO `layout_options` VALUES ('DEM', 'hipaa_message', '3Choices', 'Leave Message With', 6, 2, 1, 20, 63, '', 1, 1, '', '', 'With whom may we leave a message?');
+INSERT INTO `layout_options` VALUES ('DEM', 'home_facility', '3Choices', 'Default Facility', 7, 35, 1, 0, 0, '', 1, 1, '0', '', 'Default facility');
 INSERT INTO `layout_options` VALUES ('DEM', 'occupation', '4Employer', 'Occupation', 1, 2, 1, 20, 63, '', 1, 1, '', 'C', 'Occupation');
 INSERT INTO `layout_options` VALUES ('DEM', 'em_name', '4Employer', 'Employer Name', 2, 2, 1, 20, 63, '', 1, 1, '', 'C', 'Employer Name');
 INSERT INTO `layout_options` VALUES ('DEM', 'em_street', '4Employer', 'Employer Address', 3, 2, 1, 25, 63, '', 1, 1, '', 'C', 'Street and Number');
@@ -2485,6 +2486,7 @@ CREATE TABLE `patient_data` (
   `regdate`     date DEFAULT NULL COMMENT 'Registration Date',
   `completed_ad` VARCHAR(3) NOT NULL DEFAULT 'NO',
   `ad_reviewed` date DEFAULT NULL,
+  `home_facility` int(11) NOT NULL DEFAULT 0,
   UNIQUE KEY `pid` (`pid`),
   KEY `id` (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1 ;

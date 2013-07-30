@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2007-2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2007-2013 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -49,6 +49,7 @@ $datatypes = array(
   "26" => xl("List box w/add"),
   "27" => xl("Radio buttons"),
   "31" => xl("Static Text"),
+  "35" => xl("Facilities"),
 );
 
 function nextGroupOrder($order) {
