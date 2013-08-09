@@ -523,6 +523,10 @@ INSERT INTO list_options ( list_id, option_id, title, seq, is_default ) VALUES (
 #IfMissingColumn patient_data home_facility
 ALTER TABLE patient_data
   ADD home_facility int(11) NOT NULL DEFAULT 0;
+UPDATE patient_data AS pd SET pd.home_facility =
+  (SELECT fe.facility_id FROM form_encounter AS fe WHERE fe.pid = pd.pid ORDER BY fe.date DESC LIMIT 1)
+  WHERE pd.home_facility = 0 AND
+  (SELECT count(*) FROM form_encounter AS fe2 WHERE fe2.pid = pd.pid) > 0;
 #EndIf
 
 #IfNotRow2D layout_options form_id DEM field_id home_facility
