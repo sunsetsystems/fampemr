@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2009-2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2009-2010, 2013 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -46,6 +46,7 @@ function getSearchClass($data_type) {
     case 13: // squads
     case 14: // address book list
     case 26: // single-selection list with add
+    case 35: // facilities
       return 2;
     case  2: // text field
     case  3: // textarea
@@ -300,12 +301,10 @@ while ($frow = sqlFetchArray($fres)) {
   $list_id    = $frow['list_id'];
   $currvalue  = '';
 
-  if (strpos($field_id, 'em_') === 0) {
-    $tmp = substr($field_id, 3);
-    if (isset($result2[$tmp])) $currvalue = $result2[$tmp];
-  }
-  else {
-    if (isset($result[$field_id])) $currvalue = $result[$field_id];
+  // New client home facility defaults to user's facility.
+  if ($field_id == 'home_facility') {
+    $tmp = sqlQuery("SELECT facility_id FROM users WHERE id = '" . $_SESSION['authUserID'] . "'");
+    if (!empty($tmp['facility_id'])) $currvalue = $tmp['facility_id'];
   }
 
   // Handle a data category (group) change.
