@@ -392,11 +392,25 @@ foreach ($result2 as $iter) {
 </form>
 
 <table border=0 cellpadding=1 cellspacing=2>
-<tr><td><span class="bold"><?php xl('Username','e'); ?></span></td><td><span class="bold"><?php xl('Real Name','e'); ?></span></td><td><span class="bold"><?php xl('Info','e'); ?></span></td><td><span class="bold"><?php xl('Authorized','e'); ?>?</span></td></tr>
+<tr>
+ <td><span class="bold"><?php xl('Username','e'); ?></span></td>
+ <td><span class="bold"><?php xl('Real Name','e'); ?></span></td>
+ <td><span class="bold"><?php xl('Job Description','e'); ?></span></td>
+ <td><span class="bold"><?php xl('Provider','e'); ?>?</span></td>
+ <td><span class="bold"><?php xl('Facility','e'); ?></span></td>
+ <td><span class="bold"><?php xl('Warehouse','e'); ?></span></td>
+ <td><span class="bold"><?php xl('IRN Pool','e'); ?></span></td>
+ <td><span class="bold"><?php xl('Access Groups','e'); ?></span></td>
+</tr>
 <?php
-$query = "SELECT * FROM users WHERE username != '' ";
-if (!$form_inactive) $query .= "AND active = '1' ";
-$query .= "ORDER BY username";
+$query = "SELECT u.*, f.name AS facname, l1.title AS whname, l2.title AS irnpname " .
+  "FROM users AS u " .
+  "LEFT JOIN facility AS f ON f.id = u.facility_id " .
+  "LEFT JOIN list_options AS l1 ON l1.list_id = 'warehouse' AND l1.option_id = u.default_warehouse " .
+  "LEFT JOIN list_options AS l2 ON l2.list_id = 'irnpool'   AND l2.option_id = u.irnpool " .
+  "WHERE username != '' ";
+if (!$form_inactive) $query .= "AND u.active = '1' ";
+$query .= "ORDER BY u.username";
 $res = sqlStatement($query);
 for ($iter = 0;$row = sqlFetchArray($res);$iter++)
   $result4[$iter] = $row;
@@ -406,16 +420,27 @@ foreach ($result4 as $iter) {
   } else {
       $iter{"authorized"} = "";
   }
-
-  print "<tr><td><span class='text'>" . $iter{"username"} .
-    "</span><a href='user_admin.php?id=" . $iter{"id"} .
-    "' class='link_submit' onclick='top.restoreSession()'>(" . xl('Edit') . ")</a>" .
-    "</td><td><span class='text'>" .
-    $iter{"fname"} . ' ' . $iter{"lname"}."</span></td><td><span class='text'>" .
-    $iter{"info"} . "</span></td><td align='center'><span class='text'>" .
-    $iter{"authorized"} . "</span></td>";
-  print "<td><!--<a href='usergroup_admin.php?mode=delete&id=" . $iter{"id"} .
-    "' class='link_submit'>[Delete]</a>--></td>";
+  $acl_groups = '';
+  if (isset($phpgacl_location)) {
+    $username_acl_groups = acl_get_group_titles($iter["username"]);
+    foreach ($username_acl_groups AS $uagname) {
+      if ($acl_groups !== '') $acl_groups .= '<br />';
+      $acl_groups .= htmlspecialchars(xl_gacl_group($uagname));
+    }
+  }
+  echo "<tr>" .
+    "<td class='text'>" . htmlspecialchars($iter["username"]) .
+    "<a href='user_admin.php?id=" . $iter["id"] .
+    "' class='link_submit' onclick='top.restoreSession()'>(" . xl('Edit') . ")</a></td>" .
+    "<td class='text'>" . htmlspecialchars($iter["fname"] . ' ' . $iter["lname"]) . "</td>" .
+    "<td class='text'>" . htmlspecialchars($iter["specialty"]) . "</td>" .
+    "<td class='text'>" . ($iter["authorized"] ? xl('Yes') : '') . "</td>" .
+    "<td class='text'>" . htmlspecialchars($iter['facname']) . "</td>" .
+    "<td class='text'>" . htmlspecialchars($iter['whname']) . "</td>" .
+    "<td class='text'>" . htmlspecialchars($iter['irnpname']) . "</td>" .
+    "<td class='text'>$acl_groups</td>";
+  // print "<td><!--<a href='usergroup_admin.php?mode=delete&id=" . $iter{"id"} .
+  //   "' class='link_submit'>[Delete]</a>--></td>";
   print "</tr>\n";
 }
 ?>
