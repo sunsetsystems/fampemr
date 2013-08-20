@@ -48,7 +48,7 @@ function getCopay($patient_id, $encdate) {
     "WHERE pid = '$patient_id' AND type = 'primary' " .
     "AND date <= '$encdate' ORDER BY date DESC LIMIT 1");
   if ($tmp['provider']) return sprintf('%01.2f', 0 + $tmp['copay']);
-  return -1;
+  return 0;
 }
 
 // Display a row of data for an encounter.

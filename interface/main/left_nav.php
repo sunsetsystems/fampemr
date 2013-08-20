@@ -986,6 +986,7 @@ if (!empty($reg)) {
           <?php genPopLink(xl('Rec Summary'),'receipts_by_method_report.php'); ?>
           <?php genPopLink(xl('Pay Methods'),'methods_by_invoice.php'); ?>
           <?php genPopLink(xl('Collections'),'collections_report.php'); ?>
+          <?php if ($GLOBALS['gbl_menu_acct_trans']) genPopLink(xl('Acct Export'),'export_accounting_transactions.php'); ?>
         </ul>
       </li>
 <?php } ?>

@@ -833,6 +833,13 @@ $GLOBALS_METADATA = array(
       xl('C3 statistical reports.')
     ),
 
+    'gbl_menu_acct_trans' => array(
+      xl('Accounting Transactions Export'),
+      'bool',                           // data type
+      '0',                              // default
+      xl('Accounting transactions export to CSV')
+    ),
+
   ),
 
   // Miscellaneous Tab
