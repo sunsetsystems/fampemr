@@ -167,6 +167,9 @@ function doinvopen(ptid,encid) {
   <td class="dehead" align="right">
    <?php xl('Received','e') ?>
   </td>
+  <td class="dehead" align="right">
+   <?php xl('Voided','e') ?>
+  </td>
  </tr>
 <?php
   if ($_POST['form_refresh']) {
@@ -220,6 +223,7 @@ function doinvopen(ptid,encid) {
         $arows[$key] = array();
         $arows[$key]['transdate'] = $thedate;
         $arows[$key]['amount'] = $row['fee'];
+        $arows[$key]['voidamount'] = 0;
         $arows[$key]['cashierid'] = $row['cashierid'];
         $arows[$key]['project_id'] = 0;
         $arows[$key]['memo'] = '';
@@ -286,12 +290,76 @@ function doinvopen(ptid,encid) {
       $arows[$key] = array();
       $arows[$key]['transdate'] = $thedate;
       $arows[$key]['amount'] = 0 - $row['pay_amount'];
+      $arows[$key]['voidamount'] = 0;
       $arows[$key]['cashierid'] = $cashierid;
       $arows[$key]['project_id'] = empty($row['payer_id']) ? 0 : $row['payer_id'];
       $arows[$key]['memo'] = $row['code'];
       $arows[$key]['invnumber'] = "$patient_id.$encounter_id";
       $arows[$key]['irnumber'] = $row['invoice_refno'];
     } // end while
+
+
+
+    // Get voids, form_encounter.
+    // This will be skipped of a CPT code was specified.
+    if (!$form_cptcode) {
+      $query = "SELECT v.patient_id, v.encounter_id, v.date_voided, v.amount2, " .
+        "fe.date, fe.id AS trans_id, v.user_id AS cashierid, v.other_info, " .
+        "fe.provider_id " .
+        "FROM voids AS v " .
+        "JOIN form_encounter AS fe ON fe.pid = v.patient_id AND fe.encounter = v.encounter_id " .
+        "WHERE v.amount2 != 0 AND ( " .
+        "v.date_voided >= '$form_from_date 00:00:00' AND v.date_voided <= '$form_to_date 23:59:59' " .
+        "OR fe.date >= '$form_from_date 00:00:00' AND fe.date <= '$form_to_date 23:59:59' )";
+      // If a facility was specified.
+      if ($form_facility) $query .= " AND fe.facility_id = '$form_facility'";
+      if ($form_cashier) $query .= " AND v.user_id = '$form_cashier'";
+      //
+      $res = sqlStatement($query);
+      while ($row = sqlFetchArray($res)) {
+        $trans_id = $row['trans_id'];
+        $patient_id = $row['patient_id'];
+        $encounter_id = $row['encounter_id'];
+        //
+        if (!empty($ids_to_skip[$trans_id])) continue;
+        //
+        if ($form_use_edate) {
+          $thedate = substr($row['date'], 0, 10);
+        } else {
+          $thedate = substr($row['date_voided'], 0, 10);
+        }
+        if (strcmp($thedate, $form_from_date) < 0 || strcmp($thedate, $form_to_date) > 0) continue;
+        //
+        // If a diagnosis code was given then skip any invoices without
+        // that diagnosis.
+        if ($form_icdcode) {
+          $tmp = sqlQuery("SELECT count(*) AS count FROM billing WHERE " .
+            "pid = '$patient_id' AND encounter = '$encounter_id' AND " .
+            "code_type = 'ICD9' AND code LIKE '$form_icdcode' AND " .
+            "activity = 1");
+          if (empty($tmp['count'])) {
+            $ids_to_skip[$trans_id] = 1;
+            continue;
+          }
+        }
+        //
+        $cashierid = $row['cashierid'];
+        $key = sprintf("%08u%s%16s%08u%08u%06u", $cashierid, $thedate,
+          $row['other_info'], $patient_id, $encounter_id, ++$irow);
+        // Note invoice_refno in the above key is right-aligned.
+        $arows[$key] = array();
+        $arows[$key]['transdate'] = $thedate;
+        $arows[$key]['amount'] = 0;
+        $arows[$key]['voidamount'] = 0 + $row['amount2'];
+        $arows[$key]['cashierid'] = $cashierid;
+        $arows[$key]['project_id'] = 0;
+        $arows[$key]['memo'] = '';
+        $arows[$key]['invnumber'] = "$patient_id.$encounter_id";
+        $arows[$key]['irnumber'] = $row['other_info'];
+      } // end while
+    }
+
+
 
     ksort($arows);
     $cashierid = 0;
@@ -310,6 +378,7 @@ function doinvopen(ptid,encid) {
       $amount1 = 0;
       $amount2 = 0;
       $amount1 -= $row['amount'];
+      $amount2 -= $row['voidamount'];
 
       if ($cashierid != $row['cashierid']) {
         if ($cashierid) {
@@ -322,6 +391,9 @@ function doinvopen(ptid,encid) {
   </td>
   <td class="dehead" align="right">
    <?php bucks($cashiertotal1) ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($cashiertotal2) ?>
   </td>
  </tr>
 <?php
@@ -373,6 +445,9 @@ function doinvopen(ptid,encid) {
   <td class="detail" align="right">
    <?php bucks($amount1) ?>
   </td>
+  <td class="detail" align="right">
+   <?php bucks($amount2) ?>
+  </td>
  </tr>
 <?php
       } // end details
@@ -390,6 +465,9 @@ function doinvopen(ptid,encid) {
   <td class="dehead" align="right">
    <?php bucks($cashiertotal1) ?>
   </td>
+  <td class="dehead" align="right">
+   <?php bucks($cashiertotal2) ?>
+  </td>
  </tr>
 
  <tr bgcolor="#ffdddd">
@@ -398,6 +476,9 @@ function doinvopen(ptid,encid) {
   </td>
   <td class="dehead" align="right">
    <?php bucks($grandtotal1) ?>
+  </td>
+  <td class="dehead" align="right">
+   <?php bucks($grandtotal2) ?>
   </td>
  </tr>
 

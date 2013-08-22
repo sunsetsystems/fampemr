@@ -116,7 +116,7 @@ function receiptDetailLine($code_type, $code, $description, $quantity, $charge, 
         if ($aAdjusts[$i]['code_type'] == $code_type && $aAdjusts[$i]['code'] == $code && $aAdjusts[$i]['adj_amount'] != 0) {
           $adjust += $aAdjusts[$i]['adj_amount'];
           $aAdjusts[$i]['adj_amount'] = 0;
-          $memo = $aAdjusts[$i]['memo'];
+          $memo = $aAdjusts[$i]['memotitle'];
         }
       }
     }
@@ -256,6 +256,17 @@ body, td {
   window.close();
  }
 
+ // Process click on a void option.
+ function voidme(action) {
+  if (action == 'void' &&
+   !confirm('<?php echo xl('This will advance the receipt number. Please print the receipt if you have not already done so.'); ?>')) {
+   return false;
+  }
+  top.restoreSession();
+  document.location.href = 'pos_checkout.php?ptid=<?php echo $patient_id; ?>&' + action + '=<?php echo $encounter; ?>';
+  return false;
+ }
+
 </script>
 </head>
 <body class="body_top">
@@ -388,11 +399,15 @@ body, td {
   $aAdjusts = array();
   $ares = sqlStatement("SELECT " .
     "a.payer_type, a.adj_amount, a.memo, a.code_type, a.code, " .
-    "s.session_id, s.reference, s.check_date " .
+    "s.session_id, s.reference, s.check_date, lo.title AS memotitle " .
     "FROM ar_activity AS a " .
+    "LEFT JOIN list_options AS lo ON lo.list_id = 'adjreason' AND lo.option_id = a.memo " .
     "LEFT JOIN ar_session AS s ON s.session_id = a.session_id WHERE " .
     "a.pid = '$patient_id' AND a.encounter = '$encounter' AND a.adj_amount != 0");
-  while ($arow = sqlFetchArray($ares)) $aAdjusts[] = $arow;
+  while ($arow = sqlFetchArray($ares)) {
+    if (empty($arow['memotitle'])) $arow['memotitle'] = $arow['memo'];
+    $aAdjusts[] = $arow;
+  }
 
   $aTotals = array(0, 0, 0, 0, 0);
 
@@ -421,7 +436,7 @@ body, td {
   foreach ($aAdjusts as $arow) {
     if ($arow['adj_amount'] == 0) continue;
     $payer = empty($arow['payer_type']) ? 'Pt' : ('Ins' . $arow['payer_type']);
-    receiptDetailLine('', xl('Adjustment'), $payer . ' ' . $arow['memo'], 1,
+    receiptDetailLine('', xl('Adjustment'), $payer . ' ' . $arow['memotitle'], 1,
       0 - $arow['adj_amount'], $aTotals);
   }
 ?>
@@ -559,7 +574,12 @@ body, td {
 <a href='#' onclick='return printme();'><?php xl('Print','e'); ?></a>
 <?php if (acl_check('acct','disc')) { ?>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<a href='#' onclick='return voidme("regen");'><?php echo xl('Reprint with New Receipt'); ?></a>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<a href='#' onclick='return voidme("void");'><?php echo xl('Void and Return to Checkout'); ?></a>
+<!--
 <a href='#' onclick='return deleteme();'><?php xl('Undo Checkout','e'); ?></a>
+-->
 <?php } ?>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 <?php if ($details) { ?>
@@ -663,12 +683,16 @@ function write_form_headers() {
   // Create array aAdjusts from ar_activity rows for $inv_encounter.
   $ares = sqlStatement("SELECT " .
     "a.payer_type, a.adj_amount, a.memo, a.code_type, a.code, " .
-    "s.session_id, s.reference, s.check_date " .
+    "s.session_id, s.reference, s.check_date, lo.title AS memotitle " .
     "FROM ar_activity AS a " .
+    "LEFT JOIN list_options AS lo ON lo.list_id = 'adjreason' AND lo.option_id = a.memo " .
     "LEFT JOIN ar_session AS s ON s.session_id = a.session_id WHERE " .
     "a.pid = '$patient_id' AND a.encounter = '$inv_encounter' AND a.adj_amount != 0 " .
     "ORDER BY s.check_date, a.sequence_no");
-  while ($arow = sqlFetchArray($ares)) $aAdjusts[] = $arow;
+  while ($arow = sqlFetchArray($ares)) {
+    if (empty($arow['memotitle'])) $arow['memotitle'] = $arow['memo'];
+    $aAdjusts[] = $arow;
+  }
 }
 
 // Function to output a line item for the input form.
@@ -676,7 +700,7 @@ function write_form_headers() {
 $totalchg = 0; // totals charges after adjustments
 function write_form_line($code_type, $code, $id, $date, $description,
   $amount, $units, $taxrates) {
-  global $lino, $totalchg;
+  global $lino, $totalchg, $aAdjusts;
   // Write heading rows if that is not already done.
   write_form_headers();
   $amount = sprintf("%01.2f", $amount);
@@ -1012,9 +1036,77 @@ if ($_POST['form_save']) {
   exit();
 }
 
-// If an encounter ID was given, then we must generate a receipt and exit.
+// Common function for voiding a receipt or checkout.
 //
-if (!empty($_GET['enc'])) {
+function doVoid($patient_id, $encounter_id, $purge=false) {
+  $what_voided = $purge ? 'checkout' : 'receipt';
+  $date_original = '';
+  $adjustments = 0;
+  $payments = 0;
+  $row = sqlQuery("SELECT post_time, SUM(pay_amount) AS payments, " .
+    "SUM(adj_amount) AS adjustments FROM ar_activity WHERE " .
+    "pid = '$patient_id' AND encounter = '$encounter_id' " .
+    "GROUP BY post_time ORDER BY post_time DESC LIMIT 1");
+  if (!empty($row['post_time'])) {
+    $date_original = $row['post_time'];
+    $adjustments = $row['adjustments'];
+    $payments = $row['payments'];
+  }
+  // Get old invoice reference number.
+  $encrow = sqlQuery("SELECT invoice_refno FROM form_encounter WHERE " .
+    "pid = '$patient_id' AND encounter = '$encounter_id' LIMIT 1");
+  $old_invoice_refno = $encrow['invoice_refno'];
+  //
+  $usingirnpools = getInvoiceRefNumber();
+  // If not undoing a checkout or using IRN pools, nothing is done.
+  if ($purge || $usingirnpools) {
+    sqlStatement("INSERT INTO voids SET " .
+      "patient_id = '" . add_escape_custom($patient_id) . "', " .
+      "encounter_id = '" . add_escape_custom($encounter_id) . "', " .
+      "what_voided = '$what_voided', " .
+      ($date_original ?  "date_original = '$date_original', " : "") .
+      "date_voided = NOW(), " .
+      "user_id = '" . add_escape_custom($_SESSION['authUserID']) . "', " .
+      "amount1 = '" . $row['adjustments'] . "', " .
+      "amount2 = '" . $row['payments'] . "', " .
+      "other_info = '" . add_escape_custom($old_invoice_refno) . "'");
+  }
+  if ($purge) {
+    // Purge means delete adjustments and payments from the last checkout
+    // and re-open the visit.
+    if ($date_original) {
+      sqlStatement("DELETE FROM ar_activity WHERE " .
+        "pid = '$patient_id' AND encounter = '$encounter_id' AND " .
+        "post_time = '$date_original'");
+    }
+    sqlStatement("UPDATE billing SET billed = 0, bill_date = NULL WHERE " .
+      "pid = '$patient_id' AND encounter = '$encounterid' AND activity = 1");
+    sqlStatement("update drug_sales SET billed = 0 WHERE " .
+      "pid = '$patient_id' AND encounter = '$encounter_id'");
+    sqlStatement("UPDATE form_encounter SET last_level_billed = 0, " .
+      "last_level_closed = 0, stmt_count = 0, last_stmt_date = NULL " .
+      "WHERE pid = '$patient_id' AND encounter = '$encounter_id'");
+  }
+  else if ($usingirnpools) {
+    // Non-purge means just assign a new invoice reference number.
+    $new_invoice_refno = add_escape_custom(updateInvoiceRefNumber());
+    sqlStatement("UPDATE form_encounter " .
+      "SET invoice_refno = '$new_invoice_refno' " .
+      "WHERE pid = '$patient_id' AND encounter = '$encounter_id'");
+  }
+}
+
+// If "regen" encounter ID was given, then we must generate a new receipt ID.
+//
+if ($patient_id && !empty($_GET['regen'])) {
+  $encounter_id = 0 + $_GET['regen'];
+  doVoid($patient_id, $encounter_id, false);
+  $_GET['enc'] = $encounter_id;
+}
+
+// If "enc" encounter ID was given, then we must generate a receipt and exit.
+//
+if ($patient_id && !empty($_GET['enc'])) {
   if (empty($_GET['pdf'])) {
     generate_receipt($patient_id, $_GET['enc']);
   }
@@ -1025,6 +1117,13 @@ if (!empty($_GET['enc'])) {
     generateCheckoutReceipt(generateReceiptArray($patient_id, $_GET['enc']));
   }
   exit();
+}
+
+// If "void" encounter ID was given, then we must undo the last checkout.
+//
+if ($patient_id && !empty($_GET['void'])) {
+  $encounter_id = 0 + $_GET['void'];
+  doVoid($patient_id, $encounter_id, true);
 }
 
 // Get the unbilled billing table items and product sales for
@@ -1477,12 +1576,12 @@ foreach ($aCopays as $brow) {
 // Write any adjustments left in the aAdjusts array.
 foreach ($aAdjusts as $arow) {
   if ($arow['adj_amount'] == 0) continue;
-  $memo = $arow['memo'];
+  $memo = $arow['memotitle'];
   $reference = $arow['reference'];
   // The following removed because check numbers should not be in adjustments.
   /*******************************************************************
   if (empty($arow['session_id'])) {
-    $atmp = explode(' ', $memo, 2);
+    $atmp = explode(' ', $arow['memo'], 2);
     $memo = $atmp[0];
     $reference = $atmp[1];
   }
