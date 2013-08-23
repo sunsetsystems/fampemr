@@ -500,6 +500,7 @@ CREATE TABLE `form_encounter` (
   `invoice_refno` varchar(31) NOT NULL DEFAULT '',
   `referral_source` varchar(31) NOT NULL DEFAULT '',
   `shift` varchar(31) NOT NULL DEFAULT '',
+  `billing_facility` int(11) NOT NULL default 0,
   PRIMARY KEY  (`id`),
   KEY `pid` (`pid`),
   KEY `date` (`date`)

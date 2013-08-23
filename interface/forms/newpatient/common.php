@@ -180,6 +180,26 @@ if ($fres) {
     </tr>
 
     <tr>
+     <td class='bold' nowrap><?php echo xl('Billing Facility:'); ?></td>
+     <td class='text'>
+      <select name='billing_facility'>
+<?php
+if ($viewmode) $def_facility = $result['billing_facility'];
+$fres = sqlStatement("select * from facility where billing_location != 0 order by name");
+if ($fres) {
+  $fresult = array();
+  while ($frow = sqlFetchArray($fres)) {
+?>
+       <option value="<?php echo $frow['id']; ?>"<?php if ($def_facility == $frow['id']) echo " selected";?>><?php echo $frow['name']; ?></option>
+<?php
+  }
+}
+?>
+      </select>
+     </td>
+    </tr>
+
+    <tr>
 <?php
  $sensitivities = acl_get_sensitivities();
  if ($sensitivities && count($sensitivities)) {

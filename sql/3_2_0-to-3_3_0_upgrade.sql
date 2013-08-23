@@ -551,3 +551,8 @@ CREATE TABLE `voids` (
 ) ENGINE=MyISAM;
 #EndIf
 
+#IfMissingColumn form_encounter billing_facility
+ALTER TABLE form_encounter ADD billing_facility int(11) NOT NULL default 0;
+UPDATE form_encounter SET billing_facility = facility_id;
+#EndIf
+

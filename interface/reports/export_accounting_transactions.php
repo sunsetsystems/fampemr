@@ -393,10 +393,11 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
   // Get billing table items for encounters in the date range.
   $query = "SELECT b.fee, b.pid, b.encounter, b.code_type, b.code, b.units, " .
     "b.code_text, c.related_code, fe.date, fe.invoice_refno, " .
-    "fa.pos_code, fa.facility_npi " .
+    "fas.pos_code, fab.facility_npi " .
     "FROM billing AS b " .
     "JOIN form_encounter AS fe ON fe.pid = b.pid AND fe.encounter = b.encounter " .
-    "LEFT JOIN facility AS fa ON fa.id = fe.facility_id " .
+    "LEFT JOIN facility AS fas ON fas.id = fe.facility_id " .
+    "LEFT JOIN facility AS fab ON fab.id = fe.billing_facility " .
     "LEFT JOIN code_types AS ct ON ct.ct_key = b.code_type " .
     "LEFT JOIN codes AS c ON c.code_type = ct.ct_id AND c.code = b.code AND c.modifier = b.modifier " .
     "WHERE b.activity = 1 AND b.fee != 0 AND " .
@@ -427,13 +428,14 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
   // Get product sales items for encounters in the date range.
   $query = "SELECT s.sale_date, s.fee, s.quantity, s.pid, s.encounter, " .
     "s.drug_id, d.name, fe.date, fe.facility_id, fe.invoice_refno, " .
-    "fa.pos_code, fa.facility_npi " .
+    "fas.pos_code, fab.facility_npi " .
     "FROM drug_sales AS s " .
     "LEFT JOIN drugs AS d ON d.drug_id = s.drug_id " .
     "JOIN form_encounter AS fe ON " .
     "fe.pid = s.pid AND fe.encounter = s.encounter AND " .
     "fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59' " .
-    "LEFT JOIN facility AS fa ON fa.id = fe.facility_id " .
+    "LEFT JOIN facility AS fas ON fas.id = fe.facility_id " .
+    "LEFT JOIN facility AS fab ON fab.id = fe.billing_facility " .
     "WHERE s.fee != 0";
   // If a facility was specified.
   if ($form_facility) {
@@ -459,10 +461,11 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
   // Get adjustments and other payments from ar_activity table.
   $query = "SELECT " .
     "a.pid, a.encounter, a.code_type, a.code, a.adj_amount, a.pay_amount, a.post_time, a.memo, " .
-    "fa.pos_code, fa.facility_npi " .
+    "fas.pos_code, fab.facility_npi " .
     "FROM ar_activity AS a " .
     "JOIN form_encounter AS fe ON fe.pid = a.pid AND fe.encounter = a.encounter " .
-    "LEFT JOIN facility AS fa ON fa.id = fe.facility_id " .
+    "LEFT JOIN facility AS fas ON fas.id = fe.facility_id " .
+    "LEFT JOIN facility AS fab ON fab.id = fe.billing_facility " .
     "WHERE " .
     "a.post_time >= '$from_date 00:00:00' AND a.post_time <= '$to_date 23:59:59'";
   // If a facility was specified.
