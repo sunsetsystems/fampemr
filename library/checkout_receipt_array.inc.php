@@ -11,10 +11,19 @@
 // to understand and customize and does not have to be concerned with where the
 // data comes from.
 
+// Get a list item's title, translated if appropriate.
+function getAdjustTitle($option) {
+  $row = sqlQuery("SELECT title FROM list_options WHERE " .
+    "list_id = 'adjreason' AND option_id = '$option'");
+  if (empty($row['title'])) return $option;
+  return xl_list_label($row['title']);
+}
+
 // Store a receipt line item.
 //
 function receiptArrayDetailLine(&$aReceipt, $code_type, $code, $description, $quantity, $charge) {
   $adjust = 0;
+  $adjreason = '';
 
   // If an invoice level adjustment, get it into the right column.
   if ($code_type === '') {
@@ -31,6 +40,9 @@ function receiptArrayDetailLine(&$aReceipt, $code_type, $code, $description, $qu
           $aReceipt['_adjusts'][$i]['adj_amount'] != 0)
         {
           $adjust += $aReceipt['_adjusts'][$i]['adj_amount'];
+          if ($aReceipt['_adjusts'][$i]['memo']) {
+            $adjreason = getAdjustTitle($aReceipt['_adjusts'][$i]['memo']);
+          }
           $aReceipt['_adjusts'][$i]['adj_amount'] = 0;
         }
       }
@@ -52,6 +64,7 @@ function receiptArrayDetailLine(&$aReceipt, $code_type, $code, $description, $qu
     'quantity'    => $quantity,
     'charge'      => $charge,
     'adjustment'  => sprintf('%01.2f', $adjust),
+    'adjreason'   => $adjreason,
     'total'       => $total,
   );
 
@@ -219,9 +232,9 @@ function generateReceiptArray($patient_id, $encounter=0) {
   // Write any adjustments left in the aAdjusts array.
   foreach ($aReceipt['_adjusts'] as $arow) {
     if ($arow['adj_amount'] == 0) continue;
-    $payer = empty($arow['payer_type']) ? 'Pt' : ('Ins' . $arow['payer_type']);
+    // $payer = empty($arow['payer_type']) ? 'Pt' : ('Ins' . $arow['payer_type']);
     receiptArrayDetailLine($aReceipt, '', xl('Adjustment'),
-      $payer . ' ' . $arow['memo'], 1, 0 - $arow['adj_amount']);
+      getAdjustTitle($arow['memo']), 1, 0 - $arow['adj_amount']);
   }
 
   // Tax items.

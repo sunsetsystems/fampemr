@@ -192,7 +192,8 @@ function generateCheckoutReceipt(&$aReceipt) {
     }
     // If there is an adjustment insert a line for it.
     if ($item['adjustment'] != 0.00) {
-      gcrLine($aReceipt, $pdf, $item['code'], xl('Adjustment'),
+      $adjreason = $item['adjreason'] ? $item['adjreason'] : xl('Adjustment');
+      gcrLine($aReceipt, $pdf, $item['code'], $adjreason,
         '', '', $item['adjustment']);
     }
   }
