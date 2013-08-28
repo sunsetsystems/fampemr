@@ -393,14 +393,14 @@ foreach ($result2 as $iter) {
 
 <table border=0 cellpadding=1 cellspacing=2>
 <tr>
- <td><span class="bold"><?php xl('Username','e'); ?></span></td>
- <td><span class="bold"><?php xl('Real Name','e'); ?></span></td>
- <td><span class="bold"><?php xl('Job Description','e'); ?></span></td>
- <td><span class="bold"><?php xl('Provider','e'); ?>?</span></td>
- <td><span class="bold"><?php xl('Facility','e'); ?></span></td>
- <td><span class="bold"><?php xl('Warehouse','e'); ?></span></td>
- <td><span class="bold"><?php xl('IRN Pool','e'); ?></span></td>
- <td><span class="bold"><?php xl('Access Groups','e'); ?></span></td>
+ <td class="bold" width="12%" valign="top"><?php xl('Username','e'); ?></td>
+ <td class="bold" width="12%" valign="top"><?php xl('Real Name','e'); ?></td>
+ <td class="bold" width="16%" valign="top"><?php xl('Job Description','e'); ?></td>
+ <td class="bold" width="12%" valign="top"><?php xl('Provider','e'); ?>?</td>
+ <td class="bold" width="12%" valign="top"><?php xl('Facility','e'); ?></td>
+ <td class="bold" width="12%" valign="top"><?php xl('Warehouse','e'); ?></td>
+ <td class="bold" width="12%" valign="top"><?php xl('Invoice Pool','e'); ?></td>
+ <td class="bold" width="12%" valign="top"><?php xl('Access Groups','e'); ?></td>
 </tr>
 <?php
 $query = "SELECT u.*, f.name AS facname, l1.title AS whname, l2.title AS irnpname " .
@@ -429,16 +429,16 @@ foreach ($result4 as $iter) {
     }
   }
   echo "<tr>" .
-    "<td class='text'>" . htmlspecialchars($iter["username"]) .
+    "<td class='text' valign='top'>" . htmlspecialchars($iter["username"]) .
     "<a href='user_admin.php?id=" . $iter["id"] .
     "' class='link_submit' onclick='top.restoreSession()'>(" . xl('Edit') . ")</a></td>" .
-    "<td class='text'>" . htmlspecialchars($iter["fname"] . ' ' . $iter["lname"]) . "</td>" .
-    "<td class='text'>" . htmlspecialchars($iter["specialty"]) . "</td>" .
-    "<td class='text'>" . ($iter["authorized"] ? xl('Yes') : '') . "</td>" .
-    "<td class='text'>" . htmlspecialchars($iter['facname']) . "</td>" .
-    "<td class='text'>" . htmlspecialchars($iter['whname']) . "</td>" .
-    "<td class='text'>" . htmlspecialchars($iter['irnpname']) . "</td>" .
-    "<td class='text'>$acl_groups</td>";
+    "<td class='text' valign='top'>" . htmlspecialchars($iter["fname"] . ' ' . $iter["lname"]) . "</td>" .
+    "<td class='text' valign='top'>" . htmlspecialchars($iter["specialty"]) . "</td>" .
+    "<td class='text' valign='top'>" . ($iter["authorized"] ? xl('Yes') : '') . "</td>" .
+    "<td class='text' valign='top'>" . htmlspecialchars($iter['facname']) . "</td>" .
+    "<td class='text' valign='top'>" . htmlspecialchars($iter['whname']) . "</td>" .
+    "<td class='text' valign='top'>" . htmlspecialchars($iter['irnpname']) . "</td>" .
+    "<td class='text' valign='top'>$acl_groups</td>";
   // print "<td><!--<a href='usergroup_admin.php?mode=delete&id=" . $iter{"id"} .
   //   "' class='link_submit'>[Delete]</a>--></td>";
   print "</tr>\n";
