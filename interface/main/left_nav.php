@@ -980,7 +980,7 @@ if (!empty($reg)) {
         <ul>
           <?php genPopLink(xl('Sales'),'sales_by_item.php'); ?>
           <?php genPopLink(xl('Cash Rec'),'../billing/sl_receipts_report.php'); ?>
-          <?php genPopLink(xl('Rec by Cashier'),'cash_receipts_by_cashier.php'); ?>
+          <?php // genPopLink(xl('Rec by Cashier'),'cash_receipts_by_cashier.php'); ?>
           <?php genPopLink(xl('Svcs by Prov'),'services_by_provider.php'); ?>
           <?php genPopLink(xl('Front Rec'),'front_receipts_report.php'); ?>
           <?php genPopLink(xl('Rec Summary'),'receipts_by_method_report.php'); ?>

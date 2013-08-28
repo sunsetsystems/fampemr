@@ -141,7 +141,7 @@ function sortCmp1($a, $b) {
   return 0;
 }
 
-// Called by uksort() when sorting the second level or keys.
+// Called by uksort() when sorting the second level of keys.
 function sortCmp2($a, $b) {
   global $form_orderby;
   if ($form_orderby == 'date') return sortCmpPatient($a, $b);
@@ -195,6 +195,7 @@ if ($_POST['form_csvexport']) {
   foreach ($metharray as $key => $value) {
     echo '"' . $value['title'] . '",';
   }
+  echo '"' . xl('Voids'      ) . '",';
   echo '"' . xl('User'       ) . '"' . "\n";
 } // end export
 else {
@@ -204,9 +205,16 @@ else {
 <style>
 td.dehead { font-size:10pt; text-align:center; }
 td.detail { font-size:10pt; }
+td.delink { color:#0000cc; font-size:10pt; cursor:pointer }
 </style>
 
+<script type="text/javascript" src="../../library/topdialog.js"></script>
+<script type="text/javascript" src="../../library/dialog.js"></script>
+
 <script language="JavaScript">
+
+<?php require($GLOBALS['srcdir'] . "/restoreSession.php"); ?>
+
 function dosort(orderby) {
  var f = document.forms[0];
  f.form_orderby.value = orderby;
@@ -214,6 +222,12 @@ function dosort(orderby) {
  f.submit();
  return false;
 }
+
+// Process click to pop up the invoice receipt.
+function doinvopen(ptid,encid) {
+ dlgopen('../patient_file/pos_checkout.php?ptid=' + ptid + '&enc=' + encid, '_blank', 750, 550);
+}
+
 </script>
 
 <?php if (function_exists('html_header_show')) html_header_show(); ?>
@@ -230,8 +244,7 @@ function dosort(orderby) {
 <table border='0' cellpadding='3'>
 
  <tr>
-  <td>
-
+  <td align='center'>
 <?php
 // Build a drop-down list of facilities.
 //
@@ -247,8 +260,27 @@ while ($frow = sqlFetchArray($fres)) {
 }
 echo "   </select>\n";
 ?>
+<?php
+	// Build a drop-down list of "cashiers".
+	//
+	$query = "select id, lname, fname from users where " .
+		"username != '' and active = 1 order by lname, fname";
+	$res = sqlStatement($query);
+	echo "   <select name='form_cashier'>\n";
+	echo "    <option value=''>-- " . xl('All Cashiers') . " --\n";
+	while ($row = sqlFetchArray($res)) {
+		$cashierid = $row['id'];
+		echo "    <option value='$cashierid'";
+		if ($cashierid == $_POST['form_cashier']) echo " selected";
+		echo ">" . $row['lname'] . ", " . $row['fname'] . "\n";
+	}
+	echo "   </select>\n";
+?>
   </td>
-  <td>
+ </tr>
+
+ <tr>
+  <td align='center'>
    <select name='form_use_edate'>
     <option value='0'><?php xl('Payment Date','e'); ?></option>
     <option value='1'<?php if ($form_use_edate) echo ' selected' ?>><?php xl('Invoice Date','e'); ?></option>
@@ -282,8 +314,9 @@ echo "   </select>\n";
 } // end not export
 
 if (isset($_POST['form_orderby'])) {
-  $from_date = $form_from_date;
-  $to_date   = $form_to_date;
+  $from_date    = $form_from_date;
+  $to_date      = $form_to_date;
+  $form_cashier = $_POST['form_cashier'];
 
   $paymethod   = "";
   $paymethodleft = "";
@@ -302,6 +335,9 @@ if (isset($_POST['form_orderby'])) {
     "fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59'";
   // If a facility was specified.
   if ($form_facility) $query .= " AND fe.facility_id = '$form_facility'";
+  // If a cashier was specified.
+  if ($form_cashier) $query .= " AND b.user = '$form_cashier'";
+  //
   $query .= " ORDER BY fe.date, b.pid, b.encounter, fe.id";
   //
   $res = sqlStatement($query);
@@ -328,6 +364,9 @@ if (isset($_POST['form_orderby'])) {
     "fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59'";
   // If a facility was specified.
   if ($form_facility) $query .= " AND fe.facility_id = '$form_facility'";
+  // If a cashier was specified.
+  if ($form_cashier) $query .= " AND s.user = '$form_cashier'";
+  //
   $query .= " ORDER BY fe.date, s.pid, s.encounter, fe.id";
   //
   $res = sqlStatement($query);
@@ -360,6 +399,8 @@ if (isset($_POST['form_orderby'])) {
   }
   // If a facility was specified.
   if ($form_facility) $query .= " AND fe.facility_id = '$form_facility'";
+  // If a cashier was specified.
+  if ($form_cashier) $query .= " AND u.username = '$form_cashier'";
   //
   $query .= " ORDER BY fe.date, a.pid, a.encounter, fe.id";
   //
@@ -420,6 +461,9 @@ foreach ($metharray as $key => $value) {
   echo "  </td>\n";
 }
 ?>
+  <td class="dehead">
+   <?php xl('Voids','e') ?>
+  </td>
   <td class="dehead" <?php echoSort('user'); ?>>
    <?php xl('User','e') ?>
   </td>
@@ -431,11 +475,13 @@ foreach ($metharray as $key => $value) {
   uksort($insarray, 'sortCmp1'); // sort by first key
   $encount = 0;
   $displevel = 1;
+  $grandvoidtotal = 0;
   foreach ($insarray as $key1 => $value1) {
     $subcnttotal = 0;
     $subchgtotal = 0;
     $subadjtotal = 0;
     $subpaytotal = 0;
+    $subvoidtotal = 0;
     $subuser     = '';
     foreach ($metharray as $meth => $dummy) $metharray[$meth]['subtotal'] = 0;
 
@@ -444,6 +490,14 @@ foreach ($metharray as $key => $value) {
       ksort($value2);              // sort by encounter ID
       foreach ($value2 as $encid => $encarray) {
         $ptid = $encarray['#P'];
+
+        // Get total of voids for this $ptid, $encid.
+        $tmp = sqlQuery("SELECT SUM(v.amount2) AS amount2 " .
+          "FROM voids AS v " .
+          "JOIN form_encounter AS fe ON fe.pid = v.patient_id AND fe.encounter = v.encounter_id " .
+          "WHERE v.patient_id = '$ptid' AND v.encounter_id = '$encid' AND " .
+          "fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59'");
+        $voids = $tmp['amount2'];
 
         $disp_dos  = oeFormatShortDate($encarray['#D']);
 
@@ -481,7 +535,10 @@ foreach ($metharray as $key => $value) {
         $subchgtotal += $encarray['#$'];
         $subadjtotal += $encarray['#@'];
         $subpaytotal += $totpaid;
+        $subvoidtotal += $voids;
         $subuser      = $encarray['#U'];
+
+        $grandvoidtotal += $voids;
 
         if ($_POST['form_csvexport']) {
           echo '"'  . $disp_id   . '"';
@@ -495,6 +552,7 @@ foreach ($metharray as $key => $value) {
           foreach ($metharray as $meth => $dummy) {
             echo ',"' . bucks($encarray[$meth]) . '"';
           }
+          echo ',"' . bucks($voids) . '"';
           echo ',"' . $encarray['#U'] . '"' . "\n";
         }
         else {
@@ -510,7 +568,7 @@ foreach ($metharray as $key => $value) {
   <td class="detail">
    <?php echo $disp_name; ?>
   </td>
-  <td class="detail">
+  <td class="delink" onclick='doinvopen(<?php echo "$ptid,$encid"; ?>)'>
    <?php echo "$ptid.$encid"; ?>
   </td>
   <td class="dehead">
@@ -534,6 +592,10 @@ foreach ($metharray as $key => $value) {
             echo bucks($encarray[$meth]);
             echo "  </td>\n";
           }
+
+          echo "  <td class='detail' align='right'>\n";
+          echo bucks($voids);
+          echo "  </td>\n";
 
           echo "  <td class='detail'>\n";
           echo $encarray['#U'];
@@ -577,6 +639,9 @@ foreach ($metharray as $key => $value) {
           echo "  </td>\n";
         }
 ?>
+  <td class="detail" align="right">
+   <?php echo bucks($subvoidtotal); ?>
+  </td>
   <td class="detail">
    <?php echo $subuser; ?>
   </td>
@@ -618,6 +683,9 @@ foreach ($metharray as $key => $value) {
     echo "  </td>\n";
   }
 ?>
+  <td class="detail" align="right">
+   <?php echo bucks($grandvoidtotal); ?>
+  </td>
   <td class="detail">
    &nbsp;
   </td>
