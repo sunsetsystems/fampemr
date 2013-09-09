@@ -1080,7 +1080,7 @@ function doVoid($patient_id, $encounter_id, $purge=false) {
         "post_time = '$date_original'");
     }
     sqlStatement("UPDATE billing SET billed = 0, bill_date = NULL WHERE " .
-      "pid = '$patient_id' AND encounter = '$encounterid' AND activity = 1");
+      "pid = '$patient_id' AND encounter = '$encounter_id' AND activity = 1");
     sqlStatement("update drug_sales SET billed = 0 WHERE " .
       "pid = '$patient_id' AND encounter = '$encounter_id'");
     sqlStatement("UPDATE form_encounter SET last_level_billed = 0, " .

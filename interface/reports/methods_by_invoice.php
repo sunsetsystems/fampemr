@@ -31,8 +31,8 @@ function bucks($amount) {
   return '';
 }
 
-function recordPayment($encdate, $patient_id, $encounter_id,
-  $rowmethod, $rowchgamount, $rowpayamount, $rowadjamount, $username)
+function recordPayment($encdate, $patient_id, $encounter_id, $rowmethod,
+  $rowchgamount, $rowpayamount, $rowadjamount, $username, $invoice_refno)
 {
   global $insarray, $metharray, $grandchgtotal, $grandadjtotal, $patients;
   global $form_orderby;
@@ -49,6 +49,8 @@ function recordPayment($encdate, $patient_id, $encounter_id,
     "-->\n"; // debugging
   *******************************************************************/
 
+  if ($invoice_refno === '') $invoice_refno = "($patient_id.$encounter_id)";
+
   if ($form_orderby == 'patient') {
     $key1 = $patient_id;
     $key2 = $encdate;
@@ -58,8 +60,8 @@ function recordPayment($encdate, $patient_id, $encounter_id,
     $key2 = $encdate;
   }
   else if ($form_orderby == 'invoice') {
-    $key1 = $patient_id;
-    $key2 = '';
+    $key1 = $invoice_refno;
+    $key2 = $patient_id;
   }
   else {
     $key1 = $encdate;
@@ -103,6 +105,7 @@ function recordPayment($encdate, $patient_id, $encounter_id,
       '#D' => $encdate,     // visit date
       '#P' => $patient_id,  // patient id
       '#U' => $username,    // username
+      '#I' => $invoice_refno, // invoice reference number
     );
   }
   if (!isset($insarray[$key1][$key2][$encounter_id][$rowmethod])) {
@@ -345,12 +348,12 @@ if (isset($_POST['form_orderby'])) {
     if ($row['code_type'] == 'COPAY') {
       $rowmethod = trim($row['code_text']);
       recordPayment(substr($row['date'], 0, 10), $row['pid'], $row['encounter'],
-        $rowmethod, 0, 0 - $row['fee'], 0, $row['username']);
+        $rowmethod, 0, 0 - $row['fee'], 0, $row['username'], $row['invoice_refno']);
     }
     else {
       // Record a charge. Note these will only be the charges from the report period.
       recordPayment(substr($row['date'], 0, 10), $row['pid'], $row['encounter'],
-        '', $row['fee'], 0, 0, $row['username']);
+        '', $row['fee'], 0, 0, $row['username'], $row['invoice_refno']);
     }
   }
 
@@ -360,12 +363,13 @@ if (isset($_POST['form_orderby'])) {
     "fe.date, fe.facility_id, fe.invoice_refno " .
     "FROM drug_sales AS s " .
     "JOIN form_encounter AS fe ON fe.pid = s.pid AND fe.encounter = s.encounter " .
+    "LEFT JOIN users AS u ON u.username = s.user " .
     "WHERE s.pid != 0 AND s.fee != 0 AND " .
     "fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59'";
   // If a facility was specified.
   if ($form_facility) $query .= " AND fe.facility_id = '$form_facility'";
   // If a cashier was specified.
-  if ($form_cashier) $query .= " AND s.user = '$form_cashier'";
+  if ($form_cashier) $query .= " AND u.id = '$form_cashier'";
   //
   $query .= " ORDER BY fe.date, s.pid, s.encounter, fe.id";
   //
@@ -373,7 +377,7 @@ if (isset($_POST['form_orderby'])) {
   while ($row = sqlFetchArray($res)) {
     // Record a charge. Note these will only be the charges from the report period.
     recordPayment(substr($row['date'], 0, 10), $row['pid'], $row['encounter'],
-      '', $row['fee'], 0, 0, $row['username']);
+      '', $row['fee'], 0, 0, $row['username'], $row['invoice_refno']);
   }
 
   // Get all other payments and adjustments and their dates, corresponding
@@ -400,7 +404,7 @@ if (isset($_POST['form_orderby'])) {
   // If a facility was specified.
   if ($form_facility) $query .= " AND fe.facility_id = '$form_facility'";
   // If a cashier was specified.
-  if ($form_cashier) $query .= " AND u.username = '$form_cashier'";
+  if ($form_cashier) $query .= " AND a.post_user = '$form_cashier'";
   //
   $query .= " ORDER BY fe.date, a.pid, a.encounter, fe.id";
   //
@@ -413,8 +417,8 @@ if (isset($_POST['form_orderby'])) {
     } else {
       $rowmethod = trim($row['reference']);
     }
-    recordPayment($encdate, $row['pid'], $row['encounter'],
-      $rowmethod, 0, $row['pay_amount'], $row['adj_amount'], $row['username']);
+    recordPayment($encdate, $row['pid'], $row['encounter'], $rowmethod, 0,
+      $row['pay_amount'], $row['adj_amount'], $row['username'], $row['invoice_refno']);
   }
 
   if (!$_POST['form_csvexport']) {
@@ -490,6 +494,7 @@ foreach ($metharray as $key => $value) {
       ksort($value2);              // sort by encounter ID
       foreach ($value2 as $encid => $encarray) {
         $ptid = $encarray['#P'];
+        $invoice_refno = $encarray['#I'];
 
         // Get total of voids for this $ptid, $encid.
         $tmp = sqlQuery("SELECT SUM(v.amount2) AS amount2 " .
@@ -543,7 +548,7 @@ foreach ($metharray as $key => $value) {
         if ($_POST['form_csvexport']) {
           echo '"'  . $disp_id   . '"';
           echo ',"' . $disp_name . '"';
-          echo ',"' . "$ptid.$encid" . '"';
+          echo ',"' . addslashes($invoice_refno) . '"';
           echo ',"' . $disp_dos . '"';
           echo ',"' . bucks($encarray['#$']) . '"';
           echo ',"' . bucks($encarray['#@']) . '"';
@@ -569,7 +574,7 @@ foreach ($metharray as $key => $value) {
    <?php echo $disp_name; ?>
   </td>
   <td class="delink" onclick='doinvopen(<?php echo "$ptid,$encid"; ?>)'>
-   <?php echo "$ptid.$encid"; ?>
+   <?php echo htmlspecialchars($invoice_refno); ?>
   </td>
   <td class="dehead">
    <?php echo $disp_dos; ?>
