@@ -95,6 +95,14 @@ function updateInvoiceRefNumber() {
   return $irnumber;
 }
 
+function generate_layout_display_field($formid, $fieldid, $currvalue) {
+  $frow = sqlQuery("SELECT * FROM layout_options " .
+    "WHERE form_id = '$formid' AND field_id = '$fieldid' " .
+    "LIMIT 1");
+  if (empty($frow)) return $currvalue;
+  return generate_display_field($frow, $currvalue);
+}
+
 // Output HTML for a receipt line item.
 //
 // function receiptDetailLine($svcdate, $description, $amount, $quantity) {
@@ -289,8 +297,11 @@ body, td {
   <td width='50%' align='center' valign='top'>
    <b><?php echo $frow['name'] ?>
    <br><?php echo $frow['street'] ?>
-   <br><?php echo $frow['city'] . ', ' . $frow['state'] . ' ' . $frow['postal_code'] ?>
-   <br><?php echo $frow['phone'] ?>
+   <br><?php
+  echo $frow['city'] . ", ";
+  echo $frow['state'] . " ";
+  echo $frow['postal_code']; ?>
+   <br><?php echo $frow['phone']; ?>
   </td>
   <td width='25%' align='right' valign='top'>
    <!-- This space available. -->
@@ -333,7 +344,10 @@ body, td {
   <td width='50%' align='left' valign='top'>
    <?php echo $patdata['fname'] . ' ' . $patdata['mname'] . ' ' . $patdata['lname']; ?>
    <br><?php echo $patdata['street']; ?>
-   <br><?php echo $patdata['city'] . ', ' . $patdata['state'] . ' ' . $patdata['postal_code']; ?>
+   <br><?php
+  echo generate_layout_display_field('DEM', 'city' , $patdata['city']) . ", ";
+  echo generate_layout_display_field('DEM', 'state', $patdata['state']) . " ";
+  echo $patdata['postal_code']; ?>
   </td>
   <td width='50%' align='right' valign='top'>
    <table>

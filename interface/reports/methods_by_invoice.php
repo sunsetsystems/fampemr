@@ -534,7 +534,7 @@ foreach ($metharray as $key => $value) {
           $totpaid += $encarray[$meth];
           $metharray[$meth]['subtotal'] += $encarray[$meth];
         }
-        $totpaid = sprintf('%0.2d', $totpaid);
+        $totpaid = sprintf('%01.2f', $totpaid);
 
         $subcnttotal += 1;
         $subchgtotal += $encarray['#$'];
