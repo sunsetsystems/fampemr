@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2012 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2012-2013 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -68,22 +68,17 @@ function recordPayment($encdate, $patient_id, $encounter_id, $rowmethod,
     $key2 = $patient_id;
   }
 
+  // Ensure a unique row for each invoice reference number.
+  $key3 = $invoice_refno;
+
   // Extract only the first word as the payment method because any
   // following text will be some petty detail like a check number.
   $rowmethod = substr($rowmethod, 0, strcspn($rowmethod, ' /'));
 
   // Unexpected method is translated to Unassigned.
-  if (empty($rowmethod) || !isset($metharray[$rowmethod])) {
+  if (empty($rowmethod) || ($rowmethod !== '%void%' && !isset($metharray[$rowmethod]))) {
     $rowmethod = 'zzz';
   }
-
-  /*******************************************************************
-  // If not a recognized method, create a new entry for it.
-  if ($rowpayamount != 0 && !isset($metharray[$rowmethod])) {
-    // echo "<!-- Adding method '$rowmethod' -->\n"; // debugging
-    $metharray[$rowmethod] = array('title' => $rowmethod, 'paytotal' => 0);
-  }
-  *******************************************************************/
 
   // Get patient info here so names will be available at sort time.
   if (!isset($patients[$patient_id])) {
@@ -97,28 +92,31 @@ function recordPayment($encdate, $patient_id, $encounter_id, $rowmethod,
     $insarray[$key1] = array();
   if (!isset($insarray[$key1][$key2]))
     $insarray[$key1][$key2] = array();
-  if (!isset($insarray[$key1][$key2][$encounter_id])) {
+  if (!isset($insarray[$key1][$key2][$key3])) {
     // Here are some other attributes needed later:
-    $insarray[$key1][$key2][$encounter_id] = array(
-      '#$' => 0,            // charges
-      '#@' => 0,            // adjustments
-      '#D' => $encdate,     // visit date
-      '#P' => $patient_id,  // patient id
-      '#U' => $username,    // username
+    $insarray[$key1][$key2][$key3] = array(
+      '#$' => 0,              // charges
+      '#@' => 0,              // adjustments
+      '#D' => $encdate,       // visit date
+      '#P' => $patient_id,    // patient id
+      '#E' => $encounter_id,  // encounter id
+      '#U' => $username,      // username
       '#I' => $invoice_refno, // invoice reference number
     );
   }
-  if (!isset($insarray[$key1][$key2][$encounter_id][$rowmethod])) {
-    $insarray[$key1][$key2][$encounter_id][$rowmethod] = 0;
+  if (!isset($insarray[$key1][$key2][$key3][$rowmethod])) {
+    $insarray[$key1][$key2][$key3][$rowmethod] = 0;
   }
 
   // Accumulate charges, payments and adjustments.
-  $insarray[$key1][$key2][$encounter_id][$rowmethod] += $rowpayamount;
-  $insarray[$key1][$key2][$encounter_id]['#$']       += $rowchgamount;
-  $insarray[$key1][$key2][$encounter_id]['#@']       += $rowadjamount;
+  $insarray[$key1][$key2][$key3][$rowmethod] += $rowpayamount;
+  $insarray[$key1][$key2][$key3]['#$']       += $rowchgamount;
+  $insarray[$key1][$key2][$key3]['#@']       += $rowadjamount;
 
   // Accumulate also for bottom line totals.
-  if ($rowpayamount != 0) $metharray[$rowmethod]['paytotal'] += $rowpayamount;
+  if ($rowpayamount != 0 && $rowmethod !== '%void%') {
+    $metharray[$rowmethod]['paytotal'] += $rowpayamount;
+  }
   $grandchgtotal += $rowchgamount;
   $grandadjtotal += $rowadjamount;
 }
@@ -421,6 +419,34 @@ if (isset($_POST['form_orderby'])) {
       $row['pay_amount'], $row['adj_amount'], $row['username'], $row['invoice_refno']);
   }
 
+  // Get voids.
+  //
+  $query = "SELECT v.patient_id, v.encounter_id, v.date_voided, v.amount2, " .
+    "fe.date, fe.id, fe.provider_id, v.user_id, v.other_info, u.username " .
+    "FROM voids AS v " .
+    "JOIN form_encounter AS fe ON fe.pid = v.patient_id AND fe.encounter = v.encounter_id " .
+    "LEFT JOIN users AS u ON u.id = v.user_id " .
+    "WHERE v.amount2 != 0";
+  if ($form_use_edate) {
+    $query .= " AND fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59'";
+  } else {
+    // The Payment Date option is taken to mean void date for voids.
+    $query .= " AND v.date_voided >= '$from_date 00:00:00' AND v.date_voided <= '$to_date 23:59:59'";
+  }
+  // If a facility was specified.
+  if ($form_facility) $query .= " AND fe.facility_id = '$form_facility'";
+  // If a cashier was specified.
+  if ($form_cashier) $query .= " AND v.user_id = '$form_cashier'";
+  //
+  $query .= " ORDER BY fe.date, v.patient_id, v.encounter_id";
+  //
+  $res = sqlStatement($query);
+  while ($row = sqlFetchArray($res)) {
+    $encdate = substr($row['date'], 0, 10);
+    recordPayment($encdate, $row['patient_id'], $row['encounter_id'], '%void%', 0,
+      $row['amount2'], 0, $row['username'], $row['other_info']);
+  }
+
   if (!$_POST['form_csvexport']) {
 
   // echo "<!-- insarray:\n"; print_r($insarray); echo " -->\n"; // debugging
@@ -457,8 +483,6 @@ if (isset($_POST['form_orderby'])) {
   </td>
 <?php
 
-// ksort($metharray);
-
 foreach ($metharray as $key => $value) {
   echo "  <td class='dehead' align='right'>\n";
   echo htmlspecialchars($value['title']);
@@ -492,17 +516,11 @@ foreach ($metharray as $key => $value) {
     uksort($value1, 'sortCmp2'); // sort by second key
     foreach ($value1 as $key2 => $value2) {
       ksort($value2);              // sort by encounter ID
-      foreach ($value2 as $encid => $encarray) {
+      foreach ($value2 as $key3 => $encarray) {
         $ptid = $encarray['#P'];
+        $encid = $encarray['#E'];
         $invoice_refno = $encarray['#I'];
-
-        // Get total of voids for this $ptid, $encid.
-        $tmp = sqlQuery("SELECT SUM(v.amount2) AS amount2 " .
-          "FROM voids AS v " .
-          "JOIN form_encounter AS fe ON fe.pid = v.patient_id AND fe.encounter = v.encounter_id " .
-          "WHERE v.patient_id = '$ptid' AND v.encounter_id = '$encid' AND " .
-          "fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59'");
-        $voids = $tmp['amount2'];
+        $voids = empty($encarray['%void%']) ? 0 : $encarray['%void%'];
 
         $disp_dos  = oeFormatShortDate($encarray['#D']);
 
