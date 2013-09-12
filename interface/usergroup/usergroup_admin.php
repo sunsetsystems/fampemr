@@ -7,7 +7,20 @@ require_once("$srcdir/formdata.inc.php");
 require_once("$srcdir/options.inc.php");
 require_once(dirname(__FILE__) . "/../../library/classes/WSProvider.class.php");
 
+// This is called by usort().
+// Sorts according to the value in $_POST['form_orderby'].
+function userCmp($a, $b) {
+  global $form_orderby;
+  if ($a[$form_orderby] < $b[$form_orderby]) return -1;
+  if ($a[$form_orderby] > $b[$form_orderby]) return  1;
+  if ($a['username'] < $b['username']) return -1;
+  if ($a['username'] > $b['username']) return  1;
+  return 0;
+}
+
 $alertmsg = '';
+
+$form_orderby = empty($_POST['form_orderby']) ? 'username' : $_POST['form_orderby'];
 
 if (isset($_POST["mode"])) {
   if ($_POST["mode"] == "new_user") {
@@ -142,6 +155,14 @@ function authorized_clicked() {
  var f = document.forms[0];
  f.calendar.disabled = !f.authorized.checked;
  f.calendar.checked  =  f.authorized.checked;
+}
+
+function dosort(orderby) {
+ var f = document.userlist;
+ f.form_orderby.value = orderby;
+ top.restoreSession();
+ f.submit();
+ return false;
 }
 
 </script>
@@ -389,19 +410,50 @@ foreach ($result2 as $iter) {
  <?php if ($form_inactive) echo 'checked '; ?>/>
 <?php xl('Include inactive users','e'); ?>
 </span>
+<input type="hidden" name="form_orderby" value="<?php echo $form_orderby ?>" />
 </form>
 
 <table border=0 cellpadding=1 cellspacing=2>
 <tr>
- <td class="bold" width="12%" valign="top"><?php xl('Username','e'); ?></td>
- <td class="bold" width="12%" valign="top"><?php xl('Real Name','e'); ?></td>
- <td class="bold" width="16%" valign="top"><?php xl('Job Description','e'); ?></td>
- <td class="bold" width="12%" valign="top"><?php xl('Provider','e'); ?>?</td>
- <td class="bold" width="12%" valign="top"><?php xl('Facility','e'); ?></td>
- <td class="bold" width="12%" valign="top"><?php xl('Warehouse','e'); ?></td>
- <td class="bold" width="12%" valign="top"><?php xl('Invoice Pool','e'); ?></td>
- <td class="bold" width="12%" valign="top"><?php xl('Access Groups','e'); ?></td>
+ <td class="bold" width="12%" valign="top">
+   <a href="#" onclick="return dosort('username')"
+   <?php if ($form_orderby == 'username') echo " style='color:#00cc00'"; ?>>
+   <?php echo xl('Username'); ?></a>
+ </td>
+ <td class="bold" width="12%" valign="top">
+   <a href="#" onclick="return dosort('realname')"
+   <?php if ($form_orderby == 'realname') echo " style='color:#00cc00'"; ?>>
+   <?php echo xl('Real Name'); ?></a>
+ </td>
+ <td class="bold" width="16%" valign="top">
+   <a href="#" onclick="return dosort('specialty')"
+   <?php if ($form_orderby == 'specialty') echo " style='color:#00cc00'"; ?>>
+   <?php echo xl('Job Description'); ?></a>
+ <td class="bold" width="12%" valign="top">
+  <?php echo xl('Provider'); ?>?
+ </td>
+ <td class="bold" width="12%" valign="top">
+   <a href="#" onclick="return dosort('facname')"
+   <?php if ($form_orderby == 'facname') echo " style='color:#00cc00'"; ?>>
+   <?php echo xl('Facility'); ?></a>
+ </td>
+ <td class="bold" width="12%" valign="top">
+   <a href="#" onclick="return dosort('whname')"
+   <?php if ($form_orderby == 'whname') echo " style='color:#00cc00'"; ?>>
+   <?php echo xl('Warehouse'); ?></a>
+ </td>
+ <td class="bold" width="12%" valign="top">
+   <a href="#" onclick="return dosort('irnpname')"
+   <?php if ($form_orderby == 'irnpname') echo " style='color:#00cc00'"; ?>>
+   <?php echo xl('Invoice Pool'); ?></a>
+ </td>
+ <td class="bold" width="12%" valign="top">
+   <a href="#" onclick="return dosort('acl_groups')"
+   <?php if ($form_orderby == 'acl_groups') echo " style='color:#00cc00'"; ?>>
+   <?php echo xl('Access Groups'); ?></a>
+ </td>
 </tr>
+
 <?php
 $query = "SELECT u.*, f.name AS facname, l1.title AS whname, l2.title AS irnpname " .
   "FROM users AS u " .
@@ -412,33 +464,41 @@ $query = "SELECT u.*, f.name AS facname, l1.title AS whname, l2.title AS irnpnam
 if (!$form_inactive) $query .= "AND u.active = '1' ";
 $query .= "ORDER BY u.username";
 $res = sqlStatement($query);
-for ($iter = 0;$row = sqlFetchArray($res);$iter++)
+
+$result4 = array();
+for ($iter = 0; $row = sqlFetchArray($res); $iter++) {
+  $acl_groups = '';
+  if (isset($phpgacl_location)) {
+    $username_acl_groups = acl_get_group_titles($row['username']);
+    foreach ($username_acl_groups AS $uagname) {
+      if ($acl_groups !== '') $acl_groups .= '<br />';
+      $acl_groups .= htmlspecialchars(xl_gacl_group($uagname));
+    }
+  }
+  $row['acl_groups'] = $acl_groups;
+  $row['realname'] = $row['fname'] . ' ' . $row['lname'];
   $result4[$iter] = $row;
+}
+
+usort($result4, 'userCmp');
+
 foreach ($result4 as $iter) {
   if ($iter{"authorized"}) {
     $iter{"authorized"} = xl('yes');
   } else {
       $iter{"authorized"} = "";
   }
-  $acl_groups = '';
-  if (isset($phpgacl_location)) {
-    $username_acl_groups = acl_get_group_titles($iter["username"]);
-    foreach ($username_acl_groups AS $uagname) {
-      if ($acl_groups !== '') $acl_groups .= '<br />';
-      $acl_groups .= htmlspecialchars(xl_gacl_group($uagname));
-    }
-  }
   echo "<tr>" .
     "<td class='text' valign='top'>" . htmlspecialchars($iter["username"]) .
     "<a href='user_admin.php?id=" . $iter["id"] .
     "' class='link_submit' onclick='top.restoreSession()'>(" . xl('Edit') . ")</a></td>" .
-    "<td class='text' valign='top'>" . htmlspecialchars($iter["fname"] . ' ' . $iter["lname"]) . "</td>" .
+    "<td class='text' valign='top'>" . htmlspecialchars($iter['realname']) . "</td>" .
     "<td class='text' valign='top'>" . htmlspecialchars($iter["specialty"]) . "</td>" .
     "<td class='text' valign='top'>" . ($iter["authorized"] ? xl('Yes') : '') . "</td>" .
     "<td class='text' valign='top'>" . htmlspecialchars($iter['facname']) . "</td>" .
     "<td class='text' valign='top'>" . htmlspecialchars($iter['whname']) . "</td>" .
     "<td class='text' valign='top'>" . htmlspecialchars($iter['irnpname']) . "</td>" .
-    "<td class='text' valign='top'>$acl_groups</td>";
+    "<td class='text' valign='top'>" . $iter['acl_groups'] . "</td>";
   // print "<td><!--<a href='usergroup_admin.php?mode=delete&id=" . $iter{"id"} .
   //   "' class='link_submit'>[Delete]</a>--></td>";
   print "</tr>\n";
