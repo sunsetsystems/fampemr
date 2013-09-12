@@ -671,7 +671,8 @@ function write_form_headers() {
    <b><?php xl('Current Charges','e'); ?></b>
   </td>
   <td align='right' style='border-top:1px solid black; padding-top:5pt;'>
-   <?php echo generate_select_list('form_discount_type', 'adjreason', '', ''); ?>
+   <?php echo generate_select_list('form_discount_type', 'adjreason', '', '',
+    '', '', 'discountTypeChanged()'); ?>
   </td>
   <td style='border-top:1px solid black; padding-top:5pt;'>
    &nbsp;
@@ -780,7 +781,7 @@ function write_form_line($code_type, $code, $id, $date, $description,
     echo empty($GLOBALS['discount_by_money']) ? '%' : $GLOBALS['gbl_currency_symbol'];
     echo "</td>\n";
     echo "  <td align='right'>";
-    echo generate_select_list("line[$lino][memo]", 'adjreason', '', '');
+    echo generate_select_list("line[$lino][memo]", 'adjreason', '', '', '');
     echo "</td>\n";
     echo "  <td align='right'>";
     echo "<input type='text' name='line[$lino][amount]' value='$total' size='6'";
@@ -1403,6 +1404,15 @@ foreach ($aCellHTML as $ix => $html) {
   }
   return false;
  }
+
+ // When the main adjustment reason changes, duplicate it to all per-line reasons.
+ function discountTypeChanged() {
+  var f = document.forms[0];
+  for (lino = 0; f['line[' + lino + '][memo]']; ++lino) {
+   f['line[' + lino + '][memo]'].selectedIndex = f.form_discount_type.selectedIndex;
+  }
+ }
+
 </script>
 </head>
 
@@ -1772,6 +1782,7 @@ else if (!empty($GLOBALS['gbl_mask_invoice_number'])) {
  }
 
  Calendar.setup({inputField:"form_date", ifFormat:"%Y-%m-%d", button:"img_date"});
+ discountTypeChanged();
  addPayLine();
  billingChanged();
 <?php
