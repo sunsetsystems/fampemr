@@ -672,7 +672,7 @@ function write_form_headers() {
   </td>
   <td align='right' style='border-top:1px solid black; padding-top:5pt;'>
    <?php echo generate_select_list('form_discount_type', 'adjreason', '', '',
-    '', '', 'discountTypeChanged()'); ?>
+    ' ', '', 'discountTypeChanged()'); ?>
   </td>
   <td style='border-top:1px solid black; padding-top:5pt;'>
    &nbsp;
@@ -781,7 +781,7 @@ function write_form_line($code_type, $code, $id, $date, $description,
     echo empty($GLOBALS['discount_by_money']) ? '%' : $GLOBALS['gbl_currency_symbol'];
     echo "</td>\n";
     echo "  <td align='right'>";
-    echo generate_select_list("line[$lino][memo]", 'adjreason', '', '', '');
+    echo generate_select_list("line[$lino][memo]", 'adjreason', '', '', ' ');
     echo "</td>\n";
     echo "  <td align='right'>";
     echo "<input type='text' name='line[$lino][amount]' value='$total' size='6'";
@@ -1408,9 +1408,23 @@ foreach ($aCellHTML as $ix => $html) {
  // When the main adjustment reason changes, duplicate it to all per-line reasons.
  function discountTypeChanged() {
   var f = document.forms[0];
-  for (lino = 0; f['line[' + lino + '][memo]']; ++lino) {
-   f['line[' + lino + '][memo]'].selectedIndex = f.form_discount_type.selectedIndex;
+  if (f.form_discount_type && f.form_discount_type.selectedIndex) {
+   for (lino = 0; f['line[' + lino + '][memo]']; ++lino) {
+    f['line[' + lino + '][memo]'].selectedIndex = f.form_discount_type.selectedIndex;
+   }
   }
+ }
+
+ function validate() {
+  var f = document.forms[0];
+  for (lino = 0; f['line[' + lino + '][memo]']; ++lino) {
+   if (f['line[' + lino + '][memo]'].selectedIndex == 0 && f['line[' + lino + '][adjust]'].value) {
+    alert('<?php echo xl('Adjustment type is required for each line with an adjustment.') ?>');
+    return false;
+   }
+  }
+  top.restoreSession();
+  return true;
  }
 
 </script>
@@ -1418,7 +1432,8 @@ foreach ($aCellHTML as $ix => $html) {
 
 <body class="body_top">
 
-<form method='post' action='pos_checkout.php?rde=<?php echo $rapid_data_entry; ?>'>
+<form method='post' action='pos_checkout.php?rde=<?php echo $rapid_data_entry; ?>'
+ onsubmit="return validate()">
 <input type='hidden' name='form_pid' value='<?php echo $patient_id ?>' />
 
 <center>
