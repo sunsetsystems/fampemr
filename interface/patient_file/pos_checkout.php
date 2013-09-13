@@ -1418,7 +1418,8 @@ foreach ($aCellHTML as $ix => $html) {
  function validate() {
   var f = document.forms[0];
   for (lino = 0; f['line[' + lino + '][memo]']; ++lino) {
-   if (f['line[' + lino + '][memo]'].selectedIndex == 0 && f['line[' + lino + '][adjust]'].value) {
+   if (f['line[' + lino + '][memo]'].selectedIndex == 0 &&
+    parseFloat(f['line[' + lino + '][adjust]'].value) != 0) {
     alert('<?php echo xl('Adjustment type is required for each line with an adjustment.') ?>');
     return false;
    }
