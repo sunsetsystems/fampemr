@@ -1538,3 +1538,5 @@ INSERT INTO code_types (ct_key, ct_id, ct_seq, ct_mod, ct_just, ct_fee, ct_rel, 
 UPDATE list_options SET title = 'Client has received ITS Counselling' WHERE
   list_id = 'genitshist' AND title = 'Client has received ITS  Counselling';
 
+UPDATE facility SET billing_location = 1 WHERE pos_code = 1 AND billing_location != 1;
+

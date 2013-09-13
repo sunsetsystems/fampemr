@@ -530,7 +530,13 @@ UPDATE patient_data AS pd SET pd.home_facility =
 #EndIf
 
 #IfNotRow2D layout_options form_id DEM field_id home_facility
-INSERT INTO `layout_options` VALUES ('DEM', 'home_facility', '3Choices', 'Default Facility',7, 35, 1, 0, 0, '', 1, 1, '0', '', 'Default facility');
+INSERT INTO `layout_options` (
+  form_id, field_id, group_name, seq, title, data_type, uor, fld_length, max_length,
+  list_id, titlecols, datacols, default_value, edit_options, description
+  ) VALUES (
+  'DEM', 'home_facility',
+  (SELECT group_name AS gn FROM layout_options AS lo WHERE lo.form_id = 'DEM' AND lo.field_id = 'lname' LIMIT 1),
+  0, 'Home Facility', 35, 2, 0, 0, '', 1, 1, '0', '', 'Default facility');
 #EndIf
 
 #IfNotTable voids
