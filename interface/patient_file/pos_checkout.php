@@ -871,10 +871,11 @@ if ($_POST['form_save']) {
   $form_encounter = $_POST['form_encounter'];
 
   // Get the posting date from the form as yyyy-mm-dd.
-  $dosdate = date("Y-m-d");
+  $postdate = date("Y-m-d");
   if (preg_match("/(\d\d\d\d)\D*(\d\d)\D*(\d\d)/", $_POST['form_date'], $matches)) {
-    $dosdate = $matches[1] . '-' . $matches[2] . '-' . $matches[3];
+    $postdate = $matches[1] . '-' . $matches[2] . '-' . $matches[3];
   }
+  $dosdate = $postdate; // not sure if this is appropriate
 
   // If there is no associated encounter (i.e. this invoice has only
   // prescriptions) then assign an encounter number of the service
@@ -928,7 +929,7 @@ if ($_POST['form_save']) {
         $time = date('Y-m-d H:i:s');
         $query = "INSERT INTO ar_activity ( " .
           "pid, encounter, code_type, code, modifier, payer_type, " .
-          "post_user, post_time, session_id, memo, adj_amount " .
+          "post_user, post_time, post_date, session_id, memo, adj_amount " .
           ") VALUES ( " .
           "'$form_pid', " .
           "'$form_encounter', " .
@@ -938,6 +939,7 @@ if ($_POST['form_save']) {
           "'0', " .
           "'" . $_SESSION['authUserID'] . "', " .
           "'$time', " .
+          "'$postdate', " .
           "'0', " .
           "'$memo', " .
           "'$adjust' " .
@@ -997,7 +999,7 @@ if ($_POST['form_save']) {
     $time = date('Y-m-d H:i:s');
     $query = "INSERT INTO ar_activity ( " .
       "pid, encounter, code, modifier, payer_type, post_user, post_time, " .
-      "session_id, memo, adj_amount " .
+      "post_date, session_id, memo, adj_amount " .
       ") VALUES ( " .
       "'$form_pid', " .
       "'$form_encounter', " .
@@ -1006,6 +1008,7 @@ if ($_POST['form_save']) {
       "'0', " .
       "'" . $_SESSION['authUserID'] . "', " .
       "'$time', " .
+      "'$postdate', " .
       "'0', " .
       "'$memo', " .
       "'$amount' " .
@@ -1024,7 +1027,7 @@ if ($_POST['form_save']) {
         $refno  = $line['refno'];
         if ($method !== '' && $refno !== '') $method .= " $refno";
         $session_id = 0; // Is this OK?
-        arPostPayment($form_pid, $form_encounter, $session_id, $amount, '', 0, $method, 0);
+        arPostPayment($form_pid, $form_encounter, $session_id, $amount, '', 0, $method, 0, $time, $postdate);
       }
     }
   }

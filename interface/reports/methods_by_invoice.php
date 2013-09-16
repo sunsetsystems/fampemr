@@ -378,10 +378,10 @@ if (isset($_POST['form_orderby'])) {
       '', $row['fee'], 0, 0, $row['username'], $row['invoice_refno']);
   }
 
-  // Get all other payments and adjustments and their dates, corresponding
+  // Get all other payments and adjustments in the date range, corresponding
   // payers and check reference data, and the encounter dates separately.
   //
-  $query = "SELECT a.pid, a.encounter, a.post_time, a.pay_amount, " .
+  $query = "SELECT a.pid, a.encounter, a.pay_amount, " .
     "a.adj_amount, a.memo, a.session_id, a.code, a.payer_type, " .
     "fe.id, fe.date, fe.invoice_refno, fe.provider_id, " .
     "s.deposit_date, s.payer_id, s.reference, u.username " .
@@ -396,7 +396,11 @@ if (isset($_POST['form_orderby'])) {
   } else {
     $query .= " AND ( ( s.deposit_date IS NOT NULL AND " .
       "s.deposit_date >= '$from_date' AND s.deposit_date <= '$to_date' ) OR " .
-      "( s.deposit_date IS NULL AND a.post_time >= '$from_date 00:00:00' AND " .
+      "( s.deposit_date IS NULL AND a.post_date IS NOT NULL AND " .
+      "a.post_date >= '$from_date' AND " .
+      "a.post_date <= '$to_date' ) OR " .
+      "( s.deposit_date IS NULL AND a.post_date IS NULL AND " .
+      "a.post_time >= '$from_date 00:00:00' AND " .
       "a.post_time <= '$to_date 23:59:59' ) )";
   }
   // If a facility was specified.

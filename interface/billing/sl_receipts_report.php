@@ -291,7 +291,7 @@
       // If a doctor was specified.
       if ($form_doctor) $query .= " AND u.id = '$form_doctor'";
       ***************************************************************/
-      $query = "SELECT a.pid, a.encounter, a.post_time, a.code, a.modifier, a.pay_amount, " .
+      $query = "SELECT a.pid, a.encounter, a.post_time, a.post_date, a.code, a.modifier, a.pay_amount, " .
         "fe.date, fe.id AS trans_id, fe.provider_id AS docid, fe.invoice_refno, s.deposit_date, s.payer_id, " .
         "b.provider_id " .
         "FROM ar_activity AS a " .
@@ -302,6 +302,7 @@
         "b.code_type != 'COPAY' AND b.code_type != 'TAX' " .
         "WHERE a.pay_amount != 0 AND ( " .
         "a.post_time >= '$form_from_date 00:00:00' AND a.post_time <= '$form_to_date 23:59:59' " .
+        "OR a.post_date >= '$form_from_date' AND a.post_date <= '$form_to_date' " .
         "OR fe.date >= '$form_from_date 00:00:00' AND fe.date <= '$form_to_date 23:59:59' " .
         "OR s.deposit_date >= '$form_from_date' AND s.deposit_date <= '$form_to_date' )";
       // If a procedure code was specified.
@@ -329,6 +330,8 @@
         } else {
           if (!empty($row['deposit_date']))
             $thedate = $row['deposit_date'];
+          else if (!empty($row['post_date']))
+            $thedate = $row['post_date'];
           else
             $thedate = substr($row['post_time'], 0, 10);
         }
