@@ -1211,6 +1211,9 @@ while ($urow = sqlFetchArray($ures)) {
    if (! f[pfx + '[code_type]']) break;
    if (f[pfx + '[code_type]'].value != 'TAX') continue;
    f[pfx + '[price]'].value = '0.00';
+<?php if (!empty($GLOBALS['gbl_checkout_line_adjustments'])) { ?>
+   f[pfx + '[charge]'].value = '0.00';
+<?php } ?>
    if (visible) f[pfx + '[amount]'].value = '0.00';
   }
  }
@@ -1229,8 +1232,12 @@ while ($urow = sqlFetchArray($ures)) {
    var tax = amount * parseFloat(f[pfx + '[taxrates]'].value);
    tax = parseFloat(tax.toFixed(<?php echo $currdecimals ?>));
    var cumtax = parseFloat(f[pfx + '[price]'].value) + tax;
-   f[pfx + '[price]'].value  = cumtax.toFixed(<?php echo $currdecimals ?>); // requires JS 1.5
-   if (visible) f[pfx + '[amount]'].value = cumtax.toFixed(<?php echo $currdecimals ?>); // requires JS 1.5
+   var tmp = cumtax.toFixed(<?php echo $currdecimals ?>); // requires JS 1.5
+   f[pfx + '[price]'].value = tmp;
+<?php if (!empty($GLOBALS['gbl_checkout_line_adjustments'])) { ?>
+   f[pfx + '[charge]'].value = tmp;
+<?php } ?>
+   if (visible) f[pfx + '[amount]'].value = tmp;
    if (isNaN(tax)) alert('Tax rate not numeric at line ' + lino);
    return tax;
   }
