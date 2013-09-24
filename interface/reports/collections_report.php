@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2006-2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2006-2013 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -14,6 +14,7 @@ require_once("../../library/sl_eob.inc.php");
 require_once("../../library/formatting.inc.php");
 
 $INTEGRATED_AR = $GLOBALS['oer_config']['ws_accounting']['enabled'] === 2;
+if (!INTEGRATED_AR) die(xl("SQL-Ledger not supported."));
 
 $alertmsg = '';
 $bgcolor = "#aaaaaa";
@@ -98,8 +99,6 @@ $grand_total_paid        = 0;
 $grand_total_agedbal = array();
 for ($c = 0; $c < $form_age_cols; ++$c) $grand_total_agedbal[$c] = 0;
 
-if (!$INTEGRATED_AR) SLConnect();
-
 function bucks($amount) {
   if ($amount) echo oeFormatMoney($amount);
 }
@@ -109,6 +108,7 @@ function endPatient($ptrow) {
   global $grand_total_charges, $grand_total_adjustments, $grand_total_paid;
   global $grand_total_agedbal, $is_due_ins, $form_age_cols;
   global $initial_colspan, $final_colspan, $form_cb_idays, $form_cb_err;
+  global $aTaxNames, $aTaxTotals;
 
   if (!$ptrow['pid']) return;
 
@@ -150,14 +150,8 @@ function endPatient($ptrow) {
   else {
     if ($ptrow['count'] > 1) {
       echo " <tr bgcolor='$bgcolor'>\n";
-      /***************************************************************
-      echo "  <td class='detail' colspan='$initial_colspan'>";
-      echo "&nbsp;</td>\n";
-      echo "  <td class='detotal' colspan='$final_colspan'>&nbsp;Total Patient Balance:</td>\n";
-      ***************************************************************/
-      echo "  <td class='detotal' colspan='" . ($initial_colspan + $final_colspan) .
+      echo "  <td class='detotal' colspan='" . ($initial_colspan + $final_colspan + count($aTaxNames)) .
         "'>&nbsp;" . xl('Total Patient Balance') . ":</td>\n";
-      /**************************************************************/
       if ($form_age_cols) {
         for ($c = 0; $c < $form_age_cols; ++$c) {
           echo "  <td class='detotal' align='right'>&nbsp;" .
@@ -187,6 +181,8 @@ function endInsurance($insrow) {
   global $grand_total_charges, $grand_total_adjustments, $grand_total_paid;
   global $grand_total_agedbal, $is_due_ins, $form_age_cols;
   global $initial_colspan, $form_cb_idays, $form_cb_err;
+  global $aTaxNames, $aTaxTotals;
+
   if (!$insrow['pid']) return;
   $ins_balance = $insrow['amount'] - $insrow['paid'];
   if ($_POST['form_export'] || $_POST['form_csvexport']) {
@@ -195,12 +191,18 @@ function endInsurance($insrow) {
     $export_dollars += $ins_balance;
   }
   else {
+    $tottax = 0;
+    foreach ($aTaxTotals[1] as $tax) $tottax += $tax;
     echo " <tr bgcolor='$bgcolor'>\n";
     echo "  <td class='detail'>" . $insrow['insname'] . "</td>\n";
     echo "  <td class='detotal' align='right'>&nbsp;" .
-      oeFormatMoney($insrow['charges']) . "&nbsp;</td>\n";
+      oeFormatMoney($insrow['charges'] - $tottax) . "&nbsp;</td>\n";
     echo "  <td class='detotal' align='right'>&nbsp;" .
       oeFormatMoney($insrow['adjustments']) . "&nbsp;</td>\n";
+    foreach ($aTaxNames as $taxid => $dummy) {
+      echo "  <td class='detotal' align='right'>&nbsp;" .
+        oeFormatMoney($aTaxTotals[1][$taxid]) . "&nbsp;</td>\n";
+    }
     echo "  <td class='detotal' align='right'>&nbsp;" .
       oeFormatMoney($insrow['paid']) . "&nbsp;</td>\n";
     if ($form_age_cols) {
@@ -391,415 +393,209 @@ if ($_POST['form_search'] || $_POST['form_export'] || $_POST['form_csvexport']) 
   $rows = array();
   $where = "";
 
-  if ($INTEGRATED_AR) {
-    if ($_POST['form_export'] || $_POST['form_csvexport']) {
-      $where = "( 1 = 2";
-      foreach ($_POST['form_cb'] as $key => $value) $where .= " OR f.pid = $key";
-      $where .= ' )';
+  if ($_POST['form_export'] || $_POST['form_csvexport']) {
+    $where = "( 1 = 2";
+    foreach ($_POST['form_cb'] as $key => $value) $where .= " OR f.pid = $key";
+    $where .= ' )';
+  }
+  if ($form_date) {
+    if ($where) $where .= " AND ";
+    if ($form_to_date) {
+      $where .= "f.date >= '$form_date 00:00:00' AND f.date <= '$form_to_date 23:59:59'";
     }
-    if ($form_date) {
-      if ($where) $where .= " AND ";
-      if ($form_to_date) {
-        $where .= "f.date >= '$form_date 00:00:00' AND f.date <= '$form_to_date 23:59:59'";
-      }
-      else {
-        $where .= "f.date >= '$form_date 00:00:00' AND f.date <= '$form_date 23:59:59'";
-      }
+    else {
+      $where .= "f.date >= '$form_date 00:00:00' AND f.date <= '$form_date 23:59:59'";
     }
-    if ($form_facility) {
-      if ($where) $where .= " AND ";
-      $where .= "f.facility_id = '$form_facility'";
-    }
-    if (! $where) {
-      $where = "1 = 1";
-    }
+  }
+  if ($form_facility) {
+    if ($where) $where .= " AND ";
+    $where .= "f.facility_id = '$form_facility'";
+  }
+  if (! $where) {
+    $where = "1 = 1";
+  }
 
-    $query = "SELECT f.id, f.date, f.pid, f.encounter, f.last_level_billed, " .
-      "f.last_level_closed, f.last_stmt_date, f.stmt_count, f.invoice_refno, " .
-      "p.fname, p.mname, p.lname, p.street, p.city, p.state, " .
-      "p.postal_code, p.phone_home, p.ss, p.genericname2, p.genericval2, " .
-      "p.pubpid, p.DOB, CONCAT(u.lname, ', ', u.fname) AS referrer, " .
-      "( SELECT SUM(b.fee) FROM billing AS b WHERE " .
-      "b.pid = f.pid AND b.encounter = f.encounter AND " .
-      "b.activity = 1 AND b.code_type != 'COPAY' ) AS charges, " .
-      "( SELECT SUM(b.fee) FROM billing AS b WHERE " .
-      "b.pid = f.pid AND b.encounter = f.encounter AND " .
-      "b.activity = 1 AND b.code_type = 'COPAY' ) AS copays, " .
-      "( SELECT SUM(s.fee) FROM drug_sales AS s WHERE " .
-      "s.pid = f.pid AND s.encounter = f.encounter ) AS sales, " .
-      "( SELECT SUM(a.pay_amount) FROM ar_activity AS a WHERE " .
-      "a.pid = f.pid AND a.encounter = f.encounter ) AS payments, " .
-      "( SELECT SUM(a.adj_amount) FROM ar_activity AS a WHERE " .
-      "a.pid = f.pid AND a.encounter = f.encounter ) AS adjustments " .
-      "FROM form_encounter AS f " .
-      "JOIN patient_data AS p ON p.pid = f.pid " .
-      "LEFT OUTER JOIN users AS u ON u.id = p.providerID " .
-      "WHERE $where " .
-      "ORDER BY f.pid, f.encounter";
-    $eres = sqlStatement($query);
+  $aTaxNames = array();
 
-    while ($erow = sqlFetchArray($eres)) {
-      $patient_id = $erow['pid'];
-      $encounter_id = $erow['encounter'];
-      $pt_balance = $erow['charges'] + $erow['sales'] + $erow['copays'] - $erow['payments'] - $erow['adjustments'];
-      $pt_balance = 0 + sprintf("%.2f", $pt_balance); // yes this seems to be necessary
-      $svcdate = substr($erow['date'], 0, 10);
+  $query = "SELECT f.id, f.date, f.pid, f.encounter, f.last_level_billed, " .
+    "f.last_level_closed, f.last_stmt_date, f.stmt_count, f.invoice_refno, " .
+    "p.fname, p.mname, p.lname, p.street, p.city, p.state, " .
+    "p.postal_code, p.phone_home, p.ss, p.genericname2, p.genericval2, " .
+    "p.pubpid, p.DOB, CONCAT(u.lname, ', ', u.fname) AS referrer, " .
+    "( SELECT SUM(b.fee) FROM billing AS b WHERE " .
+    "b.pid = f.pid AND b.encounter = f.encounter AND b.activity = 1 AND " .
+    "b.code_type != 'COPAY' ) AS charges, " .
+    "( SELECT SUM(b.fee) FROM billing AS b WHERE " .
+    "b.pid = f.pid AND b.encounter = f.encounter AND " .
+    "b.activity = 1 AND b.code_type = 'COPAY' ) AS copays, " .
+    "( SELECT SUM(s.fee) FROM drug_sales AS s WHERE " .
+    "s.pid = f.pid AND s.encounter = f.encounter ) AS sales, " .
+    "( SELECT SUM(a.pay_amount) FROM ar_activity AS a WHERE " .
+    "a.pid = f.pid AND a.encounter = f.encounter ) AS payments, " .
+    "( SELECT SUM(a.adj_amount) FROM ar_activity AS a WHERE " .
+    "a.pid = f.pid AND a.encounter = f.encounter ) AS adjustments " .
+    "FROM form_encounter AS f " .
+    "JOIN patient_data AS p ON p.pid = f.pid " .
+    "LEFT OUTER JOIN users AS u ON u.id = p.providerID " .
+    "WHERE $where " .
+    "ORDER BY f.pid, f.encounter";
+  $eres = sqlStatement($query);
 
-      if ($_POST['form_search'] && ! $is_all) {
-        if ($pt_balance == 0) continue;
-      }
-      if ($_POST['form_category'] == 'Credits') {
-        if ($pt_balance > 0) continue;
-      }
+  while ($erow = sqlFetchArray($eres)) {
+    $patient_id = $erow['pid'];
+    $encounter_id = $erow['encounter'];
+    $pt_balance = $erow['charges'] + $erow['sales'] + $erow['copays'] - $erow['payments'] - $erow['adjustments'];
+    $pt_balance = 0 + sprintf("%.2f", $pt_balance); // yes this seems to be necessary
+    $svcdate = substr($erow['date'], 0, 10);
 
-      // If we have not yet billed the patient, then compute $duncount as a
-      // negative count of the number of insurance plans for which we have not
-      // yet closed out insurance.  Here we also compute $insname as the name of
-      // the insurance plan from which we are awaiting payment, and its sequence
-      // number $insposition (1-3).
-      $last_level_closed = $erow['last_level_closed'];
-      $duncount = $erow['stmt_count'];
-      $payerids = array();
-      $insposition = 0;
-      $insname = '';
-      if (! $duncount) {
-        for ($i = 1; $i <= 3; ++$i) {
-          $tmp = arGetPayerID($patient_id, $svcdate, $i);
-          if (empty($tmp)) break;
-          $payerids[] = $tmp;
-        }
-        $duncount = $last_level_closed - count($payerids);
-        if ($duncount < 0) {
-          if (!empty($payerids[$last_level_closed])) {
-            $insname = getInsName($payerids[$last_level_closed]);
-            $insposition = $last_level_closed + 1;
-          }
-        }
-      }
-
-      // Skip invoices not in the desired "Due..." category.
-      //
-      if ($is_due_ins && $duncount >= 0) continue;
-      if ($is_due_pt  && $duncount <  0) continue;
-
-      // echo "<!-- " . $erow['encounter'] . ': ' . $erow['charges'] . ' + ' . $erow['sales'] . ' + ' . $erow['copays'] . ' - ' . $erow['payments'] . ' - ' . $erow['adjustments'] . "  -->\n"; // debugging
-
-      // An invoice is due from the patient if money is owed and we are
-      // not waiting for insurance to pay.
-      $isduept = ($duncount >= 0) ? " checked" : "";
-
-      $row = array();
-
-      $row['id']        = $erow['id'];
-      $row['invnumber'] = "$patient_id.$encounter_id";
-      $row['custid']    = $patient_id;
-      $row['name']      = $erow['fname'] . ' ' . $erow['lname'];
-      $row['address1']  = $erow['street'];
-      $row['city']      = $erow['city'];
-      $row['state']     = $erow['state'];
-      $row['zipcode']   = $erow['postal_code'];
-      $row['phone']     = $erow['phone_home'];
-      $row['duncount']  = $duncount;
-      $row['dos']       = $svcdate;
-      $row['ss']        = $erow['ss'];
-      $row['DOB']       = $erow['DOB'];
-      $row['pubpid']    = $erow['pubpid'];
-      $row['billnote']  = ($erow['genericname2'] == 'Billing') ? $erow['genericval2'] : '';
-      $row['referrer']  = $erow['referrer'];
-      $row['irnumber']  = $erow['invoice_refno'];
-
-      // Also get the primary insurance company name whenever there is one.
-      $row['ins1'] = '';
-      if ($insposition == 1) {
-        $row['ins1'] = $insname;
-      } else {
-        if (empty($payerids)) {
-          $tmp = arGetPayerID($patient_id, $svcdate, 1);
-          if (!empty($tmp)) $payerids[] = $tmp;
-        }
-        if (!empty($payerids)) {
-          $row['ins1'] = getInsName($payerids[0]);
-        }
-      }
-
-      // This computes the invoice's total original charges and adjustments,
-      // date of last activity, and determines if insurance has responded to
-      // all billing items.
-      $invlines = ar_get_invoice_summary($patient_id, $encounter_id, true);
-
-      // if ($encounter_id == 185) { // debugging
-      //   echo "\n<!--\n";
-      //   print_r($invlines);
-      //   echo "\n-->\n";
-      // }
-
-      $row['charges'] = 0;
-      $row['adjustments'] = 0;
-      $row['paid'] = 0;
-      $ins_seems_done = true;
-      $ladate = $svcdate;
-      foreach ($invlines as $key => $value) {
-        $row['charges'] += $value['chg'] + $value['adj'];
-        $row['adjustments'] += 0 - $value['adj'];
-        $row['paid'] += $value['chg'] - $value['bal'];
-        foreach ($value['dtl'] as $dkey => $dvalue) {
-          $dtldate = trim(substr($dkey, 0, 10));
-          if ($dtldate && $dtldate > $ladate) $ladate = $dtldate;
-        }
-        $lckey = strtolower($key);
-        if ($lckey == 'co-pay' || $lckey == 'claim') continue;
-        if (count($value['dtl']) <= 1) $ins_seems_done = false;
-      }
-
-      // Simulating ar.amount in SQL-Ledger which is charges with adjustments:
-      $row['amount'] = $row['charges'] + $row['adjustments'];
-
-      $row['billing_errmsg'] = '';
-      if ($is_due_ins && $last_level_closed < 1 && $ins_seems_done)
-        $row['billing_errmsg'] = 'Ins1 seems done';
-      else if ($last_level_closed >= 1 && !$ins_seems_done)
-        $row['billing_errmsg'] = 'Ins1 seems not done';
-
-      $row['ladate'] = $ladate;
-
-      // Compute number of days since last activity.
-      $latime = mktime(0, 0, 0, substr($ladate, 5, 2),
-        substr($ladate, 8, 2), substr($ladate, 0, 4));
-      $row['inactive_days'] = floor((time() - $latime) / (60 * 60 * 24));
-
-      // Look up insurance policy number if we need it.
-      if ($form_cb_policy) {
-        $instype = ($insposition == 2) ? 'secondary' : (($insposition == 3) ? 'tertiary' : 'primary');
-        $insrow = sqlQuery("SELECT policy_number FROM insurance_data WHERE " .
-          "pid = '$patient_id' AND type = '$instype' AND date <= '$svcdate' " .
-          "ORDER BY date DESC LIMIT 1");
-        $row['policy'] = $insrow['policy_number'];
-      }
-
-      $ptname = $erow['lname'] . ", " . $erow['fname'];
-      if ($erow['mname']) $ptname .= " " . substr($erow['mname'], 0, 1);
-
-      if (!$is_due_ins ) $insname = '';
-      $rows[$insname . '|' . $ptname . '|' . $encounter_id] = $row;
-    } // end while
-  } // end $INTEGRATED_AR
-  else {
-    if ($_POST['form_export'] || $_POST['form_csvexport']) {
-      $where = "( 1 = 2";
-      foreach ($_POST['form_cb'] as $key => $value) $where .= " OR ar.customer_id = $key";
-      $where .= ' )';
-    }
-
-    if ($form_date) {
-      if ($where) $where .= " AND ";
-      $date1 = substr($form_date, 0, 4) . substr($form_date, 5, 2) .
-        substr($form_date, 8, 2);
-      if ($form_to_date) {
-        $date2 = substr($form_to_date, 0, 4) . substr($form_to_date, 5, 2) .
-          substr($form_to_date, 8, 2);
-        $where .= "((CAST (substring(ar.invnumber from position('.' in ar.invnumber) + 1 for 8) AS integer) " .
-          "BETWEEN '$date1' AND '$date2')";
-        $tmp = "date >= '$form_date' AND date <= '$form_to_date'";
-      }
-      else {
-        // This catches old converted invoices where we have no encounters:
-        $where .= "(ar.invnumber LIKE '%.$date1'";
-        $tmp = "date = '$form_date'";
-      }
-      // Pick out the encounters from MySQL with the desired DOS:
-      $rez = sqlStatement("SELECT pid, encounter FROM form_encounter WHERE $tmp");
-      while ($row = sqlFetchArray($rez)) {
-        $where .= " OR ar.invnumber = '" . $row['pid'] . "." . $row['encounter'] . "'";
-      }
-      $where .= ")";
-    }
-
-    if (! $where) {
-      $where = "1 = 1";
-    }
-
-    // Instead of the subselects in the following query, we will call
-    // get_invoice_summary() in order to get data at the procedure level and
-    // thus decide if insurance appears to be done with each invoice.
-
-    $query = "SELECT ar.id, ar.invnumber, ar.duedate, ar.amount, ar.paid, " .
-      "ar.intnotes, ar.notes, ar.shipvia, " .
-      "customer.id AS custid, customer.name, customer.address1, " .
-      "customer.city, customer.state, customer.zipcode, customer.phone " .
-      // ", (SELECT SUM(invoice.fxsellprice) FROM invoice WHERE " .
-      // "invoice.trans_id = ar.id AND invoice.fxsellprice > 0) AS charges, " .
-      // "(SELECT SUM(invoice.fxsellprice) FROM invoice WHERE " .
-      // "invoice.trans_id = ar.id AND invoice.fxsellprice < 0) AS adjustments " .
-      "FROM ar JOIN customer ON customer.id = ar.customer_id " .
-      "WHERE ( $where ) ";
     if ($_POST['form_search'] && ! $is_all) {
-      $query .= "AND ar.amount != ar.paid ";
+      if ($pt_balance == 0) continue;
     }
-    $query .= "ORDER BY ar.invnumber";
+    if ($_POST['form_category'] == 'Credits') {
+      if ($pt_balance > 0) continue;
+    }
 
-    // echo "<!-- $query -->\n"; // debugging
-
-    $t_res = SLQuery($query);
-    if ($sl_err) die($sl_err);
-    $num_invoices = SLRowCount($t_res);
-
-    //////////////////////////////////////////////////////////////////
-
-    for ($irow = 0; $irow < $num_invoices; ++$irow) {
-      $row = SLGetRow($t_res, $irow);
-
-      // If a facility was specified then skip invoices whose encounters
-      // do not indicate that facility.
-      if ($form_facility) {
-        list($patient_id, $encounter_id) = explode(".", $row['invnumber']);
-        $tmp = sqlQuery("SELECT count(*) AS count FROM form_encounter WHERE " .
-          "pid = '$patient_id' AND encounter = '$encounter_id' AND " .
-          "facility_id = '$form_facility'");
-        if (empty($tmp['count'])) continue;
+    // If we have not yet billed the patient, then compute $duncount as a
+    // negative count of the number of insurance plans for which we have not
+    // yet closed out insurance.  Here we also compute $insname as the name of
+    // the insurance plan from which we are awaiting payment, and its sequence
+    // number $insposition (1-3).
+    $last_level_closed = $erow['last_level_closed'];
+    $duncount = $erow['stmt_count'];
+    $payerids = array();
+    $insposition = 0;
+    $insname = '';
+    if (! $duncount) {
+      for ($i = 1; $i <= 3; ++$i) {
+        $tmp = arGetPayerID($patient_id, $svcdate, $i);
+        if (empty($tmp)) break;
+        $payerids[] = $tmp;
       }
-
-      $pt_balance = sprintf("%.2f",$row['amount']) - sprintf("%.2f",$row['paid']);
-
-      if ($_POST['form_category'] == 'Credits') {
-        if ($pt_balance > 0) continue;
-      }
-
-      // $duncount was originally supposed to be the number of times that
-      // the patient was sent a statement for this invoice.
-      //
-      $duncount = substr_count(strtolower($row['intnotes']), "statement sent");
-
-      // But if we have not yet billed the patient, then compute $duncount as a
-      // negative count of the number of insurance plans for which we have not
-      // yet closed out insurance.  Here we also compute $insname as the name of
-      // the insurance plan from which we are awaiting payment, and its sequence
-      // number $insposition (1-3).
-      //
-      $insname = '';
-      $insposition = 0;
-      $inseobs = strtolower($row['shipvia']);
-      $insgot = strtolower($row['notes']);
-      if (! $duncount) {
-        foreach (array('ins1', 'ins2', 'ins3') as $value) {
-          $i = strpos($insgot, $value);
-          if ($i !== false && strpos($inseobs, $value) === false) {
-            --$duncount;
-            if (!$insname && $is_due_ins) {
-              $j = strpos($insgot, "\n", $i);
-              if (!$j) $j = strlen($insgot);
-              $insname = trim(substr($row['notes'], $i + 5, $j - $i - 5));
-              $insposition = substr($value, 3); // 1, 2 or 3
-            }
-          }
+      $duncount = $last_level_closed - count($payerids);
+      if ($duncount < 0) {
+        if (!empty($payerids[$last_level_closed])) {
+          $insname = getInsName($payerids[$last_level_closed]);
+          $insposition = $last_level_closed + 1;
         }
       }
-      $row['insname'] = $insname;
+    }
 
-      // Also get the primary insurance company name whenever there is one.
-      $row['ins1'] = '';
-      $i = strpos($insgot, 'ins1');
-      if ($i !== false) {
-        $j = strpos($insgot, "\n", $i);
-        if (!$j) $j = strlen($insgot);
-        $row['ins1'] = trim(substr($row['notes'], $i + 5, $j - $i - 5));
+    // Skip invoices not in the desired "Due..." category.
+    //
+    if ($is_due_ins && $duncount >= 0) continue;
+    if ($is_due_pt  && $duncount <  0) continue;
+
+    // echo "<!-- " . $erow['encounter'] . ': ' . $erow['charges'] . ' + ' . $erow['sales'] . ' + ' . $erow['copays'] . ' - ' . $erow['payments'] . ' - ' . $erow['adjustments'] . "  -->\n"; // debugging
+
+    // An invoice is due from the patient if money is owed and we are
+    // not waiting for insurance to pay.
+    $isduept = ($duncount >= 0) ? " checked" : "";
+
+    // Accumulate tax IDs and names applicable to this report.
+    $tnres = sqlStatement("SELECT DISTINCT code, code_text " .
+      "FROM billing WHERE " .
+      "code_type = 'TAX' AND activity = '1' AND " .
+      "pid = '$patient_id' AND encounter = '$encounter_id'");
+    while ($tnrow = sqlFetchArray($tnres)) {
+      $aTaxNames[$tnrow['code']] = $tnrow['code_text'];
+    }
+
+    $row = array();
+
+    $row['id']        = $erow['id'];
+    $row['invnumber'] = "$patient_id.$encounter_id";
+    $row['custid']    = $patient_id;
+    $row['name']      = $erow['fname'] . ' ' . $erow['lname'];
+    $row['address1']  = $erow['street'];
+    $row['city']      = $erow['city'];
+    $row['state']     = $erow['state'];
+    $row['zipcode']   = $erow['postal_code'];
+    $row['phone']     = $erow['phone_home'];
+    $row['duncount']  = $duncount;
+    $row['dos']       = $svcdate;
+    $row['ss']        = $erow['ss'];
+    $row['DOB']       = $erow['DOB'];
+    $row['pubpid']    = $erow['pubpid'];
+    $row['billnote']  = ($erow['genericname2'] == 'Billing') ? $erow['genericval2'] : '';
+    $row['referrer']  = $erow['referrer'];
+    $row['irnumber']  = $erow['invoice_refno'];
+
+    // Also get the primary insurance company name whenever there is one.
+    $row['ins1'] = '';
+    if ($insposition == 1) {
+      $row['ins1'] = $insname;
+    } else {
+      if (empty($payerids)) {
+        $tmp = arGetPayerID($patient_id, $svcdate, 1);
+        if (!empty($tmp)) $payerids[] = $tmp;
       }
-
-      // An invoice is now due from the patient if money is owed and we are
-      // not waiting for insurance to pay.  We no longer look at the due date
-      // for this.
-      //
-      $isduept = ($duncount >= 0) ? " checked" : "";
-
-      // Skip invoices not in the desired "Due..." category.
-      //
-      if ($is_due_ins && $duncount >= 0) continue;
-      if ($is_due_pt  && $duncount <  0) continue;
-
-      $row['duncount'] = $duncount;
-
-      // Determine the date of service.  An 8-digit encounter number is
-      // presumed to be a date of service imported during conversion.
-      // Otherwise look it up in the form_encounter table.
-      //
-      $svcdate = "";
-      list($pid, $encounter) = explode(".", $row['invnumber']);
-      if (strlen($encounter) == 8) {
-        $svcdate = substr($encounter, 0, 4) . "-" . substr($encounter, 4, 2) .
-          "-" . substr($encounter, 6, 2);
+      if (!empty($payerids)) {
+        $row['ins1'] = getInsName($payerids[0]);
       }
-      else if ($encounter) {
-        $tmp = sqlQuery("SELECT date FROM form_encounter WHERE " .
-          "encounter = $encounter");
-        $svcdate = substr($tmp['date'], 0, 10);
+    }
+
+    // This computes the invoice's total original charges and adjustments,
+    // date of last activity, and determines if insurance has responded to
+    // all billing items.
+    $invlines = ar_get_invoice_summary($patient_id, $encounter_id, true);
+
+    // if ($encounter_id == 185) { // debugging
+    //   echo "\n<!--\n";
+    //   print_r($invlines);
+    //   echo "\n-->\n";
+    // }
+
+    $row['charges'] = 0;
+    $row['adjustments'] = 0;
+    $row['paid'] = 0;
+    $ins_seems_done = true;
+    $ladate = $svcdate;
+    foreach ($invlines as $key => $value) {
+      $row['charges'] += $value['chg'] + $value['adj'];
+      $row['adjustments'] += 0 - $value['adj'];
+      $row['paid'] += $value['chg'] - $value['bal'];
+      foreach ($value['dtl'] as $dkey => $dvalue) {
+        $dtldate = trim(substr($dkey, 0, 10));
+        if ($dtldate && $dtldate > $ladate) $ladate = $dtldate;
       }
+      $lckey = strtolower($key);
+      if ($lckey == 'co-pay' || $lckey == 'claim') continue;
+      if (count($value['dtl']) <= 1) $ins_seems_done = false;
+    }
 
-      $row['dos'] = $svcdate;
+    // Simulating ar.amount in SQL-Ledger which is charges with adjustments:
+    $row['amount'] = $row['charges'] + $row['adjustments'];
 
-      // This computes the invoice's total original charges and adjustments,
-      // date of last activity, and determines if insurance has responded to
-      // all billing items.
-      //
-      $invlines = get_invoice_summary($row['id'], true);
-      $row['charges'] = 0;
-      $row['adjustments'] = 0;
-      $ins_seems_done = true;
-      $ladate = $svcdate;
-      foreach ($invlines as $key => $value) {
-        $row['charges'] += $value['chg'] + $value['adj'];
-        $row['adjustments'] += 0 - $value['adj'];
-        foreach ($value['dtl'] as $dkey => $dvalue) {
-          $dtldate = trim(substr($dkey, 0, 10));
-          if ($dtldate && $dtldate > $ladate) $ladate = $dtldate;
-        }
-        $lckey = strtolower($key);
-        if ($lckey == 'co-pay' || $lckey == 'claim') continue;
-        if (count($value['dtl']) <= 1) $ins_seems_done = false;
-      }
-      $row['billing_errmsg'] = '';
-      if ($is_due_ins && strpos($inseobs, 'ins1') === false && $ins_seems_done)
-        $row['billing_errmsg'] = 'Ins1 seems done';
-      else if (strpos($inseobs, 'ins1') !== false && !$ins_seems_done)
-        $row['billing_errmsg'] = 'Ins1 seems not done';
+    $row['billing_errmsg'] = '';
+    if ($is_due_ins && $last_level_closed < 1 && $ins_seems_done)
+      $row['billing_errmsg'] = 'Ins1 seems done';
+    else if ($last_level_closed >= 1 && !$ins_seems_done)
+      $row['billing_errmsg'] = 'Ins1 seems not done';
 
-      $row['ladate'] = $ladate;
+    $row['ladate'] = $ladate;
 
-      // Compute number of days since last activity.
-      $latime = mktime(0, 0, 0, substr($ladate, 5, 2),
-        substr($ladate, 8, 2), substr($ladate, 0, 4));
-      $row['inactive_days'] = floor((time() - $latime) / (60 * 60 * 24));
+    // Compute number of days since last activity.
+    $latime = mktime(0, 0, 0, substr($ladate, 5, 2),
+      substr($ladate, 8, 2), substr($ladate, 0, 4));
+    $row['inactive_days'] = floor((time() - $latime) / (60 * 60 * 24));
 
-      $pdrow = sqlQuery("SELECT pd.fname, pd.lname, pd.mname, pd.ss, " .
-        "pd.genericname2, pd.genericval2, pd.pid, pd.pubpid, pd.DOB, " .
-        "CONCAT(u.lname, ', ', u.fname) AS referrer FROM " .
-        "integration_mapping AS im, patient_data AS pd " .
-        "LEFT OUTER JOIN users AS u ON u.id = pd.providerID " .
-        "WHERE im.foreign_id = " . $row['custid'] . " AND " .
-        "im.foreign_table = 'customer' AND " .
-        "pd.id = im.local_id");
+    // Look up insurance policy number if we need it.
+    if ($form_cb_policy) {
+      $instype = ($insposition == 2) ? 'secondary' : (($insposition == 3) ? 'tertiary' : 'primary');
+      $insrow = sqlQuery("SELECT policy_number FROM insurance_data WHERE " .
+        "pid = '$patient_id' AND type = '$instype' AND date <= '$svcdate' " .
+        "ORDER BY date DESC LIMIT 1");
+      $row['policy'] = $insrow['policy_number'];
+    }
 
-      $row['ss'] = $pdrow['ss'];
-      $row['DOB'] = $pdrow['DOB'];
-      $row['pubpid'] = $pdrow['pubpid'];
-      $row['billnote'] = ($pdrow['genericname2'] == 'Billing') ? $pdrow['genericval2'] : '';
-      $row['referrer'] = $pdrow['referrer'];
+    $ptname = $erow['lname'] . ", " . $erow['fname'];
+    if ($erow['mname']) $ptname .= " " . substr($erow['mname'], 0, 1);
 
-      $ptname = $pdrow['lname'] . ", " . $pdrow['fname'];
-      if ($pdrow['mname']) $ptname .= " " . substr($pdrow['mname'], 0, 1);
+    if (!$is_due_ins ) $insname = '';
+    $rows[$insname . '|' . $ptname . '|' . $encounter_id] = $row;
+  } // end while
 
-      // Look up insurance policy number if we need it.
-      if ($form_cb_policy) {
-        $patient_id = $pdrow['pid'];
-        $instype = ($insposition == 2) ? 'secondary' : (($insposition == 3) ? 'tertiary' : 'primary');
-        $insrow = sqlQuery("SELECT policy_number FROM insurance_data WHERE " .
-          "pid = '$patient_id' AND type = '$instype' AND date <= '$svcdate' " .
-          "ORDER BY date DESC LIMIT 1");
-        $row['policy'] = $insrow['policy_number'];
-      }
-
-      $rows[$insname . '|' . $ptname . '|' . $encounter] = $row;
-    } // end for
-  } // end not $INTEGRATED_AR
-
+  asort($aTaxNames);
   ksort($rows);
 
   if ($_POST['form_export']) {
@@ -815,6 +611,9 @@ if ($_POST['form_search'] || $_POST['form_export'] || $_POST['form_csvexport']) 
       echo '"Referrer",';
       echo '"Charge",';
       echo '"Adjust",';
+      foreach ($aTaxNames as $taxname) {
+        echo '"' . addslashes($taxname) . '",';
+      }
       echo '"Paid",';
       echo '"Balance",';
       echo '"IDays",';
@@ -866,6 +665,13 @@ if ($_POST['form_search'] || $_POST['form_export'] || $_POST['form_csvexport']) 
 <?php } ?>
   <td class="dehead" align="right"><?php xl('Charge','e') ?>&nbsp;</td>
   <td class="dehead" align="right"><?php xl('Adjust','e') ?>&nbsp;</td>
+<?php
+    foreach ($aTaxNames as $taxname) {
+      echo "  <td class='dehead' align='right'>";
+      echo htmlspecialchars($taxname);
+      echo "&nbsp</td>\n";
+    }
+?>
   <td class="dehead" align="right"><?php xl('Paid','e') ?>&nbsp;</td>
 <?php
     // Generate aging headers if appropriate, else balance header.
@@ -905,6 +711,13 @@ if ($_POST['form_search'] || $_POST['form_export'] || $_POST['form_csvexport']) 
   $ptrow = array('insname' => '', 'pid' => 0);
   $orow = -1;
 
+  // This stores taxes by type for: invoice, subtotals and grand totals.
+  $aTaxTotals = array();
+  for ($i = 0; $i < 3; ++$i) {
+    $aTaxTotals[$i] = array();
+    foreach ($aTaxNames as $taxid => $dummy) $aTaxTotals[$i][$taxid] = 0;
+  }
+
   foreach ($rows as $key => $row) {
     list($insname, $ptname, $trash) = explode('|', $key);
     list($pid, $encounter) = explode(".", $row['invnumber']);
@@ -915,6 +728,8 @@ if ($_POST['form_search'] || $_POST['form_export'] || $_POST['form_csvexport']) 
       $ptrow = array('insname' => $insname, 'ptname' => $ptname, 'pid' => $pid, 'count' => 1);
       foreach ($row as $key => $value) $ptrow[$key] = $value;
       $ptrow['agedbal'] = array();
+      // Clear array for tax subtotals.
+      foreach ($aTaxNames as $taxid => $dummy) $aTaxTotals[1][$taxid] = 0;
     }
     else if (!$is_ins_summary && ($insname != $ptrow['insname'] || $pid != $ptrow['pid'])) {
       // For the report, this will write the patient totals.  For the
@@ -924,6 +739,8 @@ if ($_POST['form_search'] || $_POST['form_export'] || $_POST['form_csvexport']) 
       $ptrow = array('insname' => $insname, 'ptname' => $ptname, 'pid' => $pid, 'count' => 1);
       foreach ($row as $key => $value) $ptrow[$key] = $value;
       $ptrow['agedbal'] = array();
+      // Clear array for tax subtotals.
+      foreach ($aTaxNames as $taxid => $dummy) $aTaxTotals[1][$taxid] = 0;
     } else {
       $ptrow['amount']      += $row['amount'];
       $ptrow['paid']        += $row['paid'];
@@ -941,6 +758,20 @@ if ($_POST['form_search'] || $_POST['form_export'] || $_POST['form_csvexport']) 
       $days = floor((time() - $agetime) / (60 * 60 * 24));
       $agecolno = min($form_age_cols - 1, max(0, floor($days / $form_age_inc)));
       $ptrow['agedbal'][$agecolno] += $balance;
+    }
+
+    // Compute taxes by type for this row and accumulate them in subtotals and grand totals.
+    $invtax = 0; // will be total taxes for this invoice
+    foreach ($aTaxNames as $taxid => $dummy) $aTaxTotals[0][$taxid] = 0;
+    $taxres = sqlStatement("SELECT code, fee FROM billing WHERE " .
+      "pid = '$pid' AND encounter = '$encounter' AND " .
+      "code_type = 'TAX' AND activity = 1 " .
+      "ORDER BY id");
+    while ($taxrow = sqlFetchArray($taxres)) {
+      $aTaxTotals[0][$taxrow['code']] += $taxrow['fee'];
+      $aTaxTotals[1][$taxrow['code']] += $taxrow['fee'];
+      $aTaxTotals[2][$taxrow['code']] += $taxrow['fee'];
+      $invtax += $taxrow['fee'];
     }
 
     if (!$is_ins_summary && !$_POST['form_export'] && !$_POST['form_csvexport']) {
@@ -995,11 +826,18 @@ if ($_POST['form_search'] || $_POST['form_export'] || $_POST['form_csvexport']) 
   </td>
 <?php } ?>
   <td class="detail" align="right">
-   <?php bucks($row['charges']) ?>&nbsp;
+   <?php bucks($row['charges'] - $invtax); ?>&nbsp;
   </td>
   <td class="detail" align="right">
    <?php bucks($row['adjustments']) ?>&nbsp;
   </td>
+<?php
+      foreach ($aTaxNames as $taxid => $dummy) {
+        echo "  <td class='detail' align='right'>\n";
+        echo "   "; bucks($aTaxTotals[0][$taxid]); echo "\n";
+        echo "  </td>\n";
+      }
+?>
   <td class="detail" align="right">
    <?php bucks($row['paid']) ?>&nbsp;
   </td>
@@ -1060,8 +898,11 @@ if ($_POST['form_search'] || $_POST['form_export'] || $_POST['form_csvexport']) 
       echo '"' . (empty($row['irnumber']) ? $row['invnumber'] : $row['irnumber']) . '",';
       echo '"' . oeFormatShortDate($row['dos'])       . '",';
       echo '"' . $row['referrer']                     . '",';
-      echo '"' . oeFormatMoney($row['charges'])       . '",';
+      echo '"' . oeFormatMoney($row['charges'] - $invtax) . '",';
       echo '"' . oeFormatMoney($row['adjustments'])   . '",';
+      foreach ($aTaxNames as $taxid => $dummy) {
+        echo '"' . oeFormatMoney($aTaxTotals[0][$taxid]) . '",';
+      }
       echo '"' . oeFormatMoney($row['paid'])          . '",';
       echo '"' . oeFormatMoney($balance)              . '",';
       echo '"' . $row['inactive_days']                . '",';
@@ -1104,6 +945,10 @@ if ($_POST['form_search'] || $_POST['form_export'] || $_POST['form_csvexport']) 
       oeFormatMoney($grand_total_charges) . "&nbsp;</td>\n";
     echo "  <td class='dehead' align='right'>&nbsp;" .
       oeFormatMoney($grand_total_adjustments) . "&nbsp;</td>\n";
+    foreach ($aTaxNames as $taxid => $dummy) {
+      echo "  <td class='dehead' align='right'>&nbsp;" .
+        oeFormatMoney($aTaxTotals[2][$taxid]) . "&nbsp;</td>\n";
+    }
     echo "  <td class='dehead' align='right'>&nbsp;" .
       oeFormatMoney($grand_total_paid) . "&nbsp;</td>\n";
     if ($form_age_cols) {
@@ -1124,8 +969,6 @@ if ($_POST['form_search'] || $_POST['form_export'] || $_POST['form_csvexport']) 
     echo "</table>\n";
   }
 } // end if form_search
-
-if (!$INTEGRATED_AR) SLClose();
 
 if (!$_POST['form_csvexport']) {
   if (!$_POST['form_export']) {

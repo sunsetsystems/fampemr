@@ -32,10 +32,11 @@ function bucks($amount) {
 }
 
 function recordPayment($encdate, $patient_id, $encounter_id, $rowmethod,
-  $rowchgamount, $rowpayamount, $rowadjamount, $username, $invoice_refno)
+  $rowchgamount, $rowpayamount, $rowadjamount, $username, $invoice_refno,
+  $code_type='', $code='', $code_text='')
 {
   global $insarray, $metharray, $grandchgtotal, $grandadjtotal, $patients;
-  global $form_orderby;
+  global $form_orderby, $aTaxNames;
 
   /*******************************************************************
   echo "<!-- " .
@@ -102,6 +103,7 @@ function recordPayment($encdate, $patient_id, $encounter_id, $rowmethod,
       '#E' => $encounter_id,  // encounter id
       '#U' => $username,      // username
       '#I' => $invoice_refno, // invoice reference number
+      '#T' => array(),        // taxes
     );
   }
   if (!isset($insarray[$key1][$key2][$key3][$rowmethod])) {
@@ -109,15 +111,26 @@ function recordPayment($encdate, $patient_id, $encounter_id, $rowmethod,
   }
 
   // Accumulate charges, payments and adjustments.
+  if ($code_type == 'TAX') {
+    // A tax is a special type of charge categorized by its type.
+    if (!isset($insarray[$key1][$key2][$key3]['#T'][$code])) {
+      $insarray[$key1][$key2][$key3]['#T'][$code] = 0;
+    }
+    $insarray[$key1][$key2][$key3]['#T'][$code] += $rowchgamount;
+    // Accumulate the unique tax types for use as column headings.
+    $aTaxNames[$code] = $code_text;
+  }
+  else {
+    $insarray[$key1][$key2][$key3]['#$'] += $rowchgamount;
+    $grandchgtotal += $rowchgamount;
+  }
   $insarray[$key1][$key2][$key3][$rowmethod] += $rowpayamount;
-  $insarray[$key1][$key2][$key3]['#$']       += $rowchgamount;
   $insarray[$key1][$key2][$key3]['#@']       += $rowadjamount;
 
   // Accumulate also for bottom line totals.
   if ($rowpayamount != 0 && $rowmethod !== '%void%') {
     $metharray[$rowmethod]['paytotal'] += $rowpayamount;
   }
-  $grandchgtotal += $rowchgamount;
   $grandadjtotal += $rowadjamount;
 }
 
@@ -165,6 +178,8 @@ $form_from_date = fixDate($_POST['form_from_date'], date('Y-m-d'));
 $form_to_date   = fixDate($_POST['form_to_date']  , date('Y-m-d'));
 $form_facility  = $_POST['form_facility'];
 
+$aTaxNames = array();
+
 // Build array of payment methods. Key is method ID, value is an array of title
 // and payment total accumulator.  Last entry is for no method.
 //
@@ -184,20 +199,6 @@ if ($_POST['form_csvexport']) {
   header("Content-Type: application/force-download");
   header("Content-Disposition: attachment; filename=receipts_by_payment_method.csv");
   header("Content-Description: File Transfer");
-  // CSV headers:
-  echo '"' . xl('ID'         ) . '",';
-  echo '"' . xl('Patient'    ) . '",';
-  echo '"' . xl('Invoice'    ) . '",';
-  echo '"' . xl('Svc Date'   ) . '",';
-  echo '"' . xl('Charges'    ) . '",';
-  echo '"' . xl('Adjustments') . '",';
-  echo '"' . xl('Total Paid' ) . '",';
-  echo '"' . xl('Balance'    ) . '",';
-  foreach ($metharray as $key => $value) {
-    echo '"' . $value['title'] . '",';
-  }
-  echo '"' . xl('Voids'      ) . '",';
-  echo '"' . xl('User'       ) . '"' . "\n";
 } // end export
 else {
 ?>
@@ -324,10 +325,10 @@ if (isset($_POST['form_orderby'])) {
   $grandchgtotal  = 0;
   $grandadjtotal  = 0;
 
-  // Get service charges and co-pays using the encounter date as the pay date.
+  // Get service charges, taxes and co-pays using the encounter date as the pay date.
   // Co-pays will always be considered patient payments.
   //
-  $query = "SELECT b.fee, b.pid, b.encounter, b.code_type, b.code_text, " .
+  $query = "SELECT b.fee, b.pid, b.encounter, b.code_type, b.code, b.code_text, " .
     "fe.date, fe.facility_id, fe.invoice_refno, u.username " .
     "FROM billing AS b " .
     "JOIN form_encounter AS fe ON fe.pid = b.pid AND fe.encounter = b.encounter " .
@@ -349,9 +350,10 @@ if (isset($_POST['form_orderby'])) {
         $rowmethod, 0, 0 - $row['fee'], 0, $row['username'], $row['invoice_refno']);
     }
     else {
-      // Record a charge. Note these will only be the charges from the report period.
+      // Record a charge or tax. Note these will only be the charges from the report period.
       recordPayment(substr($row['date'], 0, 10), $row['pid'], $row['encounter'],
-        '', $row['fee'], 0, 0, $row['username'], $row['invoice_refno']);
+        '', $row['fee'], 0, 0, $row['username'], $row['invoice_refno'],
+        $row['code_type'], $row['code'], $row['code_text']);
     }
   }
 
@@ -451,8 +453,29 @@ if (isset($_POST['form_orderby'])) {
       $row['amount2'], 0, $row['username'], $row['other_info']);
   }
 
-  if (!$_POST['form_csvexport']) {
+  // Sort tax names by name while preserving their keys.
+  asort($aTaxNames);
 
+  if ($_POST['form_csvexport']) {
+    // CSV headers:
+    echo '"' . xl('ID'         ) . '",';
+    echo '"' . xl('Patient'    ) . '",';
+    echo '"' . xl('Invoice'    ) . '",';
+    echo '"' . xl('Svc Date'   ) . '",';
+    echo '"' . xl('Charges'    ) . '",';
+    echo '"' . xl('Adjustments') . '",';
+    foreach ($aTaxNames as $taxname) {
+      echo '"' . addslashes($taxname) . '",';
+    }
+    echo '"' . xl('Total Paid' ) . '",';
+    echo '"' . xl('Balance'    ) . '",';
+    foreach ($metharray as $key => $value) {
+      echo '"' . $value['title'] . '",';
+    }
+    echo '"' . xl('Voids'      ) . '",';
+    echo '"' . xl('User'       ) . '"' . "\n";
+  }
+  else {
   // echo "<!-- insarray:\n"; print_r($insarray); echo " -->\n"; // debugging
 ?>
 
@@ -479,6 +502,13 @@ if (isset($_POST['form_orderby'])) {
   <td class="dehead" align="right">
    <?php xl('Adjustments','e') ?>
   </td>
+<?php
+  foreach ($aTaxNames as $taxname) {
+    echo "  <td class='dehead' align='right'>\n";
+    echo "   " . htmlspecialchars($taxname) . "\n";
+    echo "  </td>\n";
+  }
+?>
   <td class="dehead">
    <?php xl('Total Paid','e') ?>
   </td>
@@ -504,6 +534,11 @@ foreach ($metharray as $key => $value) {
 <?php
   } // end not export
 
+  // This stores subtotals and grand totals of taxes.
+  $aTaxTotals = array(array(), array());
+  // Clear tax grand totals.
+  foreach ($aTaxNames as $taxid => $dummy) $aTaxTotals[1][$taxid] = 0;
+
   uksort($insarray, 'sortCmp1'); // sort by first key
   $encount = 0;
   $displevel = 1;
@@ -516,6 +551,8 @@ foreach ($metharray as $key => $value) {
     $subvoidtotal = 0;
     $subuser     = '';
     foreach ($metharray as $meth => $dummy) $metharray[$meth]['subtotal'] = 0;
+    // Clear tax subtotals.
+    foreach ($aTaxNames as $taxid => $dummy) $aTaxTotals[0][$taxid] = 0;
 
     uksort($value1, 'sortCmp2'); // sort by second key
     foreach ($value1 as $key2 => $value2) {
@@ -566,6 +603,7 @@ foreach ($metharray as $key => $value) {
         $subuser      = $encarray['#U'];
 
         $grandvoidtotal += $voids;
+        $tottax = 0;
 
         if ($_POST['form_csvexport']) {
           echo '"'  . $disp_id   . '"';
@@ -574,8 +612,16 @@ foreach ($metharray as $key => $value) {
           echo ',"' . $disp_dos . '"';
           echo ',"' . bucks($encarray['#$']) . '"';
           echo ',"' . bucks($encarray['#@']) . '"';
+          foreach ($aTaxNames as $taxid => $dummy) {
+            $tmp = 0;
+            foreach ($encarray['#T'] as $tid => $tax) {
+              if ($tid == $taxid) $tmp += $tax;
+            }
+            echo ',"' . bucks($tmp) . '"';
+            $tottax += $tmp;
+          }
           echo ',"' . bucks($totpaid) . '"';
-          echo ',"' . bucks($encarray['#$'] - $encarray['#@'] - $totpaid) . '"';
+          echo ',"' . bucks($encarray['#$'] + $tottax - $encarray['#@'] - $totpaid) . '"';
           foreach ($metharray as $meth => $dummy) {
             echo ',"' . bucks($encarray[$meth]) . '"';
           }
@@ -607,11 +653,25 @@ foreach ($metharray as $key => $value) {
   <td class="detail" align="right">
    <?php echo bucks($encarray['#@']); ?>
   </td>
+<?php
+          foreach ($aTaxNames as $taxid => $dummy) {
+            $tmp = 0;
+            foreach ($encarray['#T'] as $tid => $tax) {
+              if ($tid == $taxid) $tmp += $tax;
+            }
+            echo "  <td class='detail' align='right'>\n";
+            echo "   " . bucks($tmp) . "\n";
+            echo "  </td>\n";
+            $aTaxTotals[0][$taxid] += $tmp;
+            $aTaxTotals[1][$taxid] += $tmp;
+            $tottax += $tmp;
+          }
+?>
   <td class="detail" align="right">
    <?php echo bucks($totpaid); ?>
   </td>
   <td class="detail" align="right">
-   <?php echo bucks($encarray['#$'] - $encarray['#@'] - $totpaid); ?>
+   <?php echo bucks($encarray['#$'] + $tottax - $encarray['#@'] - $totpaid); ?>
   </td>
 <?php
           foreach ($metharray as $meth => $dummy) {
@@ -653,11 +713,20 @@ foreach ($metharray as $key => $value) {
   <td class="detail" align="right">
    <?php echo bucks($subadjtotal); ?>
   </td>
+<?php
+        $subtaxtotal = 0;
+        foreach ($aTaxNames as $taxid => $dummy) {
+          echo "  <td class='detail' align='right'>\n";
+          echo "   " . bucks($aTaxTotals[0][$taxid]) . "\n";
+          echo "  </td>\n";
+          $subtaxtotal += $aTaxTotals[0][$taxid];
+        }
+?>
   <td class="detail" align="right">
    <?php echo bucks($subpaytotal); ?>
   </td>
   <td class="detail" align="right">
-   <?php echo bucks($subchgtotal - $subadjtotal - $subpaytotal); ?>
+   <?php echo bucks($subchgtotal + $subtaxtotal - $subadjtotal - $subpaytotal); ?>
   </td>
 <?php
         foreach ($metharray as $meth => $value) {
@@ -697,11 +766,20 @@ foreach ($metharray as $key => $value) {
   <td class="detail" align="right">
    <?php echo bucks($grandadjtotal); ?>
   </td>
+<?php
+    $grandtaxtotal = 0;
+    foreach ($aTaxNames as $taxid => $dummy) {
+      echo "  <td class='detail' align='right'>\n";
+      echo "   " . bucks($aTaxTotals[1][$taxid]) . "\n";
+      echo "  </td>\n";
+      $grandtaxtotal += $aTaxTotals[1][$taxid];
+    }
+?>
   <td class="detail" align="right">
    <?php echo bucks($grandpaytotal); ?>
   </td>
   <td class="detail" align="right">
-   <?php echo bucks($grandchgtotal - $grandadjtotal - $grandpaytotal); ?>
+   <?php echo bucks($grandchgtotal + $grandtaxtotal - $grandadjtotal - $grandpaytotal); ?>
   </td>
 <?php
   foreach ($metharray as $meth => $value) {

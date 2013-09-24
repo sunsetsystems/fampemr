@@ -26,13 +26,54 @@ function display_desc($desc) {
   return $desc;
 }
 
-// For a given encounter, this gets all charges and allocates payments and
-// adjustments among them, if that has not already been done.
+// Initialize the $aItems entry for this line item if it does not yet exist.
+function ensureItems($invno, $codekey) {
+  global $aItems, $aTaxNames;
+  if (!isset($aItems[$invno][$codekey])) {
+    // Charges, Adjustments, Payments
+    $aItems[$invno][$codekey] = array(0, 0, 0);
+    // Then a cell for each tax type.
+    for ($i = 0; $i < count($aTaxNames); ++$i) {
+      $aItems[$invno][$codekey][3 + $i] = 0;
+    }
+  }
+}
+
+// Get taxes matching this line item and store them in their proper $aItems array slots.
+function getItemTaxes($patient_id, $encounter_id, $codekey, $id) {
+  global $aItems, $aTaxNames;
+  $invno = "$patient_id.$encounter_id";
+  $total = 0;
+  $taxres = sqlStatement("SELECT code, fee FROM billing WHERE " .
+    "pid = '$patient_id' AND encounter = '$encounter_id' AND " .
+    "code_type = 'TAX' AND activity = 1 AND ndc_info = '$id' " .
+    "ORDER BY id");
+  while ($taxrow = sqlFetchArray($taxres)) {
+    $i = 0;
+    $matchcount = 0;
+    foreach ($aTaxNames as $tmpcode => $dummy) {
+      if ($tmpcode == $taxrow['code']) {
+        ++$matchcount;
+        $aItems[$invno][$codekey][3 + $i] += $taxrow['fee'];
+      }
+      if ($matchcount != 1) {
+        // TBD: This is an error.
+        echo "ERROR: invno = '$invno' codekey = '$codekey' matchcount = '$matchcount'\n";
+      }
+      ++$i;
+    }
+    $total += $taxrow['fee'];
+  }
+  return $total;
+}
+
+// For a given encounter, this gets all charges and taxes and allocates payments
+// and adjustments among them, if that has not already been done.
 // Any invoice-level adjustments and payments are allocated among the line
 // items in proportion to their line-level remaining balances.
 //
 function ensureLineAmounts($patient_id, $encounter_id) {
-  global $aItems, $overpayments;
+  global $aItems, $overpayments, $aTaxNames;
 
   $invno = "$patient_id.$encounter_id";
   if (isset($aItems[$invno])) return $invno;
@@ -42,37 +83,34 @@ function ensureLineAmounts($patient_id, $encounter_id) {
   $denom = 0;    // sum of adjusted line item charges
   $aItems[$invno] = array();
 
-  // Get charges and copays from billing table.
-  $tres = sqlStatement("SELECT b.code_type, b.code, b.fee " .
+  // Get charges and copays from billing table and associated taxes.
+  $tres = sqlStatement("SELECT b.code_type, b.code, b.fee, b.id " .
     "FROM billing AS b WHERE " .
-    "b.pid = '$patient_id' AND b.encounter = '$encounter_id' AND " .
-    "b.activity = 1 AND b.fee != 0");
+    "b.pid = '$patient_id' AND b.encounter = '$encounter_id' AND b.activity = 1 AND " .
+    "b.fee != 0 AND (b.code_type != 'TAX' OR b.ndc_info = '')");
   while ($trow = sqlFetchArray($tres)) {
     if ($trow['code_type'] == 'COPAY') {
       $payments -= $trow['fee'];
     }
     else {
       $codekey = $trow['code_type'] . ':' . $trow['code'];
-      if (!isset($aItems[$invno][$codekey])) {
-        // Charges, Adjustments, Payments
-        $aItems[$invno][$codekey] = array(0, 0, 0);
-      }
+      ensureItems($invno, $codekey);
       $aItems[$invno][$codekey][0] += $trow['fee'];
       $denom += $trow['fee'];
+      $denom += getItemTaxes($patient_id, $encounter_id, $codekey, 'S:' . $trow['id']);
     }
   }
 
-  // Get charges from drug_sales table.
-  $tres = sqlStatement("SELECT s.drug_id, s.fee " .
+  // Get charges from drug_sales table and associated taxes.
+  $tres = sqlStatement("SELECT s.drug_id, s.fee, s.sale_id " .
     "FROM drug_sales AS s WHERE " .
     "s.pid = '$patient_id' AND s.encounter = '$encounter_id' AND s.fee != 0");
   while ($trow = sqlFetchArray($tres)) {
     $codekey = 'PROD:' . $trow['drug_id'];
-    if (!isset($aItems[$invno][$codekey])) {
-      $aItems[$invno][$codekey] = array(0, 0, 0);
-    }
+    ensureItems($invno, $codekey);
     $aItems[$invno][$codekey][0] += $trow['fee'];
     $denom += $trow['fee'];
+    $denom += getItemTaxes($patient_id, $encounter_id, $codekey, 'P:' . $trow['sale_id']);
   }
 
   // Get adjustments and other payments from ar_activity table.
@@ -102,26 +140,31 @@ function ensureLineAmounts($patient_id, $encounter_id) {
     if (--$nlines > 0) {
       // Avoid dividing by zero!
       if ($denom) {
-        $factor = ($aItems[$invno][$codekey][0] - $aItems[$invno][$codekey][1] - $aItems[$invno][$codekey][2]) / $denom;
+        $bal = $aItems[$invno][$codekey][0] - $aItems[$invno][$codekey][1] - $aItems[$invno][$codekey][2];
+        for ($i = 0; $i < count($aTaxNames); ++$i) $bal += $aItems[$invno][$codekey][3 + $i];
+        $factor = $bal / $denom;
         $tmp = sprintf('%01.2f', $adjusts * $factor);
         $aItems[$invno][$codekey][1] += $tmp;
         $adjrem -= $tmp;
         $tmp = sprintf('%01.2f', $payments * $factor);
         $aItems[$invno][$codekey][2] += $tmp;
         $payrem -= $tmp;
+        // echo "<!-- invno = '$invno' codekey = '$codekey' denom = '$denom' bal='$bal' payments='$payments' tmp = '$tmp' -->\n"; // debugging
       }
     }
     else {
       // Last line gets what's left to avoid rounding errors.
       $aItems[$invno][$codekey][1] += $adjrem;
       $aItems[$invno][$codekey][2] += $payrem;
+      // echo "<!-- invno = '$invno' codekey = '$codekey' payrem = '$payrem' -->\n"; // debugging
     }
   }
 
-  // For each line item having (payment > charge - adjustment), move the
+  // For each line item having (payment > charge + tax - adjustment), move the
   // overpayment amount to a global variable $overpayments.
   foreach ($aItems[$invno] AS $codekey => $dummy) {
     $diff = $aItems[$invno][$codekey][2] + $aItems[$invno][$codekey][1] - $aItems[$invno][$codekey][0];
+    for ($i = 0; $i < count($aTaxNames); ++$i) $diff -= $aItems[$invno][$codekey][3 + $i];
     $diff = sprintf('%01.2f', $diff);
     if ($diff > 0.00) {
       $overpayments += $diff;
@@ -133,6 +176,8 @@ function ensureLineAmounts($patient_id, $encounter_id) {
 }
 
 function writeCatTotals($category, $catleft, $catqty, $cattotal, $catadjtotal, $catpaytotal) {
+  global $aTaxTotals;
+
   if ($_POST['form_csvexport']) return;
   if (!$category) return;
   if ($catleft == '') $catleft = '&nbsp;';
@@ -153,6 +198,13 @@ function writeCatTotals($category, $catleft, $catqty, $cattotal, $catadjtotal, $
   <td class="dehead" align="right">
    <?php bucks($catadjtotal); ?>
   </td>
+<?php
+  for ($i = 0; $i < count($aTaxTotals[1]); ++$i) {
+    echo "  <td class='dehead' align='right'>\n";
+    echo "   "; bucks($aTaxTotals[1][$i]); echo "\n";
+    echo "  </td>\n";
+  }
+?>
   <td class="dehead" align="right">
    <?php bucks($catpaytotal); ?>
   </td>
@@ -163,6 +215,8 @@ function writeCatTotals($category, $catleft, $catqty, $cattotal, $catadjtotal, $
 function writeProdTotals($category, $catleft, $product,
   $productqty, $producttotal, $prodadjtotal, $prodpaytotal)
 {
+  global $aTaxTotals;
+
   // Print product total.
   if ($_POST['form_csvexport']) {
     if (! $_POST['form_details']) {
@@ -171,6 +225,9 @@ function writeProdTotals($category, $catleft, $product,
       echo '"' . $productqty             . '",';
       echo '"'; bucks($producttotal); echo '",';
       echo '"'; bucks($prodadjtotal); echo '",';
+      for ($i = 0; $i < count($aTaxTotals[0]); ++$i) {
+        echo '"'; bucks($aTaxTotals[0][$i]); echo '",';
+      }
       echo '"'; bucks($prodpaytotal); echo '"';
       echo "\n";
     }
@@ -193,6 +250,13 @@ function writeProdTotals($category, $catleft, $product,
   <td class="dehead" align="right">
    <?php bucks($prodadjtotal); ?>
   </td>
+<?php
+  for ($i = 0; $i < count($aTaxTotals[0]); ++$i) {
+    echo "  <td class='dehead' align='right'>\n";
+    echo "   "; bucks($aTaxTotals[0][$i]); echo "\n";
+    echo "  </td>\n";
+  }
+?>
   <td class="dehead" align="right">
    <?php bucks($prodpaytotal); ?>
   </td>
@@ -208,6 +272,7 @@ function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
   global $producttotal, $prodadjtotal, $prodpaytotal, $productqty;
   global $cattotal, $catadjtotal, $catpaytotal, $catqty;
   global $grandtotal, $grandadjtotal, $grandpaytotal, $grandqty;
+  global $aTaxNames;
 
   $invnumber = $irnumber ? $irnumber : "$patient_id.$encounter_id";
   $rowamount = sprintf('%01.2f', $amount);
@@ -232,6 +297,7 @@ function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
     $productqty = 0;
     $product = $rowproduct;
     $productleft = $product;
+    clearTaxTotals(0); // Clear product-level tax totals.
   }
 
   if ($category != $rowcat) {
@@ -242,6 +308,7 @@ function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
     $catqty = 0;
     $category = $rowcat;
     $catleft = $category;
+    clearTaxTotals(1); // Clear category-level tax totals.
   }
 
   if ($_POST['form_details']) {
@@ -253,6 +320,9 @@ function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
       echo '"' . display_desc($qty      ) . '",';
       echo '"'; bucks($rowamount); echo '", ';
       echo '"'; bucks($rowadj);    echo '", ';
+      for ($i = 0; $i < count($aTaxNames); ++$i) {
+        echo '"'; bucks($aItems[$invno][$codekey][3 + $i]); echo '", ';
+      }
       echo '"'; bucks($rowpay);    echo '"';
       echo "\n";
     }
@@ -281,6 +351,13 @@ function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
   <td class="detail" align="right">
    <?php bucks($rowadj); ?>
   </td>
+<?php
+      for ($i = 0; $i < count($aTaxNames); ++$i) {
+        echo "  <td class='detail' align='right'>\n";
+        echo "   "; bucks($aItems[$invno][$codekey][3 + $i]); echo "\n";
+        echo "  </td>\n";
+      }
+?>
   <td class="detail" align="right">
    <?php bucks($rowpay); ?>
   </td>
@@ -291,22 +368,59 @@ function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
   $producttotal  += $rowamount;
   $prodadjtotal  += $rowadj;
   $prodpaytotal  += $rowpay;
+  addTaxTotals(0, array_slice($aItems[$invno][$codekey], 3));
   $cattotal      += $rowamount;
   $catadjtotal   += $rowadj;
   $catpaytotal   += $rowpay;
+  addTaxTotals(1, array_slice($aItems[$invno][$codekey], 3));
   $grandtotal    += $rowamount;
   $grandadjtotal += $rowadj;
   $grandpaytotal += $rowpay;
+  addTaxTotals(2, array_slice($aItems[$invno][$codekey], 3));
   $productqty    += $qty;
   $catqty        += $qty;
   $grandqty      += $qty;
 } // end function thisLineItem
+
+function clearTaxTotals($level) {
+  global $aTaxNames, $aTaxTotals;
+  $aTaxTotals[$level] = array();
+  for ($i = 0; $i < count($aTaxNames); ++$i) {
+    $aTaxTotals[$level][$i] = 0;  
+  }
+}
+
+function addTaxTotals($level, $amounts) {
+  global $aTaxNames, $aTaxTotals;
+  for ($i = 0; $i < count($aTaxNames); ++$i) {
+    $aTaxTotals[$level][$i] += $amounts[$i];  
+  }
+}
 
   if (! acl_check('acct', 'rep')) die(xl("Unauthorized access."));
 
   $form_from_date = fixDate($_POST['form_from_date'], date('Y-m-d'));
   $form_to_date   = fixDate($_POST['form_to_date']  , date('Y-m-d'));
   $form_facility  = $_POST['form_facility'];
+
+  // Get the tax types applicable to this report's date range.
+  $aTaxNames = array();
+  $tnres = sqlStatement("SELECT DISTINCT b.code, b.code_text " .
+    "FROM billing AS b " .
+    "JOIN form_encounter AS fe ON fe.pid = b.pid AND fe.encounter = b.encounter " .
+    "WHERE " .
+    "b.code_type = 'TAX' AND b.activity = '1' AND " .
+    "fe.date >= '$form_from_date 00:00:00' AND fe.date <= '$form_to_date 23:59:59' " .
+    "ORDER BY b.code, b.code_text");
+  while ($tnrow = sqlFetchArray($tnres)) {
+    $aTaxNames[$tnrow['code']] = $tnrow['code_text'];
+  }
+
+  // This contains 3 arrays of tax totals.
+  // First is for product totals, second for category totals, third for grand totals.
+  // For each array there is one numeric element for each tax type.
+  $aTaxTotals = array();
+  for ($i = 0; $i < 3; ++$i) clearTaxTotals($i);
 
   if ($_POST['form_csvexport']) {
     header("Pragma: public");
@@ -321,26 +435,20 @@ function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
     // http://crashcoursing.blogspot.com/2011/05/exporting-csv-with-special-characters.html
     echo "\xEF\xBB\xBF";
     // CSV headers:
+    echo '"' . xl('Category') . '",';
+    echo '"' . xl('Item'    ) . '",';
     if ($_POST['form_details']) {
-      echo '"' . xl('Category') . '",';
-      echo '"' . xl('Item'    ) . '",';
       echo '"' . xl('Date'    ) . '",';
       echo '"' . xl('Invoice' ) . '",';
-      echo '"' . xl('Qty'     ) . '",';
-      echo '"' . xl('Price'   ) . '",';
-      echo '"' . xl('Adj'     ) . '",';
-      echo '"' . xl('Payment' ) . '"';
-      echo "\n";
     }
-    else {
-      echo '"' . xl('Category') . '",';
-      echo '"' . xl('Item'    ) . '",';
-      echo '"' . xl('Qty'     ) . '",';
-      echo '"' . xl('Price'   ) . '",';
-      echo '"' . xl('Adj'     ) . '",';
-      echo '"' . xl('Payment' ) . '"';
-      echo "\n";
+    echo '"' . xl('Qty'     ) . '",';
+    echo '"' . xl('Price'   ) . '",';
+    echo '"' . xl('Adj'     ) . '",';
+    foreach ($aTaxNames as $taxname) {
+      echo '"' . addslashes($taxname) . '",';
     }
+    echo '"' . xl('Payment' ) . '"';
+    echo "\n";
   } // end export
   else {
 ?>
@@ -447,6 +555,13 @@ function doinvopen(ptid,encid) {
   <td class="dehead" align="right">
    <?php xl('Adj','e'); ?>
   </td>
+<?php
+  foreach ($aTaxNames as $taxname) {
+    echo "  <td class='dehead' align='right'>\n";
+    echo "   " . htmlspecialchars($taxname) . "\n";
+    echo "  </td>\n";
+  }
+?>
   <td class="dehead" align="right">
    <?php xl('Payment','e'); ?>
   </td>
@@ -464,28 +579,33 @@ function doinvopen(ptid,encid) {
     $catadjtotal = 0;
     $catpaytotal = 0;
     $catqty = 0;
+    clearTaxTotals(1);
     $product = "";
     $productleft = "";
     $producttotal = 0;
     $prodadjtotal = 0;
     $prodpaytotal = 0;
     $productqty = 0;
+    clearTaxTotals(0);
     $grandtotal = 0;
     $grandadjtotal = 0;
     $grandpaytotal = 0;
     $grandqty = 0;
+    clearTaxTotals(2);
     $overpayments = 0;
 
     $aItems = array();
 
+    // Get service items.
     $query = "SELECT b.fee, b.pid, b.encounter, b.code_type, b.code, b.units, " .
-      "b.code_text, fe.date, fe.facility_id, fe.invoice_refno, lo.title " .
+      "b.code_text, b.id, fe.date, fe.facility_id, fe.invoice_refno, lo.title " .
       "FROM billing AS b " .
       "JOIN code_types AS ct ON ct.ct_key = b.code_type " .
       "JOIN form_encounter AS fe ON fe.pid = b.pid AND fe.encounter = b.encounter " .
       "LEFT JOIN codes AS c ON c.code_type = ct.ct_id AND c.code = b.code AND c.modifier = b.modifier " .
       "LEFT JOIN list_options AS lo ON lo.list_id = 'superbill' AND lo.option_id = c.superbill " .
       "WHERE b.code_type != 'COPAY' AND b.activity = 1 AND b.fee != 0 AND " .
+      "(b.code_type != 'TAX' OR b.ndc_info = '') AND " .
       "fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59'";
     // If a facility was specified.
     if ($form_facility) {
@@ -497,11 +617,11 @@ function doinvopen(ptid,encid) {
     while ($row = sqlFetchArray($res)) {
       thisLineItem($row['pid'], $row['encounter'], $row['code_type'], $row['code'],
         $row['title'], $row['code'] . ' ' . $row['code_text'],
-        substr($row['date'], 0, 10), $row['units'], $row['fee'], $row['invoice_refno']);
+        substr($row['date'], 0, 10), $row['units'], $row['fee'], $row['invoice_refno'], $row['id']);
     }
     //
     $query = "SELECT s.sale_date, s.fee, s.quantity, s.pid, s.encounter, " .
-      "s.drug_id, d.name, fe.date, fe.facility_id, fe.invoice_refno " .
+      "s.drug_id, s.sale_id, d.name, fe.date, fe.facility_id, fe.invoice_refno " .
       "FROM drug_sales AS s " .
       "LEFT JOIN drugs AS d ON d.drug_id = s.drug_id " .
       "JOIN form_encounter AS fe ON " .
@@ -518,7 +638,7 @@ function doinvopen(ptid,encid) {
     while ($row = sqlFetchArray($res)) {
       thisLineItem($row['pid'], $row['encounter'], 'PROD', $row['drug_id'],
         xl('Products'), $row['name'], substr($row['date'], 0, 10), $row['quantity'],
-        $row['fee'], $row['invoice_refno']);
+        $row['fee'], $row['invoice_refno'], $row['sale_id']);
     }
 
     // Write totals for last product.
@@ -549,6 +669,13 @@ function doinvopen(ptid,encid) {
   <td class="dehead" align="right">
    <?php bucks($grandadjtotal); ?>
   </td>
+<?php
+  for ($i = 0; $i < count($aTaxTotals[2]); ++$i) {
+    echo "  <td class='dehead' align='right'>\n";
+    echo "   "; bucks($aTaxTotals[2][$i]); echo "\n";
+    echo "  </td>\n";
+  }
+?>
   <td class="dehead" align="right">
    <?php bucks($grandpaytotal); ?>
   </td>
