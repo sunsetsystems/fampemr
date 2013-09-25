@@ -150,8 +150,7 @@ function getRelatedCode($related_code, $code_type='ACCT') {
   1. Customer ID             - e.g. 02
      Facility NPI
   2. Customer Name           - always blank
-  3. Reference               - e.g. 20130729_13-14_02
-     Run time date, time, facility
+  3. Reference               - Same as Receipt Number except not a link
   4. Date                    - e.g. 07/16/13
      Posting date of payment
   5. Payment Method          - e.g. Cash
@@ -174,8 +173,8 @@ function getRelatedCode($related_code, $code_type='ACCT') {
      Charge (positive) or adjustment (negative) amount.
  14. Amount                  - e.g. -15
      Negative charge amount or positive adjustment amount.
- 15. Receipt Number          - e.g. 443818
-     Invoice reference number.
+ 15. Receipt Number          - e.g. 02-443818
+     Facility code and Invoice reference number as a link.
 ****/
 function thisLineItem($patient_id, $encounter_id, $npi, $paydate, $paymethod,
   $payaccount, $payamount, $rowcount, $description, $saleaccount, $quantity,
@@ -189,21 +188,21 @@ function thisLineItem($patient_id, $encounter_id, $npi, $paydate, $paymethod,
   }
 
   if ($_POST['form_csvexport']) {
-    echo '"' . display_csv($npi)           . '",';
-    echo '"' . ''                          . '",';
-    echo '"' . $reference                  . '",';
-    echo '"' . display_csv($paydate)          . '",';
-    echo '"' . display_csv($paymethod)     . '",';
-    echo '"' . display_csv($payaccount)    . '",';
-    echo '"' . bucks($payamount)           . '",';
-    echo '"' . $rowcount                   . '",';
-    echo '"' . display_csv($description)   . '",';
-    echo '"' . ''                          . '",';
-    echo '"' . display_csv($saleaccount)   . '",';
-    echo '"' . display_csv($quantity)      . '",';
-    echo '"' . bucks($price)               . '",';
-    echo '"' . bucks($amount)              . '",';
-    echo '"' . display_csv($invoice_refno) . '"';
+    echo '"' . display_csv($npi)                  . '",';
+    echo '"' . ''                                 . '",';
+    echo '"' . display_csv("$npi-$invoice_refno") . '",';
+    echo '"' . display_csv($paydate)              . '",';
+    echo '"' . display_csv($paymethod)            . '",';
+    echo '"' . display_csv($payaccount)           . '",';
+    echo '"' . bucks($payamount)                  . '",';
+    echo '"' . $rowcount                          . '",';
+    echo '"' . display_csv($description)          . '",';
+    echo '"' . ''                                 . '",';
+    echo '"' . display_csv($saleaccount)          . '",';
+    echo '"' . display_csv($quantity)             . '",';
+    echo '"' . bucks($price)                      . '",';
+    echo '"' . bucks($amount)                     . '",';
+    echo '"' . display_csv("$npi-$invoice_refno") . '"';
     echo "\n";
   }
   else {
@@ -211,7 +210,7 @@ function thisLineItem($patient_id, $encounter_id, $npi, $paydate, $paymethod,
  <tr>
   <td class='detail'><?php echo display_html($npi); ?></td>
   <td class='detail'><?php echo display_html(''); ?></td>
-  <td class='detail'><?php echo display_html($reference); ?></td>
+  <td class='detail'><?php echo display_html("$npi-$invoice_refno"); ?></td>
   <td class='detail'><?php echo display_html($paydate); ?></td>
   <td class='detail'><?php echo display_html($paymethod); ?></td>
   <td class='detail'><?php echo display_html($payaccount); ?></td>
@@ -223,7 +222,8 @@ function thisLineItem($patient_id, $encounter_id, $npi, $paydate, $paymethod,
   <td class='detail' align='right'><?php echo display_html($quantity); ?></td>
   <td class='detail' align='right'><?php echo bucks($price); ?></td>
   <td class='detail' align='right'><?php echo bucks($amount); ?></td>
-  <td class='delink' onclick='doinvopen(<?php echo "$patient_id,$encounter_id"; ?>)'><?php echo display_html($invoice_refno); ?></td>
+  <td class='delink' onclick='doinvopen(<?php echo "$patient_id,$encounter_id"; ?>)'
+   ><?php echo display_html("$npi-$invoice_refno"); ?></td>
   <td class='detail'><?php echo display_html($warnings); ?></td>
  </tr>
 <?php
