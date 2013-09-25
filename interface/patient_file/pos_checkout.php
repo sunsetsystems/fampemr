@@ -167,7 +167,7 @@ function receiptDetailLine($code_type, $code, $description, $quantity, $charge, 
     // Accumulate columns 5 and beyond for taxes.
     $i = 5;
     foreach ($aTaxes as $tax) {
-      $aTotals[$i++] = $tax;
+      $aTotals[$i++] += $tax;
     }
   }
 
@@ -208,14 +208,14 @@ function receiptPaymentLine($paydate, $amount, $description='', $method='') {
   echo " <tr>\n";
   echo "  <td>&nbsp;</td>\n";
   echo "  <td>" . oeFormatShortDate($paydate) . "</td>\n";
-  echo "  <td align='center'>$method</td>\n";
-  if ($GLOBALS['gbl_checkout_line_adjustments']) {
-    echo "  <td>&nbsp;</td>\n";
-  }
-  echo "  <td>" . xl('Payment') . " $description</td>\n";
-
   echo "  <td colspan='" .
-       (($GLOBALS['gbl_checkout_line_adjustments'] ? 3 : 1) + count($aTaxNames)) .
+       ($GLOBALS['gbl_checkout_line_adjustments'] ? 3 : 1) .
+       "' align='left'>$method</td>\n";
+  echo "  <td colspan='" .
+       ($GLOBALS['gbl_checkout_line_adjustments'] ? 2 : 1) .
+       "' align='left'>" . xl('Payment') . " $description</td>\n";
+  echo "  <td colspan='" .
+       (($GLOBALS['gbl_checkout_line_adjustments'] ? 1 : 1) + count($aTaxNames)) .
        "' align='right'>" . oeFormatMoney($amount) . "</td>\n";
   echo " </tr>\n";
 }
@@ -494,6 +494,7 @@ body, td {
   }
 
   $aTotals = array(0, 0, 0, 0, 0);
+  for ($i = 0; $i < count($aTaxNames); ++$i) $aTotals[5 + $i] = 0;
 
   // Product sales
   $inres = sqlStatement("SELECT s.sale_id, s.sale_date, s.fee, " .
@@ -600,12 +601,11 @@ body, td {
  <tr>
   <td>&nbsp;</td>
   <td><b><?php xl('Date of Service','e'); ?></b></td>
-  <td align='center'><b><?php xl('Payment Method','e'); ?></b></td>
-<?php if ($GLOBALS['gbl_checkout_line_adjustments']) { ?>
-  <td>&nbsp;</td>
-<?php } ?>
-  <td><b><?php xl('Ref No','e'); ?></b></td>
-  <td colspan='<?php echo ($GLOBALS['gbl_checkout_line_adjustments'] ? 3 : 1) + count($aTaxNames); ?>'
+  <td colspan="<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 3 : 1; ?>"
+   align='left'><b><?php echo xl('Payment Method'); ?></b></td>
+  <td colspan="<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 2 : 1; ?>"
+   align='left'><b><?php xl('Ref No','e'); ?></b></td>
+  <td colspan='<?php echo ($GLOBALS['gbl_checkout_line_adjustments'] ? 1 : 1) + count($aTaxNames); ?>'
    align='right'><b><?php xl('Amount','e'); ?></b></td>
  </tr>
 
@@ -656,7 +656,7 @@ body, td {
  <tr>
   <td colspan='<?php echo ($GLOBALS['gbl_checkout_line_adjustments'] ? 5 : 2) + count($aTaxNames); ?>'>&nbsp;</td>
   <td colspan='2' align='right'><b><?php xl('Total Payments','e'); ?></b></td>
-  <td align='right'><?php echo oeFormatMoney($payments, true) ?></td>
+  <td align='right'><?php echo str_replace(' ', '&nbsp;', oeFormatMoney($payments, true)); ?></td>
  </tr>
 
 </table>
