@@ -14,6 +14,7 @@ require_once("$srcdir/patient.inc");
 require_once("$srcdir/sql-ledger.inc");
 require_once("$srcdir/acl.inc");
 require_once("$srcdir/formatting.inc.php");
+require_once("$srcdir/options.inc.php");
 
 function bucks($amount) {
   if ($amount) echo oeFormatMoney($amount);
@@ -397,11 +398,27 @@ function addTaxTotals($level, $amounts) {
   }
 }
 
+// Get the adjustment type, if any, associated with a service or product sale.
+// Invoice-level adjustments are considered to match all items in the invoice.
+//
+function get_adjustment_type($patient_id, $encounter_id, $code_type, $code) {
+  global $form_adjreason;
+  $adjreason = '';
+  $row = sqlQuery("SELECT memo FROM ar_activity WHERE " .
+    "pid = '$patient_id' AND encounter = '$encounter_id' AND " .
+    "(code_type = '' OR (code_type = '$code_type' AND code = '$code')) AND " .
+    "adj_amount != 0.00 AND memo != '' " .
+    "ORDER BY code DESC, adj_amount DESC LIMIT 1");
+  if (isset($row['memo'])) $adjreason = $row['memo'];
+  return $adjreason;
+}
+
   if (! acl_check('acct', 'rep')) die(xl("Unauthorized access."));
 
   $form_from_date = fixDate($_POST['form_from_date'], date('Y-m-d'));
   $form_to_date   = fixDate($_POST['form_to_date']  , date('Y-m-d'));
-  $form_facility  = $_POST['form_facility'];
+  $form_facility  = isset($_POST['form_facility']) ? $_POST['form_facility'] : '';
+  $form_adjreason = isset($_POST['form_adjreason']) ? $_POST['form_adjreason'] : '';
 
   // Get the tax types applicable to this report's date range.
   $aTaxNames = array();
@@ -485,7 +502,7 @@ function doinvopen(ptid,encid) {
 <table border='0' cellpadding='3'>
 
  <tr>
-  <td>
+  <td align='center'>
 <?php
   // Build a drop-down list of facilities.
   //
@@ -501,6 +518,19 @@ function doinvopen(ptid,encid) {
   }
   echo "   </select>\n";
 ?>
+  &nbsp;
+<?php
+  // Build a drop-down list of adjustment types.
+  //
+  echo generate_select_list('form_adjreason', 'adjreason', $form_adjreason, '',
+    '-- ' . xl('No Adjustment Filter') . ' --');
+?>
+   &nbsp;
+   <input type='checkbox' name='form_details' value='1'<?php if ($_POST['form_details']) echo " checked"; ?>><?php xl('Details','e') ?>
+  </td>
+ </tr>
+ <tr>
+  <td align='center'>
    &nbsp;<?php xl('From','e'); ?>:
    <input type='text' name='form_from_date' id="form_from_date" size='10' value='<?php echo $form_from_date ?>'
     onkeyup='datekeyup(this,mypcc)' onblur='dateblur(this,mypcc)' title='yyyy-mm-dd'>
@@ -513,8 +543,6 @@ function doinvopen(ptid,encid) {
    <img src='../pic/show_calendar.gif' align='absbottom' width='24' height='22'
     id='img_to_date' border='0' alt='[?]' style='cursor:pointer'
     title='<?php xl('Click here to choose a date','e'); ?>'>
-   &nbsp;
-   <input type='checkbox' name='form_details' value='1'<?php if ($_POST['form_details']) echo " checked"; ?>><?php xl('Details','e') ?>
    &nbsp;
    <input type='submit' name='form_refresh' value="<?php xl('Refresh','e') ?>">
    &nbsp;
@@ -615,6 +643,10 @@ function doinvopen(ptid,encid) {
     //
     $res = sqlStatement($query);
     while ($row = sqlFetchArray($res)) {
+      if ($form_adjreason) {
+        $adjreason = get_adjustment_type($row['pid'], $row['code_type'], $row['code']);
+        if ($adjreason != $form_adjreason) continue;
+      }
       thisLineItem($row['pid'], $row['encounter'], $row['code_type'], $row['code'],
         $row['title'], $row['code'] . ' ' . $row['code_text'],
         substr($row['date'], 0, 10), $row['units'], $row['fee'], $row['invoice_refno'], $row['id']);
@@ -636,6 +668,10 @@ function doinvopen(ptid,encid) {
     //
     $res = sqlStatement($query);
     while ($row = sqlFetchArray($res)) {
+      if ($form_adjreason) {
+        $adjreason = get_adjustment_type($row['pid'], $row['encounter'], 'PROD', $row['drug_id']);
+        if ($adjreason != $form_adjreason) continue;
+      }
       thisLineItem($row['pid'], $row['encounter'], 'PROD', $row['drug_id'],
         xl('Products'), $row['name'], substr($row['date'], 0, 10), $row['quantity'],
         $row['fee'], $row['invoice_refno'], $row['sale_id']);

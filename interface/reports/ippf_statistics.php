@@ -12,6 +12,7 @@
 include_once("../globals.php");
 include_once("../../library/patient.inc");
 include_once("../../library/acl.inc");
+include_once("../../library/options.inc.php");
 
 $alertmsg = '';
 
@@ -26,6 +27,7 @@ $to_date       = fixDate($_POST['form_to_date'], date('Y-m-d'));
 $form_by_arr   = $_POST['form_by'];     // this is an array
 $form_show     = $_POST['form_show'];   // this is an array
 $form_facility = isset($_POST['form_facility']) ? $_POST['form_facility'] : '';
+$form_adjreason = isset($_POST['form_adjreason']) ? $_POST['form_adjreason'] : '';
 $form_sexes    = isset($_POST['form_sexes']) ? $_POST['form_sexes'] : '4';
 $form_content  = isset($_POST['form_content']) ? $_POST['form_content'] : '1';
 $form_output   = isset($_POST['form_output']) ? 0 + $_POST['form_output'] : 1;
@@ -712,6 +714,25 @@ function service_contraception_scan($pid, $encounter) {
   return $contraception_code;
 }
 
+// Get the adjustment type, if any, associated with a service or product sale.
+// Invoice-level adjustments are considered to match all items in the invoice.
+//
+function get_adjustment_type($patient_id, $encounter_id, $code_type, $code) {
+  global $form_adjreason;
+
+  $adjreason = '';
+  $row = sqlQuery("SELECT memo FROM ar_activity WHERE " .
+    "pid = '$patient_id' AND encounter = '$encounter_id' AND " .
+    "(code_type = '' OR (code_type = '$code_type' AND code = '$code')) AND " .
+    "adj_amount != 0.00 AND memo != '' " .
+    "ORDER BY code DESC, adj_amount DESC LIMIT 1");
+  if (isset($row['memo'])) $adjreason = $row['memo'];
+
+  // echo "<!-- '$patient_id' '$encounter_id' '$code_type' '$code' = '$adjreason' / '$form_adjreason' -->\n"; // debugging
+
+  return $adjreason;
+}
+
 // This is called for each IPPF service code that is selected.
 //
 function process_ippf_code($row, $code, $quantity=1) {
@@ -892,10 +913,22 @@ function process_ippf_code($row, $code, $quantity=1) {
 // This is called for each MA service code that is selected.
 //
 function process_ma_code($row, $code='', $quantity=1) {
-  global $form_by, $arr_content, $form_content;
+  global $form_by, $arr_content, $form_content, $form_adjreason;
 
   if ($code === '') $code = $row['code'];
   $key = 'Unspecified';
+
+  // Filtering by adjustment type.
+  //
+  if ($form_adjreason) {
+    if (!empty($row['drug_id'])) {
+      $adjreason = get_adjustment_type($row['pid'], $row['encounter'], 'PROD', $row['drug_id']);
+    }
+    else {
+      $adjreason = get_adjustment_type($row['pid'], $row['encounter'], 'MA', $code);
+    }
+    if ($adjreason != $form_adjreason) return;
+  }
 
   // One row for each service category.
   //
@@ -937,10 +970,17 @@ function process_ma_code($row, $code='', $quantity=1) {
 // This is called for each ADM service code that is selected.
 //
 function process_adm_code($row, $code='', $quantity=1) {
-  global $form_by, $arr_content, $form_content;
+  global $form_by, $arr_content, $form_content, $form_adjreason;
 
   if ($code === '') $code = $row['code'];
   $key = 'ADM:Unspecified';
+
+  // Filtering by adjustment type.
+  //
+  if ($form_adjreason) {
+    $adjreason = get_adjustment_type($row['pid'], $row['encounter'], 'ADM', $code);
+    if ($adjreason != $form_adjreason) return;
+  }
 
   // One row for each service category.
   //
@@ -1359,6 +1399,20 @@ while ($lrow = sqlFetchArray($lres)) {
 ?>
      </td>
     </tr>
+
+<?php if ($report_type == 'm') { ?>
+    <tr>
+     <td valign='top' class='detail' nowrap>
+      <?php echo xl('Adj Type'); ?>:
+     </td>
+     <td valign='top' class='detail'>
+<?php
+  echo generate_select_list('form_adjreason', 'adjreason', $form_adjreason);
+?>
+     </td>
+    </tr>
+<?php } ?>
+
     <tr>
      <td colspan='2' class='detail' nowrap>
       <?php xl('From','e'); ?>
@@ -1489,7 +1543,7 @@ if ($_POST['form_submit']) {
     //
     if ($form_content == 5) { // sales of contraceptive items
       $query = "SELECT " .
-        "ds.pid, ds.encounter, ds.sale_date, ds.quantity, " .
+        "ds.pid, ds.encounter, ds.sale_date, ds.quantity, ds.drug_id, " .
         "d.name, d.cyp_factor, d.related_code, " . 
         "pd.regdate, pd.sex, pd.DOB, pd.lname, pd.fname, pd.mname, " .
         "pd.referral_source$pd_fields, " .
