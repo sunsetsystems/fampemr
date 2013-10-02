@@ -644,7 +644,7 @@ function doinvopen(ptid,encid) {
     $res = sqlStatement($query);
     while ($row = sqlFetchArray($res)) {
       if ($form_adjreason) {
-        $adjreason = get_adjustment_type($row['pid'], $row['code_type'], $row['code']);
+        $adjreason = get_adjustment_type($row['pid'], $row['encounter'], $row['code_type'], $row['code']);
         if ($adjreason != $form_adjreason) continue;
       }
       thisLineItem($row['pid'], $row['encounter'], $row['code_type'], $row['code'],

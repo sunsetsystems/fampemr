@@ -925,10 +925,36 @@ function generate_print_field($frow, $currvalue) {
     echo nl2br($frow['description']);
   }
 
-  // facilities drop-down list
-  else if ($data_type == 35) {   
-    if (empty($currvalue)) $currvalue = 0;
-    dropdown_facility($currvalue, "form_$field_id", true, false);
+  // Facilities list
+  else if ($data_type == 35) {
+    // In this special case, fld_length is the number of columns generated.
+    $cols = max(1, $frow['fld_length']);
+    $lres = sqlStatement("SELECT id, name FROM facility ORDER BY name");
+    echo "<table cellpadding='0' cellspacing='0' width='100%'>";
+    $tdpct = (int) (100 / $cols);
+    for ($count = 0; $lrow = sqlFetchArray($lres); ++$count) {
+      $option_id = $lrow['id'];
+      if ($count % $cols == 0) {
+        if ($count) echo "</tr>";
+        echo "<tr>";
+      }
+      echo "<td width='$tdpct%'>";
+      echo "<input type='radio'";
+      if (strlen($currvalue)  > 0 && $option_id == $currvalue) {
+        // Do not use defaults for these printable forms.
+        echo " checked";
+      }
+      echo ">" . htmlspecialchars($lrow['name']);
+      echo "</td>";
+    }
+    if ($count) {
+      echo "</tr>";
+      if ($count > $cols) {
+        // Add some space after multiple rows of radio buttons.
+        echo "<tr><td colspan='$cols' style='height:0.7em'></td></tr>";
+      }
+    }
+    echo "</table>";
   }
 
 }
@@ -1133,7 +1159,7 @@ function generate_display_field($frow, $currvalue) {
   // facility
   else if ($data_type == 35) {
     if (empty($currvalue)) {
-      $s = xl('Unspecified');
+      $s = '';
     }
     else {
       $urow = sqlQuery("SELECT name FROM facility WHERE id = '$currvalue'");
