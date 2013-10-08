@@ -65,6 +65,19 @@ if ($report_type == 'm') {
     5 => xl('Contraceptive Items Provided'),          // reactivated 2/2012
     // 7 => xl('Administrative Services'),            // TBD: remove this
   );
+  $arr_invalid = array(
+    101 => array(5,6),
+    102 => array(5,6),
+    6   => array(5),
+    105 => array(1,2,4),
+    17  => array(5,6),
+    9   => array(5,6),
+    10  => array(5,6),
+    14  => array(5,6),
+    15  => array(5,6),
+    103 => array(5,6),
+    2   => array(5,6),
+  );
   $arr_report = array(
     // Items are content|row|column|column|...
     /*****************************************************************
@@ -1512,6 +1525,17 @@ if ($_POST['form_submit']) {
   //
   foreach ($form_by_arr as $form_by) {
 
+    if (!empty($arr_invalid[$form_by]) && in_array($form_content, $arr_invalid[$form_by])) {
+      $alertmsg = xl('For Content') . ' = ' . addslashes($arr_content[$form_content]) . ', ' .
+      xl('valid Row selections are') . ':';
+      foreach ($arr_by as $bykey => $bydesc) {
+        if (!in_array($form_content, $arr_invalid[$bykey])) {
+          $alertmsg .= '\\n     * ' . addslashes($bydesc);
+        }
+      }
+      continue;
+    }
+
     // This will become the array of reportable values.
     $areport = array();
 
@@ -1669,8 +1693,9 @@ if ($_POST['form_submit']) {
      if ($report_type == 'i' && $form_by !== '104') { // content is new acceptors but incompatible report type
       $alertmsg = xl("New Acceptors content type is valid only for contraceptive service reporting.");
      }
+     else
 
-     else if ($form_by === '6' || $form_by === '7' || $form_by === '104' || $form_by === '105') {
+     if ($form_by === '6' || $form_by === '7' || $form_by === '104' || $form_by === '105') {
 
       // This enumerates instances of "contraception starting" for the MA.  Note that a
       // client could be counted twice, once for nonsurgical and once for surgical.
@@ -2132,7 +2157,7 @@ if ($_POST['form_submit']) {
 
 <?php
   if ($alertmsg) {
-    echo "alert('" . htmlentities($alertmsg) . "');\n";
+    echo "alert('" . $alertmsg . "');\n";
   }
 ?>
 
