@@ -61,6 +61,7 @@ if ($report_type == 'm') {
     1 => xl('Services'),
     2 => xl('Unique Clients'),
     4 => xl('Unique New Clients'),
+    7 => xl('Unique Returning Clients'),
     6 => xl('Acceptors New to Modern Contraception'), // new on 2/2012
     5 => xl('Contraceptive Items Provided'),          // reactivated 2/2012
     // 7 => xl('Administrative Services'),            // TBD: remove this
@@ -69,7 +70,7 @@ if ($report_type == 'm') {
     101 => array(5,6),
     102 => array(5,6),
     6   => array(5),
-    105 => array(1,2,4),
+    105 => array(1,2,4,7),
     17  => array(5,6),
     9   => array(5,6),
     10  => array(5,6),
@@ -83,6 +84,7 @@ if ($report_type == 'm') {
     /*****************************************************************
     '2|2|3|4|5|8|11' => xl('Client Profile - Unique Clients'),
     '4|2|3|4|5|8|11' => xl('Client Profile - New Clients'),
+    '7|2|3|4|5|8|11' => xl('Client Profile - Returning Clients'),
     *****************************************************************/
   );
 }
@@ -103,6 +105,7 @@ else if ($report_type == 'g') {
     1 => xl('Services'),
     2 => xl('Unique Clients'),
     4 => xl('Unique New Clients'),
+    7 => xl('Unique Returning Clients'),
   );
   $arr_report = array(
     /*****************************************************************
@@ -558,6 +561,13 @@ function loadColumnData($key, $row, $quantity=1) {
       $row['regdate'] > $to_date) return;
   }
 
+  // If we are counting returning clients, then disallow a registration date
+  // within the reporting period.
+  if ($form_content == '7') {
+    if ($row['regdate'] && $row['regdate'] >= $from_date &&
+      $row['regdate'] <= $to_date) return;
+  }
+
   // If first instance of this key, initialize its arrays.
   if (empty($areport[$key])) {
     $areport[$key] = array();
@@ -565,9 +575,11 @@ function loadColumnData($key, $row, $quantity=1) {
     $areport[$key]['.dtl'] = array();
   }
 
-  // If we are counting unique clients, new acceptors or new clients, then
+  // If we are counting unique clients, new acceptors, new or returning clients, then
   // require a unique patient.
-  if ($form_content == '2' || $form_content == '3' || $form_content == '4' || $form_content == '6') {
+  if ($form_content == '2' || $form_content == '3' || $form_content == '4' ||
+    $form_content == '6' || $form_content == '7')
+  {
     if ($row['pid'] == $areport[$key]['.prp']) return;
   }
 
@@ -1979,7 +1991,9 @@ if ($_POST['form_submit']) {
         $this_group = $tmp[1];
         $display_key = $tmp[2];
       }
-      if ($form_output != 3 && $form_content != '2' && $form_content != '3' && $form_content != '4') {
+      if ($form_output != 3 && $form_content != '2' && $form_content != '3' &&
+        $form_content != '4' && $form_content != '7')
+      {
         // If it is a group change and there is a non-empty $last_group,
         // generate a subtotals line and clear subtotals array.
         // Set $last_group to the current group name.
@@ -2102,11 +2116,12 @@ if ($_POST['form_submit']) {
 
     } // end foreach reporting key
 
-    // If we are exporting or counting unique clients, new acceptors or new clients,
+    // If we are exporting or counting unique clients, new acceptors, new or returning clients,
     // then the totals line is skipped.
     //
-    if ($form_output != 3 && $form_content != '2' && $form_content != '3' && $form_content != '4') {
-
+    if ($form_output != 3 && $form_content != '2' && $form_content != '3' &&
+      $form_content != '4' && $form_content != '7')
+    {
       // If there is a non-empty $last_group, generate a subtotals line.
       if ($last_group_count > 1) {
         writeSubtotals($last_group, $asubtotals, $form_by);
