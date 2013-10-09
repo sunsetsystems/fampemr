@@ -17,7 +17,7 @@ class POSRef {
     $res = sqlStatement("SELECT option_id, title, notes FROM list_options " .
       "WHERE list_id = 'posref' ORDER BY seq, option_id");
     while ($row = sqlFetchArray($res)) {
-      $pos[] = array('code' => $row['option_id'], 'title' => $row['title'], 'description' => $row['notes']);
+      $pos[] = array('code' => $row['option_id'], 'title' => xl_list_label($row['title']), 'description' => $row['notes']);
     }
 		if (!empty($pos)) return $pos;
 
