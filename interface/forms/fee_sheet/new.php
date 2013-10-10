@@ -470,10 +470,22 @@ function echoProdLine($lino, $drug_id, $rx = FALSE, $del = FALSE, $units = NULL,
 // who do not appear in the calendar.
 //
 function genProviderSelect($selname, $toptext, $default=0, $disabled=false) {
-  $query = "SELECT id, lname, fname FROM users WHERE " .
+  // Get user's default facility, or 0 if none.
+  $drow = sqlQuery("SELECT facility_id FROM users where username = '" . $_SESSION['authUser'] . "'");
+  $def_facility = 0 + $drow['facility_id'];
+  //
+  $query = "SELECT id, lname, fname, facility_id FROM users WHERE " .
     "( authorized = 1 OR info LIKE '%provider%' ) AND username != '' " .
-    "AND active = 1 AND ( info IS NULL OR info NOT LIKE '%Inactive%' ) " .
-    "ORDER BY lname, fname";
+    "AND active = 1 AND ( info IS NULL OR info NOT LIKE '%Inactive%' )";
+  // If restricting to providers matching user facility...
+  if ($GLOBALS['gbl_restrict_provider_facility']) {
+    $query .= " AND ( facility_id = 0 OR facility_id = $def_facility )";
+    $query .= " ORDER BY lname, fname";
+  }
+  // If not restricting then sort the matching providers first.
+  else {
+    $query .= " ORDER BY (facility_id = $def_facility) DESC, lname, fname";
+  }
   $res = sqlStatement($query);
   echo "   <select name='$selname'";
   if ($disabled) echo " disabled";
@@ -483,7 +495,12 @@ function genProviderSelect($selname, $toptext, $default=0, $disabled=false) {
     $provid = $row['id'];
     echo "    <option value='$provid'";
     if ($provid == $default) echo " selected";
-    echo ">" . $row['lname'] . ", " . $row['fname'] . "\n";
+    echo ">";
+    if (!$GLOBALS['gbl_restrict_provider_facility'] && $def_facility && $row['facility_id'] == $def_facility) {
+      // Mark providers in the matching facility with an asterisk.
+      echo "* ";
+    }
+    echo $row['lname'] . ", " . $row['fname'] . "\n";
   }
   echo "   </select>\n";
 }

@@ -476,6 +476,13 @@ $GLOBALS_METADATA = array(
       xl('Support export/import of configuration data via the Backup page.')
     ),
 
+    'gbl_restrict_provider_facility' => array(
+      xl('Restrict Providers by Facility'),
+      'bool',                           // data type
+      '0',                              // default
+      xl('Limit service provider selection according to the facility of the logged-in user.')
+    ),
+
     'restrict_user_facility' => array(
       xl('Restrict Users to Facilities'),
       'bool',                           // data type
