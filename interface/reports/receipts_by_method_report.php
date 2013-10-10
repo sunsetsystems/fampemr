@@ -351,7 +351,11 @@ if ($_POST['form_refresh']) {
     } else {
       $query .= " AND ( ( s.deposit_date IS NOT NULL AND " .
         "s.deposit_date >= '$from_date' AND s.deposit_date <= '$to_date' ) OR " .
-        "( s.deposit_date IS NULL AND a.post_time >= '$from_date 00:00:00' AND " .
+        "( s.deposit_date IS NULL AND a.post_date IS NOT NULL AND " .
+        "a.post_date >= '$from_date' AND " .
+        "a.post_date <= '$to_date' ) OR " .
+        "( s.deposit_date IS NULL AND a.post_date IS NULL AND " .
+        "a.post_time >= '$from_date 00:00:00' AND " .
         "a.post_time <= '$to_date 23:59:59' ) )";
     }
     // If a procedure code was specified.
