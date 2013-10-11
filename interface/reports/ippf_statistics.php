@@ -1426,7 +1426,7 @@ while ($lrow = sqlFetchArray($lres)) {
      </td>
     </tr>
 
-<?php if ($report_type == 'm') { ?>
+<?php if ($report_type == 'm' && $GLOBALS['gbl_checkout_line_adjustments']) { ?>
     <tr>
      <td valign='top' class='detail' nowrap>
       <?php echo xl('Adj Type'); ?>:
