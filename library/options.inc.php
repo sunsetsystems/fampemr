@@ -198,6 +198,8 @@ function generate_form_field($frow, $currvalue) {
     else if (strpos($frow['edit_options'], 'U') !== FALSE)
       echo " onchange='this.value = this.value.toUpperCase()'";
     $tmp = addslashes($GLOBALS['gbl_mask_patient_id']);
+    // If mask is for use at save time, treat as no mask.
+    if (strpos($tmp, '^') !== FALSE) $tmp = '';
     if ($field_id == 'pubpid' && strlen($tmp) > 0) {
       echo " onkeyup='maskkeyup(this,\"$tmp\")'";
       echo " onblur='maskblur(this,\"$tmp\")'";
