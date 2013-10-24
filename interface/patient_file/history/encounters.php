@@ -17,7 +17,6 @@ require_once("$srcdir/formatting.inc.php");
 require_once("../../../custom/code_types.inc.php");
 
  $accounting_enabled = $GLOBALS['oer_config']['ws_accounting']['enabled'];
- $INTEGRATED_AR = $accounting_enabled === 2;
 
  //maximum number of encounter entries to display on this page:
  $N = 12;
@@ -60,7 +59,7 @@ else if ($GLOBALS['gbl_encounters_default_view'] == 2) {
 // This is called to generate a line of output for a patient document.
 //
 function showDocument(&$drow) {
-  global $ISSUE_TYPES, $auth_med;
+  global $ISSUE_TYPES, $auth_med, $aTaxNames;
 
   $docdate = $drow['docdate'];
 
@@ -94,11 +93,204 @@ function showDocument(&$drow) {
 
   // skip billing and insurance columns
   if (!$GLOBALS['athletic_team']) {
-    echo "<td colspan=5>&nbsp;</td>\n";
+    echo "<td colspan='" . (5 + count($aTaxNames)) . "'>&nbsp;</td>\n";
   }
 
   echo "</tr>\n";
 }
+
+// Initialize the $aItems entry for this line item if it does not yet exist.
+function ensureItems($invno, $codekey) {
+  global $aItems, $aTaxNames;
+  if (!isset($aItems[$invno][$codekey])) {
+    // Charges, Adjustments, Payments
+    $aItems[$invno][$codekey] = array();
+    $aItems[$invno][$codekey]['fee'] = 0;
+    $aItems[$invno][$codekey]['adj'] = 0;
+    $aItems[$invno][$codekey]['pay'] = 0;
+    // Then a slot for each tax type.
+    $aItems[$invno][$codekey]['tax'] = array();
+    for ($i = 0; $i < count($aTaxNames); ++$i) {
+      $aItems[$invno][$codekey]['tax'][$i] = 0;
+    }
+  }
+}
+
+// Get taxes matching this line item and store them in their proper $aItems array slots.
+function getItemTaxes($patient_id, $encounter_id, $codekey, $id) {
+  global $aItems, $aTaxNames;
+  $invno = "$patient_id.$encounter_id";
+  $total = 0;
+  $taxres = sqlStatement("SELECT code, fee FROM billing WHERE " .
+    "pid = '$patient_id' AND encounter = '$encounter_id' AND " .
+    "code_type = 'TAX' AND activity = 1 AND ndc_info = '$id' " .
+    "ORDER BY id");
+  while ($taxrow = sqlFetchArray($taxres)) {
+    $i = 0;
+    $matchcount = 0;
+    foreach ($aTaxNames as $tmpcode => $dummy) {
+      if ($tmpcode == $taxrow['code']) {
+        ++$matchcount;
+        $aItems[$invno][$codekey]['tax'][$i] += $taxrow['fee'];
+      }
+      if ($matchcount != 1) {
+        // TBD: This is an error.
+        echo "ERROR: invno = '$invno' codekey = '$codekey' matchcount = '$matchcount'\n";
+      }
+      ++$i;
+    }
+    $total += $taxrow['fee'];
+  }
+  return $total;
+}
+
+// For a given encounter, this gets all charges and taxes and allocates payments
+// and adjustments among them, if that has not already been done.
+// Any invoice-level adjustments and payments are allocated among the line
+// items in proportion to their line-level remaining balances.
+//
+// This was lifted from sales_by_item.php. Should make it a library function.
+//
+function ensureLineAmounts($patient_id, $encounter_id, $def_provider_id=0, $set_overpayments=false) {
+  global $aItems, $aTaxNames, $overpayments;
+
+  $invno = "$patient_id.$encounter_id";
+  if (isset($aItems[$invno])) return $invno;
+
+  $adjusts  = 0; // sum of invoice level adjustments
+  $payments = 0; // sum of invoice level payments
+  $denom    = 0; // sum of adjusted line item charges
+  $aItems[$invno] = array();
+
+  // From the billing table get charges, copays and taxes that are not specific
+  // to line items. Then plug the service taxes into their line items.
+  $tres = sqlStatement("SELECT b.code_type, b.code, b.code_text, b.fee, b.id, " .
+    "u.id AS uid, u.lname, u.fname, u.username " .
+    "FROM billing AS b " .
+    "LEFT JOIN users AS u ON u.id = IF(b.provider_id, b.provider_id, '$def_provider_id') " .
+    "WHERE " .
+    "b.pid = '$patient_id' AND b.encounter = '$encounter_id' AND b.activity = 1 AND " .
+    "b.fee != 0 AND (b.code_type != 'TAX' OR b.ndc_info = '') " .
+    "ORDER BY u.lname, u.fname, u.id, b.code_type, b.code");
+  while ($trow = sqlFetchArray($tres)) {
+    if ($trow['code_type'] == 'COPAY') {
+      $payments -= $trow['fee'];
+    }
+    else {
+      $codekey = $trow['code_type'] . ':' . $trow['code'];
+      ensureItems($invno, $codekey);
+      $denom += $trow['fee'];
+      if ($trow['code_type'] == 'TAX') {
+        // If this is a tax, put it in its correct column.
+        $i = 0;
+        foreach ($aTaxNames as $tmpcode => $dummy) {
+          if ($tmpcode == $trow['code']) {
+            $aItems[$invno][$codekey]['tax'][$i] += $trow['fee'];
+            $trow['fee'] = 0;
+          }
+          ++$i;
+        }
+      }
+      $aItems[$invno][$codekey]['fee'] += $trow['fee'];
+      $denom += getItemTaxes($patient_id, $encounter_id, $codekey, 'S:' . $trow['id']);
+      $aItems[$invno][$codekey]['dsc']      = $trow['code_text'];
+      $aItems[$invno][$codekey]['uid']      = isset($trow['uid']     ) ? $trow['uid']      : '';
+      $aItems[$invno][$codekey]['username'] = isset($trow['username']) ? $trow['username'] : '';
+      $aItems[$invno][$codekey]['lname']    = isset($trow['lname']   ) ? $trow['lname']    : '';
+      $aItems[$invno][$codekey]['fname']    = isset($trow['fname']   ) ? $trow['fname']    : '';
+    }
+  }
+
+  // Get charges from drug_sales table and associated taxes.
+  $tres = sqlStatement("SELECT s.drug_id, s.fee, s.sale_id " .
+    "FROM drug_sales AS s WHERE " .
+    "s.pid = '$patient_id' AND s.encounter = '$encounter_id' AND s.fee != 0");
+  while ($trow = sqlFetchArray($tres)) {
+    $codekey = 'PROD:' . $trow['drug_id'];
+    ensureItems($invno, $codekey);
+    $aItems[$invno][$codekey]['fee'] += $trow['fee'];
+    $denom += $trow['fee'];
+    $denom += getItemTaxes($patient_id, $encounter_id, $codekey, 'P:' . $trow['sale_id']);
+  }
+
+  // Get adjustments and other payments from ar_activity table.
+  $tres = sqlStatement("SELECT " .
+    "a.code_type, a.code, a.adj_amount, a.pay_amount " .
+    "FROM ar_activity AS a WHERE " .
+    "a.pid = '$patient_id' AND a.encounter = '$encounter_id'");
+  while ($trow = sqlFetchArray($tres)) {
+    $codekey = $trow['code_type'] . ':' . $trow['code'];
+    if (isset($aItems[$invno][$codekey])) {
+      $aItems[$invno][$codekey]['adj'] += $trow['adj_amount'];
+      $aItems[$invno][$codekey]['pay'] += $trow['pay_amount'];
+      $denom -= $trow['adj_amount'];
+      $denom -= $trow['pay_amount'];
+    }
+    else {
+      $adjusts  += $trow['adj_amount'];
+      $payments += $trow['pay_amount'];
+    }
+  }
+
+  // Allocate all unmatched payments and adjustments among the line items.
+  $adjrem = $adjusts;  // remaining unallocated adjustments
+  $payrem = $payments; // remaining unallocated payments
+  $nlines = count($aItems[$invno]);
+  foreach ($aItems[$invno] AS $codekey => $dummy) {
+    if (--$nlines > 0) {
+      // Avoid dividing by zero!
+      if ($denom) {
+        $bal = $aItems[$invno][$codekey]['fee'] - $aItems[$invno][$codekey]['adj'] - $aItems[$invno][$codekey]['pay'];
+        for ($i = 0; $i < count($aTaxNames); ++$i) $bal += $aItems[$invno][$codekey]['tax'][$i];
+        $factor = $bal / $denom;
+        $tmp = sprintf('%01.2f', $adjusts * $factor);
+        $aItems[$invno][$codekey]['adj'] += $tmp;
+        $adjrem -= $tmp;
+        $tmp = sprintf('%01.2f', $payments * $factor);
+        $aItems[$invno][$codekey]['pay'] += $tmp;
+        $payrem -= $tmp;
+        // echo "<!-- invno = '$invno' codekey = '$codekey' denom = '$denom' bal='$bal' payments='$payments' tmp = '$tmp' -->\n"; // debugging
+      }
+    }
+    else {
+      // Last line gets what's left to avoid rounding errors.
+      $aItems[$invno][$codekey]['adj'] += $adjrem;
+      $aItems[$invno][$codekey]['pay'] += $payrem;
+      // echo "<!-- invno = '$invno' codekey = '$codekey' payrem = '$payrem' -->\n"; // debugging
+    }
+  }
+
+  if ($set_overpayments) {
+    // For each line item having (payment > charge + tax - adjustment), move the
+    // overpayment amount to a global variable $overpayments.
+    foreach ($aItems[$invno] AS $codekey => $dummy) {
+      $diff = $aItems[$invno][$codekey]['pay'] + $aItems[$invno][$codekey]['adj'] - $aItems[$invno][$codekey]['fee'];
+      for ($i = 0; $i < count($aTaxNames); ++$i) $diff -= $aItems[$invno][$codekey]['tax'][$i];
+      $diff = sprintf('%01.2f', $diff);
+      if ($diff > 0.00) {
+        $overpayments += $diff;
+        $aItems[$invno][$codekey]['pay'] -= $diff;
+      }
+    }
+  }
+
+  return $invno;
+}
+
+function getTaxNames($pid) {
+  global $aTaxNames;
+  // Get the tax types applicable to this patient.
+  $aTaxNames = array();
+  $tnres = sqlStatement("SELECT DISTINCT b.code, b.code_text " .
+    "FROM billing AS b WHERE " .
+    "b.code_type = 'TAX' AND b.activity = '1' AND b.pid = '$pid' " .
+    "ORDER BY b.code, b.code_text");
+  while ($tnrow = sqlFetchArray($tnres)) {
+    $aTaxNames[$tnrow['code']] = $tnrow['code_text'];
+  }
+}
+
+getTaxNames($pid);
 ?>
 <html>
 <head>
@@ -107,6 +299,8 @@ function showDocument(&$drow) {
 
 <style type="text/css">
 .openvisit {background-color:#ffffcc;}
+#patient_pastenc th.right {text-align:right; padding-right:5pt;}
+#patient_pastenc td.right {text-align:right; padding-right:5pt;}
 </style>
 
 <script type="text/javascript" src="<?php echo $GLOBALS['webroot'] ?>/library/js/jquery.js"></script>
@@ -207,12 +401,18 @@ function editNote(feid) {
 
 <?php if ($billing_view && $accounting_enabled) { ?>
   <th><?php xl('Code','e'); ?></th>
-  <th class='right'><?php xl('Chg','e'); ?></th>
-  <th class='right'><?php xl('Paid','e'); ?></th>
+  <th class='right'><?php xl('Charge','e'); ?></th>
   <th class='right'><?php xl('Adj','e'); ?></th>
+<?php
+  foreach ($aTaxNames as $taxname) {
+    echo "  <th class='right'>" . htmlspecialchars($taxname) . "</th>\n";
+  }
+?>
+  <th class='right'><?php xl('Paid','e'); ?></th>
   <th class='right'><?php xl('Bal','e'); ?></th>
 <?php } else { ?>
-  <th colspan='5'><?php echo ($GLOBALS['phone_country_code'] == '1') ? xl('Billing') : xl('Coding') ?></th>
+  <th colspan='<?php echo 5 + count($aTaxNames); ?>'><?php echo
+    ($GLOBALS['phone_country_code'] == '1') ? xl('Billing') : xl('Coding') ?></th>
 <?php } ?>
 
 <?php if (!$GLOBALS['athletic_team'] && !$GLOBALS['ippf_specific']) { ?>
@@ -233,22 +433,11 @@ if (! $billing_view) {
 }
 
 $count = 0;
+
+// For each of the patient's encounters...
 if ($result = getEncounters($pid)) {
 
-    if ($billing_view && $accounting_enabled && !$INTEGRATED_AR) SLConnect();
-
     foreach ($result as $iter ) {
-        /*************************************************************
-        // $count++; // Forget about limiting the number of encounters
-        if ($count > $N) {
-            //we have more encounters to print, but we've reached our display maximum
-            print "<tr><td colspan='4' align='center'>" .
-                "<a target='Main' href='encounters_full.php' class='alert' onclick='top.restoreSession()'>" .
-                xl('Some encounters were not displayed. Click here to view all.') .
-                "</a></td></tr>\n";
-            break;
-        }
-        *************************************************************/
 
         // $href = "javascript:window.toencounter(" . $iter['encounter'] . ")";
         $reason_string = "";
@@ -256,6 +445,7 @@ if ($result = getEncounters($pid)) {
 
         $raw_encounter_date = '';
 
+        // Get some encounter attributes.
         if ($result4 = sqlQuery("SELECT fe.*, u.fname, u.mname, u.lname " .
           "FROM form_encounter AS fe " .
           "LEFT JOIN users AS u ON u.id = fe.provider_id " .
@@ -278,6 +468,7 @@ if ($result = getEncounters($pid)) {
             }
         }
 
+        // Get ID of user who created the encounter.
         $erow = sqlQuery("SELECT user FROM forms WHERE encounter = '" .
         $iter['encounter'] . "' AND formdir = 'newpatient' LIMIT 1");
 
@@ -331,9 +522,8 @@ if ($result = getEncounters($pid)) {
             echo "</div>";
             echo "</td>\n";
 
-        //  *************** end billing view *********************
         }
-        else {
+        else { //clinical view
 
             // show issues for this encounter
             echo "<td>";
@@ -389,7 +579,7 @@ if ($result = getEncounters($pid)) {
             echo "</div>";
             echo "</td>\n";
 
-        } // end not billing view
+        } // end clinical view
 
         //this is where we print out the text of the billing that occurred on this encounter
         $thisauth = $auth_coding_a;
@@ -406,163 +596,75 @@ if ($result = getEncounters($pid)) {
 
         $arid = 0;
         if ($thisauth && $auth_sensitivity) {
-            $binfo = array('', '', '', '', '');
-            $subresult2 = array();
+            $binfo = array();
+            for ($i = 0; $i < 5 + count($aTaxNames); ++$i) {
+              $binfo[$i] = '';
+            }
+            $aItems = array();
+            ensureLineAmounts($pid, $iter['encounter'], $def_provider_id);
+ 
+            $invno = "$pid." . $iter['encounter'];
 
-            $billres = sqlStatement("SELECT " .
-              "b.code_type, b.code, b.modifier, b.code_text, b.fee, " .
-              "u.id, u.lname, u.fname, u.username " .
-              "FROM billing AS b " .
-              "LEFT JOIN users AS u ON u.id = IF(b.provider_id, b.provider_id, '$def_provider_id') " .
-              "WHERE " .
-              "b.pid = '$pid' AND " .
-              "b.encounter = '" . $iter['encounter'] . "' AND " .
-              "b.activity = 1 " .
-              "ORDER BY u.lname, u.fname, u.id, b.code_type, b.code");
+            foreach ($aItems[$invno] AS $codekey => $arr) {
+              $title = addslashes($arr['dsc']);
 
-            while ($billrow = sqlFetchArray($billres)) {
-              // if ($billrow['code_type'] != 'COPAY' && $billrow['code_type'] != 'TAX') {
-              if (true) {
-                $subresult2[] = $billrow;
-                $provider_id = empty($billrow['id']) ? 0 : 0 + $billrow['id'];
-                if ($provider_id != $last_provider_id) {
-                  $last_provider_id = $provider_id;
-                  $provname = '(' . xl('Unknown') . ')';
-                  if ($provider_id) {
-                    if (empty($billrow['lname']) && empty($billrow['fname'])) {
-                      $provname = '(' . xl('No name') . ')';
-                    }
-                    else {
-                      $provname = $billrow['lname'];
-                      if ($billrow['fname']) $provname .= ', ' . $billrow['fname'];
-                    }
-                  }
-                  if (!empty($hprovs)) $hprovs .= '<br />';
-                  if ($provider_id == $def_provider_id) {
-                    $def_provider_used = true;
-                    $hprovs .= "<b>$provname</b>";
+              // Append to provider name HTML.
+              $provider_id = empty($arr['uid']) ? 0 : 0 + $arr['uid'];
+              if ($provider_id != $last_provider_id) {
+                $last_provider_id = $provider_id;
+                $provname = '(' . xl('Unknown') . ')';
+                if ($provider_id) {
+                  if (empty($arr['lname']) && empty($arr['fname'])) {
+                    $provname = '(' . xl('No name') . ')';
                   }
                   else {
-                    $hprovs .= "$provname";
+                    $provname = $arr['lname'];
+                    if ($arr['fname']) $provname .= ', ' . $arr['fname'];
                   }
                 }
-                else {
-                  $hprovs .= "&nbsp;<br />";
+                if (!empty($hprovs)) $hprovs .= '<br />';
+                if ($provider_id == $def_provider_id) {
+                  $def_provider_used = true;
+                  $hprovs .= "<b>$provname</b>";
                 }
+                else {
+                  $hprovs .= "$provname";
+                }
+              }
+              else {
+                $hprovs .= "&nbsp;<br />";
+              }
+
+              if ($binfo[0]) $binfo[0] .= '<br>';
+              $binfo[0] .= "<span title='$title'>$arlinkbeg$codekey$arlinkend</span>";
+
+              if ($billing_view && $accounting_enabled) {
+                if ($binfo[1]) {
+                  for ($i = 1; $i < 5 + count($aTaxNames); ++$i) $binfo[$i] .= '<br>';
+                }
+                $binfo[1] .= oeFormatMoney($arr['fee']);
+                $binfo[2] .= oeFormatMoney($arr['adj']);
+                $tax = 0;
+                $i = 0;
+                for (; $i < count($aTaxNames); ++$i) {
+                  $binfo[3 + $i] .= oeFormatMoney($arr['tax'][$i]);
+                  $tax += $arr['tax'][$i];
+                }
+                $binfo[3 + $i] .= oeFormatMoney($arr['pay']);
+                $binfo[4 + $i] .= oeFormatMoney($arr['fee'] - $arr['adj'] + $tax - $arr['pay']);
               }
             }
 
-            // Condition removed 2013-04-04 by Rod - it seems pointless and wrong.
-            //
-            // if ($subresult2) { // if there is at least one billing item
-
-                // Get A/R info, if available, for this encounter.
-                $arinvoice = array();
-                $arlinkbeg = "";
-                $arlinkend = "";
-                if ($billing_view && $accounting_enabled) {
-                    if ($INTEGRATED_AR) {
-                        $tmp = sqlQuery("SELECT id FROM form_encounter WHERE " .
-                                    "pid = '$pid' AND encounter = '" . $iter['encounter'] . "'");
-                        $arid = 0 + $tmp['id'];
-                        if ($arid) $arinvoice = ar_get_invoice_summary($pid, $iter['encounter'], true);
-                    }
-                    else {
-                        $arid = SLQueryValue("SELECT id FROM ar WHERE invnumber = " .
-                                        "'$pid.{$iter['encounter']}'");
-                        if ($arid) $arinvoice = get_invoice_summary($arid, true);
-                    }
-                    if ($arid) {
-                        $arlinkbeg = "<a href='../../billing/sl_eob_invoice.php?id=$arid'" .
-                                    " target='_blank' class='text' style='color:#00cc00'>";
-                        $arlinkend = "</a>";
-                    }
-                }
-
-                // Throw in product sales.
-                $query = "SELECT s.drug_id, s.fee, d.name " .
-                  "FROM drug_sales AS s " .
-                  "LEFT JOIN drugs AS d ON d.drug_id = s.drug_id " .
-                  "WHERE s.pid = '$pid' AND s.encounter = '{$iter['encounter']}' " .
-                  "ORDER BY s.sale_id";
-                $sres = sqlStatement($query);
-                while ($srow = sqlFetchArray($sres)) {
-                  $subresult2[] = array('code_type' => 'PROD',
-                    'code' => 'PROD:' . $srow['drug_id'], 'modifier' => '',
-                    'code_text' => $srow['name'], 'fee' => $srow['fee']);
-                }
-
-                // This creates 5 columns of billing information:
-                // billing code, charges, payments, adjustments, balance.
-                foreach ($subresult2 as $iter2) {
-                    // Next 2 lines were to skip diagnoses, but that seems unpopular.
-                    // if ($iter2['code_type'] != 'COPAY' &&
-                    //   !$code_types[$iter2['code_type']]['fee']) continue;
-                    $title = addslashes($iter2['code_text']);
-                    $codekey = $iter2['code'];
-                    if ($iter2['code_type'] == 'COPAY') $codekey = 'CO-PAY';
-                    if ($iter2['modifier']) $codekey .= ':' . $iter2['modifier'];
-                    if ($binfo[0]) $binfo[0] .= '<br>';
-                    // $binfo[0] .= "<span class='form_tt' title='".$title."'>".
-                    $binfo[0] .= "<span title='$title'>".
-                                //onmouseover='ttshow(this,\"$title\")' onmouseout='tthide()'>" .
-                                $arlinkbeg . ($codekey == 'CO-PAY' ? xl($codekey) : $codekey) .
-                                $arlinkend . "</span>";
-                    if ($billing_view && $accounting_enabled) {
-                        if ($binfo[1]) {
-                            for ($i = 1; $i < 5; ++$i) $binfo[$i] .= '<br>';
-                        }
-                        if (empty($arinvoice[$codekey])) {
-                            // If no invoice, show the fee.
-                            if ($arlinkbeg) $binfo[1] .= '&nbsp;';
-                            else $binfo[1] .= oeFormatMoney($iter2['fee']);
-
-                            for ($i = 2; $i < 5; ++$i) $binfo[$i] .= '&nbsp;';
-                        }
-                        else {
-                            $binfo[1] .= oeFormatMoney($arinvoice[$codekey]['chg'] + $arinvoice[$codekey]['adj']);
-                            $binfo[2] .= oeFormatMoney($arinvoice[$codekey]['chg'] - $arinvoice[$codekey]['bal']);
-                            $binfo[3] .= oeFormatMoney($arinvoice[$codekey]['adj']);
-                            $binfo[4] .= oeFormatMoney($arinvoice[$codekey]['bal']);
-                            unset($arinvoice[$codekey]);
-                        }
-                    }
-                } // end foreach
-
-                // Pick up any remaining unmatched invoice items from the accounting
-                // system.  Display them in red, as they should be unusual.
-                if ($accounting_enabled && !empty($arinvoice)) {
-                    foreach ($arinvoice as $codekey => $val) {
-                        if ($binfo[0]) {
-                            for ($i = 0; $i < 5; ++$i) $binfo[$i] .= '<br>';
-                        }
-                        // for ($i = 0; $i < 5; ++$i) $binfo[$i] .= "<font color='red'>";
-                        if ($codekey == 'Unknown') {
-                          if ($val['adj']) $codekey = xl('Adjustment');
-                          else $codekey = xl('Payment');
-                        }
-                        $binfo[0] .= $arlinkbeg . $codekey . $arlinkend;
-                        $binfo[1] .= oeFormatMoney($val['chg'] + $val['adj']);
-                        $binfo[2] .= oeFormatMoney($val['chg'] - $val['bal']);
-                        $binfo[3] .= oeFormatMoney($val['adj']);
-                        $binfo[4] .= oeFormatMoney($val['bal']);
-                        // for ($i = 0; $i < 5; ++$i) $binfo[$i] .= "</font>";
-                    }
-                }
-
-            // } // end if there is billing
-
-            // echo "<td class='text'>".$binfo[0]."</td>\n";
-            $hcodes .= "<td class='text'>" . $binfo[0] . "</td>\n";
-            for ($i = 1; $i < 5; ++$i) {
-                // echo "<td class='text right'>". $binfo[$i]."</td>\n";
-                $hcodes .= "<td class='text right'>" . $binfo[$i] . "</td>\n";
+            $hcodes .= "<td class='text'>" . $binfo[0] . "</td>\n";       // billing code
+            for ($i = 1; $i < 5 + count($aTaxNames); ++$i) {
+              $hcodes .= "<td class='text right'>" . $binfo[$i] . "</td>\n";
             }
+
         } // end if authorized
 
-        else {
-            // echo "<td class='text' valign='top' colspan='5' rowspan='$encounter_rows'>(No access)</td>\n";
-            $hcodes .= "<td class='text' valign='top' colspan='5' rowspan='$encounter_rows'>(No access)</td>\n";
+        else { // access to coding is not authorized
+            $hcodes .= "<td class='text' valign='top' colspan='" . (5 + count($aTaxNames)) .
+              "' rowspan='$encounter_rows'>(No access)</td>\n";
         }
 
         // Write the providers column if this is the clinical view.
@@ -594,11 +696,7 @@ if ($result = getEncounters($pid)) {
             if ($auth_demo) {
                 $responsible = -1;
                 if ($arid) {
-                    if ($INTEGRATED_AR) {
-                        $responsible = ar_responsible_party($pid, $iter['encounter']);
-                    } else {
-                        $responsible = responsible_party($arid);
-                    }
+                    $responsible = ar_responsible_party($pid, $iter['encounter']);
                 }
                 $subresult5 = getInsuranceDataByDate($pid, $raw_encounter_date, "primary");
                 if ($subresult5 && $subresult5{"provider_name"}) {
@@ -634,8 +732,6 @@ if ($result = getEncounters($pid)) {
 
 
     } // end foreach $result
-
-    if ($billing_view && $accounting_enabled && !$INTEGRATED_AR) SLClose();
 
 } // end if
 
