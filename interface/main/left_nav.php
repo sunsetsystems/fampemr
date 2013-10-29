@@ -973,6 +973,12 @@ if (!empty($reg)) {
           <?php if (!$GLOBALS['disable_chart_tracker']) genPopLink(xl('Chart Activity'),'chart_location_activity.php'); ?>
           <?php if (!$GLOBALS['disable_chart_tracker']) genPopLink(xl('Charts Out'),'charts_checked_out.php'); ?>
           <?php genPopLink(xl('Services'),'services_by_category.php'); ?>
+<?php
+  $lrow = sqlQuery("SELECT COUNT(*) AS count FROM list_options WHERE list_id = 'shift'");
+  if (!empty($lrow['count'])) {
+    genPopLink(xl('Shifts'),'shifts_report.php');
+  }
+?>
         </ul>
       </li>
 <?php if (acl_check('acct', 'rep_a')) { ?>
