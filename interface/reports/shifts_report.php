@@ -46,10 +46,11 @@ function show_doc_total($shiftname, $docname, $encounters) {
 }
 
 function show_shift_total($lastshiftname, $shift_encounters) {
+  global $form_details;
   if ($lastshiftname) {
     echo " <tr>\n";
-    echo "  <td class='bold' align='right' colspan='2'>" . htmlspecialchars($lastshiftname) .
-         " " . xl('Sub-Total') . "</td>\n";
+    echo "  <td class='bold' align='right' colspan='" . ($form_details ? 8 : 2) . "'>" .
+         htmlspecialchars($lastshiftname) . " " . xl('Sub-Total') . "</td>\n";
     echo "  <td class='bold' align='right'>$shift_encounters</td>\n";
     echo " </tr>\n";
   }
@@ -345,6 +346,22 @@ if ($res) {
         $docname .= ', ' . $row['ufname'] . ' ' . $row['umname'];
     }
 
+    if ($shiftname != $lastshiftname || $docname != $lastdocname) {
+      if (!$form_details) {
+        show_doc_total($lastshiftname, $lastdocname, $doc_encounters);
+      }
+      $doc_encounters = 0;
+    }
+    ++$doc_encounters;
+
+    if ($shiftname != $lastshiftname) {
+      if (!$form_details || $form_orderby == 'shift') {
+        show_shift_total($lastshiftname, $shift_encounters);
+      }
+      $shift_encounters = 0;
+    }
+    ++$shift_encounters;
+
     if ($form_details) {
       // Fetch all other forms for this encounter.
       $encnames = '';
@@ -442,20 +459,6 @@ if ($res) {
   </td>
  </tr>
 <?php
-    } else {
-
-      if ($shiftname != $lastshiftname || $docname != $lastdocname) {
-        show_doc_total($lastshiftname, $lastdocname, $doc_encounters);
-        $doc_encounters = 0;
-      }
-      ++$doc_encounters;
-
-      if ($shiftname != $lastshiftname) {
-        show_shift_total($lastshiftname, $shift_encounters);
-        $shift_encounters = 0;
-      }
-      ++$shift_encounters;
-
     }
     ++$total_encounters;
     $lastshiftname = $shiftname;
@@ -464,6 +467,9 @@ if ($res) {
 
   if (!$form_details) {
     show_doc_total($lastshiftname, $lastdocname, $doc_encounters);
+  }
+
+  if (!$form_details || $form_orderby == 'shift') {
     show_shift_total($lastshiftname, $shift_encounters);
   }
 
