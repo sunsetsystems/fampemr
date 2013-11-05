@@ -141,10 +141,14 @@ function receiptDetailLine($code_type, $code, $description, $quantity, $charge, 
     if (!empty($GLOBALS['gbl_checkout_line_adjustments'])) {
       // Total and clear adjustments in $aAdjusts matching this line item.
       for ($i = 0; $i < count($aAdjusts); ++$i) {
-        if ($aAdjusts[$i]['code_type'] == $code_type && $aAdjusts[$i]['code'] == $code && $aAdjusts[$i]['adj_amount'] != 0) {
+        // if ($aAdjusts[$i]['code_type'] == $code_type && $aAdjusts[$i]['code'] == $code && $aAdjusts[$i]['adj_amount'] != 0) {
+        if ($aAdjusts[$i]['code_type'] == $code_type && $aAdjusts[$i]['code'] == $code &&
+          ($aAdjusts[$i]['adj_amount'] != 0 || $aAdjusts[$i]['memotitle'] !== ''))
+        {
           $adjust += $aAdjusts[$i]['adj_amount'];
-          $aAdjusts[$i]['adj_amount'] = 0;
           $memo = $aAdjusts[$i]['memotitle'];
+          $aAdjusts[$i]['adj_amount'] = 0;
+          $aAdjusts[$i]['memotitle'] = '';
         }
       }
     }
@@ -487,7 +491,8 @@ body, td {
     "FROM ar_activity AS a " .
     "LEFT JOIN list_options AS lo ON lo.list_id = 'adjreason' AND lo.option_id = a.memo " .
     "LEFT JOIN ar_session AS s ON s.session_id = a.session_id WHERE " .
-    "a.pid = '$patient_id' AND a.encounter = '$encounter' AND a.adj_amount != 0");
+    "a.pid = '$patient_id' AND a.encounter = '$encounter' AND " .
+    "( a.adj_amount != 0 OR a.pay_amount = 0 )");
   while ($arow = sqlFetchArray($ares)) {
     if (empty($arow['memotitle'])) $arow['memotitle'] = $arow['memo'];
     $aAdjusts[] = $arow;
@@ -519,7 +524,7 @@ body, td {
 
   // Write any adjustments left in the aAdjusts array.
   foreach ($aAdjusts as $arow) {
-    if ($arow['adj_amount'] == 0) continue;
+    if ($arow['adj_amount'] == 0 && $arow['memotitle'] == '') continue;
     $payer = empty($arow['payer_type']) ? 'Pt' : ('Ins' . $arow['payer_type']);
     receiptDetailLine('', xl('Adjustment'), $payer . ' ' . $arow['memotitle'], 1,
       0 - $arow['adj_amount'], $aTotals);
@@ -805,7 +810,8 @@ function write_form_headers() {
     "FROM ar_activity AS a " .
     "LEFT JOIN list_options AS lo ON lo.list_id = 'adjreason' AND lo.option_id = a.memo " .
     "LEFT JOIN ar_session AS s ON s.session_id = a.session_id WHERE " .
-    "a.pid = '$patient_id' AND a.encounter = '$inv_encounter' AND a.adj_amount != 0 " .
+    "a.pid = '$patient_id' AND a.encounter = '$inv_encounter' AND " .
+    "( a.adj_amount != 0 OR a.pay_amount = 0 ) " .
     "ORDER BY s.check_date, a.sequence_no");
   while ($arow = sqlFetchArray($ares)) {
     if (empty($arow['memotitle'])) $arow['memotitle'] = $arow['memo'];
@@ -833,10 +839,13 @@ function write_form_line($code_type, $code, $id, $date, $description,
   $memo = '';
   if (!empty($GLOBALS['gbl_checkout_line_adjustments'])) {
     for ($i = 0; $i < count($aAdjusts); ++$i) {
-      if ($aAdjusts[$i]['code_type'] == $code_type && $aAdjusts[$i]['code'] == $code && $aAdjusts[$i]['adj_amount'] != 0) {
+      if ($aAdjusts[$i]['code_type'] == $code_type && $aAdjusts[$i]['code'] == $code &&
+        ($aAdjusts[$i]['adj_amount'] != 0 || $aAdjusts[$i]['memotitle'] !== ''))
+      {
         $adjust += $aAdjusts[$i]['adj_amount'];
+        $memo = $aAdjusts[$i]['memotitle'];
         $aAdjusts[$i]['adj_amount'] = 0;
-        $memo = $aAdjusts[$i]['memo'];
+        $aAdjusts[$i]['memotitle'] = '';
       }
     }
   }
@@ -1030,7 +1039,7 @@ if ($_POST['form_save']) {
 
   // Clear any existing nonzero adjustments for this encounter.  Normally
   // there should not be any because checkout should only happen once.
-  sqlStatement("UPDATE ar_activity SET adj_amount = 0 WHERE " .
+  sqlStatement("UPDATE ar_activity SET adj_amount = 0, memo = '' WHERE " .
     "pid = '$form_pid' AND encounter = '$form_encounter' AND " .
     "adj_amount != 0");
 
@@ -1070,10 +1079,10 @@ if ($_POST['form_save']) {
       $adjust = sprintf('%01.2f', $charge + $linetax - $amount);
       ***************************************************************/
       $adjust = 0.00 + trim($line['adjust']);
-      if ($adjust != 0) {
+      $memo = formDataCore($line['memo']);
+      if ($adjust != 0 || $memo !== '') {
         // $memo = xl('Discount');
-        $memo = formDataCore($line['memo']);
-        if (empty($memo)) $memo = formData('form_discount_type');
+        if ($memo === '') $memo = formData('form_discount_type');
         $time = date('Y-m-d H:i:s');
         $query = "INSERT INTO ar_activity ( " .
           "pid, encounter, code_type, code, modifier, payer_type, " .
@@ -1826,8 +1835,8 @@ foreach ($aCopays as $brow) {
 
 // Write any adjustments left in the aAdjusts array.
 foreach ($aAdjusts as $arow) {
-  if ($arow['adj_amount'] == 0) continue;
   $memo = $arow['memotitle'];
+  if ($arow['adj_amount'] == 0 && $memo === '') continue;
   $reference = $arow['reference'];
   // The following removed because check numbers should not be in adjustments.
   /*******************************************************************
