@@ -170,7 +170,8 @@ function ensureLineAmounts($patient_id, $encounter_id, $def_provider_id=0, $set_
     "LEFT JOIN users AS u ON u.id = IF(b.provider_id, b.provider_id, '$def_provider_id') " .
     "WHERE " .
     "b.pid = '$patient_id' AND b.encounter = '$encounter_id' AND b.activity = 1 AND " .
-    "b.fee != 0 AND (b.code_type != 'TAX' OR b.ndc_info = '') " .
+    // "b.fee != 0 AND (b.code_type != 'TAX' OR b.ndc_info = '') " .
+    "(b.code_type != 'TAX' OR b.ndc_info = '') " .
     "ORDER BY u.lname, u.fname, u.id, b.code_type, b.code");
   while ($trow = sqlFetchArray($tres)) {
     if ($trow['code_type'] == 'COPAY') {
@@ -204,7 +205,8 @@ function ensureLineAmounts($patient_id, $encounter_id, $def_provider_id=0, $set_
   // Get charges from drug_sales table and associated taxes.
   $tres = sqlStatement("SELECT s.drug_id, s.fee, s.sale_id " .
     "FROM drug_sales AS s WHERE " .
-    "s.pid = '$patient_id' AND s.encounter = '$encounter_id' AND s.fee != 0");
+    // "s.pid = '$patient_id' AND s.encounter = '$encounter_id' AND s.fee != 0");
+    "s.pid = '$patient_id' AND s.encounter = '$encounter_id'");
   while ($trow = sqlFetchArray($tres)) {
     $codekey = 'PROD:' . $trow['drug_id'];
     ensureItems($invno, $codekey);
