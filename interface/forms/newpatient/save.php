@@ -10,27 +10,21 @@ require_once("$srcdir/sql.inc");
 require_once("$srcdir/encounter.inc");
 require_once("$srcdir/acl.inc");
 require_once("$srcdir/formatting.inc.php");
-
-foreach ($_POST as $k => $var) {
-  if (! is_array($var)) $_POST[$k] = mysql_escape_string($var);
-  // echo "$var\n";
-}
+require_once("$srcdir/formdata.inc.php");
 
 $conn = $GLOBALS['adodb']['db'];
 
-// $date = $_POST["year"]."-".$_POST["month"]."-".$_POST["day"];
-// $onset_date = $_POST["onset_year"]."-".$_POST["onset_month"]."-".$_POST["onset_day"];
-
-$date        = $_POST['form_date'];
-$onset_date  = $_POST['form_onset_date'];
-$sensitivity = $_POST['form_sensitivity'];
-$pc_catid    = $_POST['pc_catid'];
-$facility_id = $_POST['facility_id'];
-$billing_facility = $_POST['billing_facility'];
-$reason      = $_POST['reason'];
-$mode        = $_POST['mode'];
-$referral_source = $_POST['form_referral_source'];
-$shift       = $_POST['form_shift'];
+$date             = formData('form_date');
+$onset_date       = formData('form_onset_date');
+$sensitivity      = formData('form_sensitivity');
+$pc_catid         = formData('pc_catid');
+$facility_id      = formData('facility_id');
+$billing_facility = formData('billing_facility');
+$reason           = formData('reason');
+$mode             = formData('mode');
+$referral_source  = formData('form_referral_source');
+$shift            = formData('form_shift');
+$voucher_number   = formData('form_voucher_number');
 
 if ($GLOBALS['concurrent_layout'])
   $normalurl = "$rootdir/patient_file/encounter/encounter_top.php";
@@ -64,6 +58,7 @@ if ($mode == 'new')
       "sensitivity = '$sensitivity', " .
       "referral_source = '$referral_source', " .
       "shift = '$shift', " .
+      "voucher_number = '$voucher_number', " .
       "pid = '$pid', " .
       "encounter = '$encounter', " .
       "provider_id = '$provider_id'"),
@@ -71,7 +66,7 @@ if ($mode == 'new')
 }
 else if ($mode == 'update')
 {
-  $id = $_POST["id"];
+  $id = formData('id');
   $result = sqlQuery("SELECT encounter, sensitivity FROM form_encounter WHERE id = '$id'");
   if ($result['sensitivity'] && !acl_check('sensitivities', $result['sensitivity'])) {
    die("You are not authorized to see this encounter.");
@@ -89,7 +84,8 @@ else if ($mode == 'update')
     "billing_facility = '$billing_facility', " .
     "sensitivity = '$sensitivity', " .
     "referral_source = '$referral_source', " .
-    "shift = '$shift' " .
+    "shift = '$shift', " .
+    "voucher_number = '$voucher_number' " .
     "WHERE id = '$id'");
 }
 else {

@@ -501,6 +501,7 @@ CREATE TABLE `form_encounter` (
   `referral_source` varchar(31) NOT NULL DEFAULT '',
   `shift` varchar(31) NOT NULL DEFAULT '',
   `billing_facility` int(11) NOT NULL default 0,
+  `voucher_number` varchar(255) NOT NULL DEFAULT '' COMMENT 'also called referral number',
   PRIMARY KEY  (`id`),
   KEY `pid` (`pid`),
   KEY `date` (`date`)

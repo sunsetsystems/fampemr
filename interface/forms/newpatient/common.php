@@ -232,7 +232,7 @@ if ($fres) {
 ?>
     </tr>
 
-    <tr<?php if (!$GLOBALS['gbl_visit_referral_source']) echo " style='visibility:hidden;'"; ?>>
+    <tr<?php if (!$GLOBALS['gbl_visit_referral_source']) echo " style='display:none;'"; ?>>
      <td class='bold' nowrap><?php xl('Referral Source','e'); ?>:</td>
      <td class='text'>
 <?php
@@ -254,11 +254,20 @@ if ($fres) {
      </td>
     </tr>
 
+    <tr>
+     <td class='bold' nowrap><?php echo xl('Voucher Number') . ':'; ?></td>
+     <td class='text' nowrap>
+      <input type='text' size='20' maxlength='255' name='form_voucher_number'
+       value='<?php echo $viewmode ? htmlspecialchars($result['voucher_number'], ENT_QUOTES) : ''; ?>'
+       title='<?php echo xl('Voucher or referral number'); ?>' />
+     </td>
+    </tr>
+
 <?php
   // We will show the shift selector only if the shift list is not empty.
   $tmp = sqlQuery("SELECT COUNT(*) AS count FROM list_options WHERE list_id = 'shift'");
 ?>
-    <tr<?php if (empty($tmp['count'])) echo " style='visibility:hidden;'"; ?>>
+    <tr<?php if (empty($tmp['count'])) echo " style='display:none;'"; ?>>
      <td class='bold' nowrap><?php xl('Shift','e'); ?>:</td>
      <td class='text'>
 <?php
@@ -267,7 +276,7 @@ if ($fres) {
      </td>
     </tr>
 
-    <tr<?php if ($GLOBALS['ippf_specific']) echo " style='visibility:hidden;'"; ?>>
+    <tr<?php if ($GLOBALS['ippf_specific']) echo " style='display:none;'"; ?>>
      <td class='bold' nowrap><?php xl('Onset/hosp. date:','e'); ?></td>
      <td class='text' nowrap>
       <input type='text' size='10' name='form_onset_date' id='form_onset_date'

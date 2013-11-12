@@ -562,3 +562,7 @@ ALTER TABLE form_encounter ADD billing_facility int(11) NOT NULL default 0;
 UPDATE form_encounter SET billing_facility = facility_id;
 #EndIf
 
+#IfMissingColumn form_encounter voucher_number
+ALTER TABLE form_encounter ADD voucher_number varchar(255) NOT NULL DEFAULT '' COMMENT 'also called referral number';
+#EndIf
+
