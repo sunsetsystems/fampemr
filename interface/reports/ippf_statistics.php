@@ -2024,7 +2024,7 @@ if ($_POST['form_submit']) {
         $dispspan = 1;
         $sqltype = $form_by === '102' ? 'MA' : 'IPPF'; // MA or IPPF
         $sqlcode = $display_key;
-        if (substr($display_key, 0, 3) == 'ADM') {
+        if (substr($display_key, 0, 4) == 'ADM:') {
           $sqltype = 'ADM';
           $sqlcode = substr($display_key, 4);
         }

@@ -769,7 +769,7 @@ function write_form_headers() {
   </td>
   <td align='right' style='border-top:1px solid black; padding-top:5pt;'>
    <?php echo generate_select_list('form_discount_type', 'adjreason', '', '',
-    ' ', '', 'discountTypeChanged()'); ?>
+    ' ', '', 'discountTypeChanged();billingChanged();'); ?>
   </td>
   <td colspan='<?php echo 1 + count($taxes); ?>'
    style='border-top:1px solid black; padding-top:5pt;'>
@@ -905,7 +905,7 @@ function write_form_line($code_type, $code, $id, $date, $description,
     echo empty($GLOBALS['discount_by_money']) ? '%' : $GLOBALS['gbl_currency_symbol'];
     echo "</td>\n";
     echo "  <td align='right'>";
-    echo generate_select_list("line[$lino][memo]", 'adjreason', '', '', ' ');
+    echo generate_select_list("line[$lino][memo]", 'adjreason', '', '', ' ', '', 'billingChanged()');
     echo "</td>\n";
   }
 
@@ -1418,19 +1418,40 @@ while ($urow = sqlFetchArray($ures)) {
  }
  ********************************************************************/
 
+ // This computes taxes and extended amount for the specified line, and returns
+ // the extended amount.
  function calcTax(lino) {
    var f = document.forms[0];
    var pfx = 'line[' + lino + ']';
-   var amount = parseFloat(f[pfx + '[charge]'].value);
+   var taxable = parseFloat(f[pfx + '[charge]'].value);
+   var adjust = 0.00;
    if (f[pfx + '[adjust]']) {
-    amount -= parseFloat(f[pfx + '[adjust]'].value);
+    adjust = parseFloat(f[pfx + '[adjust]'].value);
    }
-   var extended = amount;
+   var adjreason = '';
+   if (f[pfx + '[memo]']) {
+    adjreason = f[pfx + '[memo]'].value;
+   }
+   var extended = taxable - adjust;
+   if (true
+<?php
+  // Generate JavaScript that checks if the chosen adjustment type is to be
+  // applied before taxes are computed. option_value 1 indicates that the
+  // "After Taxes" checkbox is checked for an adjustment type.
+  $tmpres = sqlStatement("SELECT option_id FROM list_options WHERE " .
+    "list_id = 'adjreason' AND option_value = 1");
+  while ($tmprow = sqlFetchArray($tmpres)) {
+    echo "    && adjreason != '" . addslashes($tmprow['option_id']) . "'\n";
+  }
+?>
+   ) {
+    taxable -= adjust;
+   }
    var taxnumrates  = f[pfx + '[taxnumrates]'].value;
    var rates = taxnumrates.split(':');
    for (var i = 0; i < rates.length; ++i) {
     if (! f[pfx + '[tax][' + i + ']']) break;
-    var tax = amount * parseFloat(rates[i]);
+    var tax = taxable * parseFloat(rates[i]);
     tax = parseFloat(tax.toFixed(<?php echo $currdecimals ?>));
     if (isNaN(tax)) alert('Tax rate not numeric at line ' + lino);
     f[pfx + '[tax][' + i + ']'].value = tax.toFixed(<?php echo $currdecimals ?>);

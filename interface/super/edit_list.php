@@ -195,7 +195,8 @@ function writeOptionLine($option_id, $title, $seq, $default, $value, $mapping=''
     "onclick='defClicked($opt_line_no)' class='optin'$checked />";
   echo "</td>\n";
 
-  // Tax rates, form names, contraceptive methods and facilities have an additional attribute.
+  // Tax rates, form names, contraceptive methods, adjustment reasons and facilities
+  // have an additional attribute.
   //
   if ($list_id == 'taxrate' || $list_id == 'lbfnames') {
     echo "  <td align='center' class='optcell'>";
@@ -203,7 +204,7 @@ function writeOptionLine($option_id, $title, $seq, $default, $value, $mapping=''
         htmlspecialchars($value, ENT_QUOTES) . "' size='8' maxlength='15' class='optin' />";
     echo "</td>\n";
   }
-  else if ($list_id == 'contrameth') {
+  else if ($list_id == 'contrameth' || $list_id == 'adjreason') {
     $tmp = $value ? " checked" : "";
     echo "  <td align='center' class='optcell'>";
     echo "<input type='checkbox' name='opt[$opt_line_no][value]' value='1' class='optin'$tmp />";
@@ -596,6 +597,8 @@ while ($row = sqlFetchArray($res)) {
   <td><b><?php xl('Rate'   ,'e'); ?></b></td>
 <?php } else if ($list_id == 'contrameth') { ?>
   <td><b><?php xl('Modern','e'); ?></b></td>
+<?php } else if ($list_id == 'adjreason') { ?>
+  <td><b><?php xl('After Taxes','e'); ?></b></td>
 <?php } else if ($list_id == 'warehouse') { ?>
   <td><b><?php xl('Facility','e'); ?></b></td>
 <?php } else if ($list_id == 'lbfnames') { ?>
