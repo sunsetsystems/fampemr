@@ -285,7 +285,7 @@ echo "   </select>\n";
   <td align='center'>
    <select name='form_use_edate'>
     <option value='0'><?php xl('Payment Date','e'); ?></option>
-    <option value='1'<?php if ($form_use_edate) echo ' selected' ?>><?php xl('Invoice Date','e'); ?></option>
+    <option value='1'<?php if ($form_use_edate) echo ' selected' ?>><?php xl('Service Date','e'); ?></option>
    </select>
    &nbsp;<?xl('From:','e')?>
    <input type='text' name='form_from_date' id="form_from_date" size='10' value='<?php echo $form_from_date ?>'
@@ -432,7 +432,7 @@ if (isset($_POST['form_orderby'])) {
     "FROM voids AS v " .
     "JOIN form_encounter AS fe ON fe.pid = v.patient_id AND fe.encounter = v.encounter_id " .
     "LEFT JOIN users AS u ON u.id = v.user_id " .
-    "WHERE v.amount2 != 0";
+    "WHERE ( v.amount1 != 0 OR v.amount2 != 0 )";
   if ($form_use_edate) {
     $query .= " AND fe.date >= '$from_date 00:00:00' AND fe.date <= '$to_date 23:59:59'";
   } else {
