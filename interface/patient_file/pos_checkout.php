@@ -203,21 +203,31 @@ function receiptPaymentLine($paydate, $amount, $description='', $method='') {
   global $aTaxNames;
 
   $amount = sprintf('%01.2f', $amount); // make it negative
+  if ($description == 'Pt') $description = '';
   // Resolve the payment method portion of the memo to display properly.
   if (!empty($method)) {
     $tmp = explode(' ', $method, 2);
     $method = getListTitle('paymethod', $tmp[0]);
-    if (isset($tmp[1])) $method .= ' ' . $tmp[1];
+    if (isset($tmp[1])) {
+      // If the description is not interesting then let it hold the check number
+      // or similar, otherwise append that to the payment method.
+      if ($description == '') {
+        $description = $tmp[1];
+      }
+      else {
+        $method .= ' ' . $tmp[1];
+      }
+    }
   }
   echo " <tr>\n";
   echo "  <td>&nbsp;</td>\n";
   echo "  <td>" . oeFormatShortDate($paydate) . "</td>\n";
   echo "  <td colspan='" .
        ($GLOBALS['gbl_checkout_line_adjustments'] ? 3 : 1) .
-       "' align='left'>$method</td>\n";
+       "' align='left'>" . htmlspecialchars($method) . "</td>\n";
   echo "  <td colspan='" .
        ($GLOBALS['gbl_checkout_line_adjustments'] ? 2 : 1) .
-       "' align='left'>" . xl('Payment') . " $description</td>\n";
+       "' align='left'>" . htmlspecialchars($description) . "</td>\n";
   echo "  <td colspan='" .
        (($GLOBALS['gbl_checkout_line_adjustments'] ? 1 : 1) + count($aTaxNames)) .
        "' align='right'>" . oeFormatMoney($amount) . "</td>\n";
@@ -236,10 +246,12 @@ function generate_receipt($patient_id, $encounter=0) {
 
   // Get the most recent invoice data or that for the specified encounter.
   if ($encounter) {
-    $ferow = sqlQuery("SELECT id, date, encounter, facility_id FROM form_encounter " .
+    $ferow = sqlQuery("SELECT id, date, encounter, facility_id, invoice_refno " .
+      "FROM form_encounter " .
       "WHERE pid = '$patient_id' AND encounter = '$encounter'");
   } else {
-    $ferow = sqlQuery("SELECT id, date, encounter, facility_id FROM form_encounter " .
+    $ferow = sqlQuery("SELECT id, date, encounter, facility_id, invoice_refno " .
+      "FROM form_encounter " .
       "WHERE pid = '$patient_id' " .
       "ORDER BY id DESC LIMIT 1");
   }
@@ -247,17 +259,13 @@ function generate_receipt($patient_id, $encounter=0) {
   $trans_id = $ferow['id'];
   $encounter = $ferow['encounter'];
   $svcdate = substr($ferow['date'], 0, 10);
+  $invoice_refno = $ferow['invoice_refno'];
 
   // Get details for the visit's facility.
   $frow = sqlQuery("SELECT f.* FROM facility AS f " .
     "WHERE f.id = '" . $ferow['facility_id'] . "'");
 
   $patdata = getPatientData($patient_id, 'fname,mname,lname,pubpid,street,city,state,postal_code');
-
-  // Get invoice reference number.
-  $encrow = sqlQuery("SELECT invoice_refno FROM form_encounter WHERE " .
-    "pid = '$patient_id' AND encounter = '$encounter' LIMIT 1");
-  $invoice_refno = $encrow['invoice_refno'];
 
   // Generate $aTaxNames = array of tax names, and $aInvTaxes = array of taxes for this invoice.
   // For a given tax ID and line ID, $aInvTaxes[$taxID][$lineID] = tax amount.
@@ -381,7 +389,7 @@ body, td {
 
 <p><b>
 <?php
-  echo xl("Client Receipt") . '<br />' . dateformat();
+  echo xl("Client Receipt"); // . '<br />' . dateformat();
   if ($invoice_refno) echo " " . xl("for Invoice") . " $invoice_refno";
 ?>
 <br>&nbsp;
@@ -443,16 +451,19 @@ body, td {
 
 <table cellpadding='2' width='95%'>
 <?php if ($details) { ?>
+
+ <!--
  <tr>
   <td colspan='<?php echo (empty($GLOBALS['gbl_checkout_line_adjustments']) ? 5 : 8) + count($aTaxNames); ?>'>
     <b><?php echo xl('Today`s Visit'); ?></b><br />&nbsp;
   </td>
  </tr>
+ -->
 
  <tr>
   <td colspan='<?php echo (empty($GLOBALS['gbl_checkout_line_adjustments']) ? 5 : 8) + count($aTaxNames); ?>'
    style='padding-top:5pt;'>
-    <b><?php echo xl('Charges'); ?></b>
+    <b><?php echo xl('Charges for') . ' ' . oeFormatShortDate($svcdate); ?></b>
   </td>
  </tr>
 
@@ -605,7 +616,7 @@ body, td {
 
  <tr>
   <td>&nbsp;</td>
-  <td><b><?php xl('Date of Service','e'); ?></b></td>
+  <td><b><?php xl('Payment Date','e'); ?></b></td>
   <td colspan="<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 3 : 1; ?>"
    align='left'><b><?php echo xl('Payment Method'); ?></b></td>
   <td colspan="<?php echo $GLOBALS['gbl_checkout_line_adjustments'] ? 2 : 1; ?>"
@@ -637,6 +648,7 @@ body, td {
   // Get other payments.
   $inres = sqlStatement("SELECT " .
     "a.code, a.modifier, a.memo, a.payer_type, a.adj_amount, a.pay_amount, " .
+    "IFNULL(a.post_date, a.post_time) AS post_date, " .
     "s.payer_id, s.reference, s.check_date, s.deposit_date " .
     "FROM ar_activity AS a " .
     "LEFT JOIN ar_session AS s ON s.session_id = a.session_id WHERE " .
@@ -646,8 +658,8 @@ body, td {
   $payer = empty($inrow['payer_type']) ? 'Pt' : ('Ins' . $inrow['payer_type']);
   while ($inrow = sqlFetchArray($inres)) {
     $payments += sprintf('%01.2f', $inrow['pay_amount']);
-    receiptPaymentLine($svcdate, $inrow['pay_amount'],
-      $payer . ' ' . $inrow['reference'], $inrow['memo']);
+    receiptPaymentLine(substr($inrow['post_date'], 0, 10), $inrow['pay_amount'],
+      trim($payer . ' ' . $inrow['reference']), $inrow['memo']);
   }
 ?>
 
@@ -730,10 +742,14 @@ body, td {
 $form_headers_written = false;
 function write_form_headers() {
   global $form_headers_written, $patdata, $patient_id, $inv_encounter, $aAdjusts;
-  global $taxes;
+  global $taxes, $encounter_date;
 
   if ($form_headers_written) return;
   $form_headers_written = true;
+
+  $ferow = sqlQuery("SELECT date FROM form_encounter " .
+    "WHERE pid = '$patient_id' AND encounter = '$inv_encounter'");
+  $encounter_date = substr($ferow['date'], 0, 10);
 ?>
  <tr>
   <td colspan='<?php echo ($GLOBALS['gbl_checkout_line_adjustments'] ? 8 : 4) + count($taxes); ?>' align='center'>
@@ -824,7 +840,7 @@ function write_form_headers() {
 $totalchg = 0; // totals charges after adjustments
 function write_form_line($code_type, $code, $id, $date, $description,
   $amount, $units, $taxrates) {
-  global $lino, $totalchg, $aAdjusts, $taxes;
+  global $lino, $totalchg, $aAdjusts, $taxes, $encounter_date;
 
   // Write heading rows if that is not already done.
   write_form_headers();
@@ -865,7 +881,7 @@ function write_form_line($code_type, $code, $id, $date, $description,
   }
 
   echo " <tr>\n";
-  echo "  <td>" . oeFormatShortDate($date);
+  echo "  <td>" . oeFormatShortDate($encounter_date);
   echo "<input type='hidden' name='line[$lino][code_type]' value='$code_type'>";
   echo "<input type='hidden' name='line[$lino][code]' value='$code'>";
   echo "<input type='hidden' name='line[$lino][id]' value='$id'>";
@@ -1679,6 +1695,9 @@ $inv_provider  = 0;
 $inv_payer     = 0;
 $gcac_related_visit = false;
 $gcac_service_provided = false;
+
+// This is set by write_form_headers() when the encounter is known.
+$encounter_date = '';
 
 // This to save copays from the billing table.
 $aCopays = array();
