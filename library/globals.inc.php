@@ -847,6 +847,13 @@ $GLOBALS_METADATA = array(
       xl('Accounting transactions export to CSV')
     ),
 
+    'gbl_menu_projects' => array(
+      xl('Restricted Projects Reporting'),
+      'bool',                           // data type
+      '0',                              // default
+      xl('For IPPF Belize and maybe others')
+    ),
+
   ),
 
   // Miscellaneous Tab

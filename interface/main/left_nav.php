@@ -993,7 +993,7 @@ if (!empty($reg)) {
           <?php genPopLink(xl('Pay Methods'),'methods_by_invoice.php'); ?>
           <?php genPopLink(xl('Collections'),'collections_report.php'); ?>
           <?php if ($GLOBALS['gbl_menu_acct_trans']) genPopLink(xl('Acct Export'),'export_accounting_transactions.php'); ?>
-          <?php genPopLink(xl('Projects'),'restricted_projects_report.php'); ?>
+          <?php if ($GLOBALS['gbl_menu_projects']) genPopLink(xl('Projects'),'restricted_projects_report.php'); ?>
         </ul>
       </li>
 <?php } ?>

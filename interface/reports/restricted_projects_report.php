@@ -70,14 +70,6 @@ function tblEndRow() {
   }
 }
 
-function endEncounter($enctotal) {
-  global $tblNewRow;
-  if (!$tblNewRow) {
-    tblCell(oeFormatMoney($enctotal), false, true);
-    tblEndRow();
-  }
-}
-
 // Compute age in years given a DOB and "as of" date.
 //
 function getAge($dob, $asof='') {
@@ -261,23 +253,15 @@ function doinvopen(ptid,encid) {
 } // end not export
 
 if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
-  $enctotal = 0;
   $last_encounter = 0;
-  $last_billing_id = 0;
 
   // Get service items.
   $query = "SELECT " .
     "fe.pid, fe.encounter, fe.date, fe.invoice_refno, fe.voucher_number, " .
     "pd.pubpid, pd.usertext6, pd.usertext8, pd.DOB, lo.title AS sex, " .
-    "b.id, b.code_text, b.units, b.fee, " .
     "opc.pc_catname " .
     "FROM form_encounter AS fe " .
     "JOIN patient_data AS pd ON pd.pid = fe.pid " .
-    "JOIN billing AS b ON b.pid = fe.pid AND b.encounter = fe.encounter AND b.activity = 1 " .
-    "JOIN ar_activity AS a ON a.pid = fe.pid AND a.encounter = fe.encounter AND " .
-    "  ( a.pay_amount = 0 OR a.adj_amount != 0 ) AND " .
-    "  ( a.code_type = '' OR ( a.code_type = b.code_type AND a.code = b.code ) ) AND " .
-    "  a.memo = '" . $form_adjreason . "' " .
     "LEFT JOIN openemr_postcalendar_categories AS opc ON opc.pc_catid = fe.pc_catid " .
     "LEFT JOIN list_options AS lo ON lo.list_id = 'sex' AND lo.option_id = pd.sex " .
     "WHERE fe.date >= '$form_from_date 00:00:00' AND fe.date <= '$form_to_date 23:59:59'";
@@ -285,34 +269,12 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
   if ($form_facility) {
     $query .= " AND fe.facility_id = '$form_facility'";
   }
-  $query .= " ORDER BY fe.date, pd.pubpid, fe.pid, fe.encounter, b.code_text, b.id";
+  $query .= " ORDER BY fe.date, pd.pubpid, fe.pid, fe.encounter";
 
   $res = sqlStatement($query);
   while ($row = sqlFetchArray($res)) {
-    if ($row['id'] == $last_billing_id) continue;
-    $isRepeated = $row['encounter'] == $last_encounter;
-    if ($isRepeated) {
-      // Write empty last cell for previous row and terminate it.
-      tblCell('');
-      tblEndRow();
-    }
-    else {
-      // If there was a previous row, write its invoice total and terminate it.
-      endEncounter($enctotal);
-      $enctotal = 0;
-    }
-
-    // This gets taxes that are associated directly with this service item.
-    $taxes = getItemTaxes($row['pid'], $row['encounter'], 'S:' . $row['id']);
-
-    tblStartRow();
-    tblCell(oeFormatShortDate(substr($row['date'], 0, 10)), $isRepeated);
-    tblCell($row['pubpid'        ], $isRepeated);
-    tblCell($row['pc_catname'    ], $isRepeated);
-    tblCell($row['usertext6'     ], $isRepeated);
-    tblCell($row['voucher_number'], $isRepeated);
-    tblCell($row['usertext8'     ], $isRepeated);
-    tblCell($row['sex'           ], $isRepeated);
+    $item_count = 0; // number of line items displayed for this invoice
+    $enctotal = 0;   // total dollars of selected items for this invoice
 
     $age = getAge(fixDate($row['DOB']), $row['date']);
     if      ($age < 10) $agetext = '0-9';
@@ -324,20 +286,106 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
     else if ($age < 40) $agetext = '35-39';
     else if ($age < 45) $agetext = '40-44';
     else                $agetext = '45+';
-    tblCell($agetext, $isRepeated);
 
-    tblCell($row['units'], false, true);
-    tblCell($row['code_text']);
-    tblCell($row['invoice_refno'], $isRepeated);
-    tblCell(oeFormatMoney($row['fee'] + $taxes), false, true);
+    // Get service items.
+    $query = "SELECT " .
+      "b.id, b.code_text, b.units, b.fee " .
+      "FROM billing AS b " .
+      "JOIN ar_activity AS a ON a.pid = b.pid AND a.encounter = b.encounter AND " .
+      "  ( a.pay_amount = 0 OR a.adj_amount != 0 ) AND " .
+      "  ( a.code_type = '' OR ( a.code_type = b.code_type AND a.code = b.code ) ) AND " .
+      "  a.memo = '" . $form_adjreason . "' WHERE " .
+      "b.pid = '" . $row['pid'] . "' AND b.encounter = '" . $row['encounter'] .
+      "' AND b.activity = 1 " .
+      "ORDER BY b.code_text, b.id";
 
-    $enctotal += $row['fee'] + $taxes;
+    $last_billing_id = 0;
+    $bres = sqlStatement($query);
 
-    $last_encounter  = 0 + $row['encounter'];
-    $last_billing_id = 0 + $row['id'];
+    while ($brow = sqlFetchArray($bres)) {
+      if ($brow['id'] == $last_billing_id) continue;
+
+      if ($last_billing_id) {
+        // Write empty last cell for previous row and terminate it.
+        tblCell('');
+        tblEndRow();
+      }
+
+      // This gets taxes that are associated directly with this service item.
+      $taxes = getItemTaxes($row['pid'], $row['encounter'], 'S:' . $brow['id']);
+
+      tblStartRow();
+      tblCell(oeFormatShortDate(substr($row['date'], 0, 10)), $item_count);
+      tblCell($row['pubpid'        ], $item_count);
+      tblCell($row['pc_catname'    ], $item_count);
+      tblCell($row['usertext6'     ], $item_count);
+      tblCell($row['voucher_number'], $item_count);
+      tblCell($row['usertext8'     ], $item_count);
+      tblCell($row['sex'           ], $item_count);
+      tblCell($agetext              , $item_count);
+      tblCell($brow['units'], false, true);
+      tblCell($brow['code_text']);
+      tblCell($row['invoice_refno'], $item_count);
+      tblCell(oeFormatMoney($brow['fee'] + $taxes), false, true);
+
+      $enctotal += $brow['fee'] + $taxes;
+      $last_encounter  = 0 + $row['encounter'];
+      $last_billing_id = 0 + $brow['id'];
+      ++$item_count;
+    }
+
+    // Products.
+    $query = "SELECT " .
+      "s.fee, s.quantity, s.sale_id, d.name " .
+      "FROM drug_sales AS s " .
+      "JOIN ar_activity AS a ON a.pid = s.pid AND a.encounter = s.encounter AND " .
+      "  ( a.pay_amount = 0 OR a.adj_amount != 0 ) AND " .
+      "  ( a.code_type = '' OR ( a.code_type = 'PROD' AND a.code = s.drug_id ) ) AND " .
+      "  a.memo = '" . $form_adjreason . "' " .
+      "LEFT JOIN drugs AS d ON d.drug_id = s.drug_id " .
+      "WHERE s.pid = '" . $row['pid'] . "' AND s.encounter = '" . $row['encounter'] . "' " .
+      "ORDER BY d.name, s.sale_id";
+
+    $last_sale_id = 0;
+    $sres = sqlStatement($query);
+
+    while ($srow = sqlFetchArray($sres)) {
+      if ($srow['sale_id'] == $last_sale_id) continue;
+
+      if ($last_sale_id) {
+        // Write empty last cell for previous row and terminate it.
+        tblCell('');
+        tblEndRow();
+      }
+
+      // This gets taxes that are associated directly with this service item.
+      $taxes = getItemTaxes($row['pid'], $row['encounter'], 'P:' . $srow['sale_id']);
+
+      tblStartRow();
+      tblCell(oeFormatShortDate(substr($row['date'], 0, 10)), $item_count);
+      tblCell($row['pubpid'        ], $item_count);
+      tblCell($row['pc_catname'    ], $item_count);
+      tblCell($row['usertext6'     ], $item_count);
+      tblCell($row['voucher_number'], $item_count);
+      tblCell($row['usertext8'     ], $item_count);
+      tblCell($row['sex'           ], $item_count);
+      tblCell($agetext              , $item_count);
+      tblCell($srow['quantity'], false, true);
+      tblCell($srow['name']);
+      tblCell($row['invoice_refno'], $item_count);
+      tblCell(oeFormatMoney($srow['fee'] + $taxes), false, true);
+
+      $enctotal += $srow['fee'] + $taxes;
+      $last_encounter  = 0 + $row['encounter'];
+      $last_sale_id = 0 + $srow['sale_id'];
+      ++$item_count;
+    }
+
+    if ($item_count) {
+      tblCell(oeFormatMoney($enctotal), false, true);
+      tblEndRow();
+    }
   }
-
-  endEncounter($enctotal);
 
 } // End refresh or export
 
