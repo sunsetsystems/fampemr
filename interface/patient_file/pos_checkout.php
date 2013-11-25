@@ -408,13 +408,13 @@ body, td {
   $row = sqlQuery("SELECT SUM(pay_amount) AS payments, " .
     "SUM(adj_amount) AS adjustments FROM ar_activity WHERE " .
     "pid = '$patient_id' AND encounter = '$encounter'");
-  $head_charges -= $row['adjustments'];
+  $head_adjustments = $row['adjustments'];
   $head_payments = $row['payments'];
   $row = sqlQuery("SELECT SUM(fee) AS amount FROM billing WHERE " .
     "pid = '$patient_id' AND encounter = '$encounter' AND activity = 1 AND " .
     "code_type = 'COPAY'");
   $head_payments -= $row['amount'];
-  $head_endbal = $head_begbal + $head_charges - $head_payments;
+  $head_endbal = $head_begbal + $head_charges - $head_adjustments - $head_payments;
 ?>
 <table width='95%'>
  <tr>
@@ -435,6 +435,10 @@ body, td {
     <tr>
      <td><?php xl('Total Visit Charges','e'); ?>&nbsp;&nbsp;&nbsp;&nbsp;</td>
      <td align='right'><?php echo oeFormatMoney($head_charges); ?></td>
+    </tr>
+    <tr>
+     <td><?php xl('Adjustments','e'); ?>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+     <td align='right'><?php echo oeFormatMoney($head_adjustments); ?></td>
     </tr>
     <tr>
      <td><?php xl('Payments','e'); ?>&nbsp;&nbsp;&nbsp;&nbsp;</td>
@@ -679,15 +683,19 @@ body, td {
 </table>
 </center>
 
-<p>
 <?php
   // The user-customizable note.
   if (!empty($GLOBALS['gbl_checkout_receipt_note'])) {
+    echo "<p>";
     echo str_repeat('*', 80) . '<br />';
     echo '&nbsp;&nbsp;' . htmlspecialchars($GLOBALS['gbl_checkout_receipt_note']) . '<br />';
     echo str_repeat('*', 80) . '<br />';
+    echo "</p>";
   }
 ?>
+
+<p>
+<?php echo xl("Printed on") . ' ' . dateformat(); ?>
 </p>
 
 <div id='hideonprint'>
