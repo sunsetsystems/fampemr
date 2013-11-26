@@ -277,6 +277,10 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
     $enctotal = 0;   // total dollars of selected items for this invoice
 
     $age = getAge(fixDate($row['DOB']), $row['date']);
+
+    // We were originally to show age category as computed below, but
+    // this was changed to just show age in years.
+    /*****************************************************************
     if      ($age < 10) $agetext = '0-9';
     else if ($age < 15) $agetext = '10-14';
     else if ($age < 20) $agetext = '15-19';
@@ -286,6 +290,7 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
     else if ($age < 40) $agetext = '35-39';
     else if ($age < 45) $agetext = '40-44';
     else                $agetext = '45+';
+    *****************************************************************/
 
     // Get service items.
     $query = "SELECT " .
@@ -322,7 +327,7 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
       tblCell($row['voucher_number'], $item_count);
       tblCell($row['usertext8'     ], $item_count);
       tblCell($row['sex'           ], $item_count);
-      tblCell($agetext              , $item_count);
+      tblCell($age, $item_count, true);
       tblCell($brow['units'], false, true);
       tblCell($brow['code_text']);
       tblCell($row['invoice_refno'], $item_count);
@@ -369,7 +374,7 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
       tblCell($row['voucher_number'], $item_count);
       tblCell($row['usertext8'     ], $item_count);
       tblCell($row['sex'           ], $item_count);
-      tblCell($agetext              , $item_count);
+      tblCell($age, $item_count, true);
       tblCell($srow['quantity'], false, true);
       tblCell($srow['name']);
       tblCell($row['invoice_refno'], $item_count);
