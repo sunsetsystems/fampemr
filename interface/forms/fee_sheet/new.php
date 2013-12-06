@@ -76,6 +76,20 @@ function getAge($dob, $asof='') {
   return $age;
 }
 
+// Compute a current checksum of Fee Sheet data from the database.
+//
+function visitChecksum($pid, $encounter) {
+  $rowb = sqlQuery("SELECT BIT_XOR(CRC32(CONCAT_WS(',', " .
+    "id, code, modifier, units, fee, authorized, provider_id, ndc_info, justify, billed" .
+    "))) AS checksum FROM billing WHERE " .
+    "pid = '$pid' AND encounter = '$encounter' AND activity = 1");
+  $rowp = sqlQuery("SELECT BIT_XOR(CRC32(CONCAT_WS(',', " .
+    "sale_id, inventory_id, prescription_id, quantity, fee, sale_date, billed" .
+    "))) AS checksum FROM drug_sales WHERE " .
+    "pid = '$pid' AND encounter = '$encounter'");
+  return (0 + $rowb['checksum']) ^ (0 + $rowp['checksum']);
+}
+
 function checkRelatedForContraception($related_code) {
   global $line_contra_code, $line_contra_cyp, $line_contra_methtype;
 
@@ -560,7 +574,14 @@ $visit_date = substr($visit_row['date'], 0, 10);
 $match_services_to_products = $GLOBALS['ippf_specific'] &&
   !empty($visit_row['extra_validation']);
 
-if ($_POST['bn_save'] || $_POST['bn_save_close']) {
+$current_checksum = visitChecksum($pid, $encounter);
+if (isset($_POST['form_checksum'])) {
+  if ($_POST['form_checksum'] != $current_checksum) {
+    $alertmsg = xl('Save rejected because someone else has changed this visit. Please cancel this page and try again.');
+  }
+}
+
+if (!$alertmsg && ($_POST['bn_save'] || $_POST['bn_save_close'])) {
   // Check for insufficient product inventory levels.
   $prod = $_POST['prod'];
   $insufficient = 0;
@@ -1692,6 +1713,7 @@ if (true) {
 &nbsp;
 <?php } ?>
 <input type='hidden' name='form_has_charges' value='<?php echo $hasCharges ? 1 : 0; ?>' />
+<input type='hidden' name='form_checksum' value='<?php echo $current_checksum; ?>' />
 
 <input type='button' value='<?php xl('Cancel','e');?>'
  onclick="top.restoreSession();location='<?php echo "$rootdir/patient_file/encounter/$returnurl" ?>'" />
