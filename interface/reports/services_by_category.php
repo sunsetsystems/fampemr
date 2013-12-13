@@ -18,6 +18,32 @@ function bucks($amount) {
   return oeFormatMoney($amount);
 }
 
+// Given a numeric code type ID, return its alpha type string.
+//
+function codeTypeFromID($id) {
+  global $code_types;
+  foreach ($code_types as $key => $value) {
+    if ($value['id'] == $id) return $key;
+  }
+  return ''; // should not happen
+}
+
+// Get array of code types that relate to or from other codes.
+// This is used in the heading line.
+//
+$ctarr = array();
+$ctres = sqlStatement("SELECT code_type, related_code FROM codes WHERE " .
+  "related_code != '' AND active = 1");
+while ($ctrow = sqlFetchArray($ctres)) {
+  $ctarr[codeTypeFromID($ctrow['code_type'])] = 1;
+  $arel = explode(';', $ctrow['related_code']);
+  foreach ($arel as $tmp) {
+    list($reltype, $dummy) = explode(':', $tmp);
+    $ctarr[$reltype] = 1;
+  }
+}
+ksort($ctarr);
+
 $filter = $_REQUEST['filter'] + 0;
 $where = "c.active = 1";
 if ($filter) $where .= " AND c.code_type = '$filter'";
@@ -96,7 +122,9 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
     echo '"Mod",';
     echo '"Units",';
     echo '"Description"';
-    if (related_codes_are_used()) echo ',"Related"';
+    foreach ($ctarr as $ctkey => $dummy) {
+      echo ',"' . addslashes(xl('Related') . ' ' . $ctkey) . '"';
+    }
     while ($prow = sqlFetchArray($pres)) {
       echo ',"' . xl_list_label($prow['title']) . '"';
     }
@@ -114,10 +142,10 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
    <th class='bold'><?php xl('Mod'        ,'e'); ?></th>
    <th class='bold'><?php xl('Units'      ,'e'); ?></th>
    <th class='bold'><?php xl('Description','e'); ?></th>
-<?php if (related_codes_are_used()) { ?>
-   <th class='bold'><?php xl('Related'    ,'e'); ?></th>
-<?php } ?>
 <?php
+    foreach ($ctarr as $ctkey => $dummy) {
+      echo "   <th class='bold' align='right' nowrap>" . htmlspecialchars(xl('Related') . " $ctkey") . "</th>\n";
+    }
     while ($prow = sqlFetchArray($pres)) {
       echo "   <th class='bold' align='right' nowrap>" . xl_list_label($prow['title']) . "</th>\n";
     }
@@ -145,11 +173,7 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
       ++$irow;
     }
 
-    foreach ($code_types as $key => $value) {
-      if ($value['id'] == $row['code_type']) {
-        break;
-      }
-    }
+    $key = codeTypeFromID($row['code_type']);
 
     // This section fills in the array of related codes, which also includes
     // codes that relate to this one.
@@ -194,14 +218,18 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
       echo '"' . $row['modifier']         . '",';
       echo '"' . $row['units']            . '",';
       echo '"' . $row['code_text']        . '"';
-      if (related_codes_are_used()) {
-        echo ',"';
+
+      foreach ($ctarr as $ctkey => $dummy) {
+        $tmp = '';
         foreach ($relarr as $rkey => $rval) {
-          if ($rkey) echo ',';
-          echo $rval[0] . ':' . $rval[1];
+          if ($rval[0] == $ctkey) {
+            if ($tmp) $tmp .= ', ';
+            $tmp .= $rval[1];
+          }
         }
-        echo '"';
+        echo ',"' . addslashes($tmp) . '"';
       }
+
       while ($prow = sqlFetchArray($pres)) {
         echo ',"' . bucks($prow['pr_price']) . '"';
       }
@@ -217,13 +245,18 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
       echo "   <td class='text'>" . $row['modifier'] . "</td>\n";
       echo "   <td class='text'>" . $row['units'] . "</td>\n";
       echo "   <td class='text'>" . $row['code_text'] . "</td>\n";
-      if (related_codes_are_used()) {
-        echo "   <td class='text'>";
+
+      foreach ($ctarr as $ctkey => $dummy) {
+        $tmp = '';
         foreach ($relarr as $rkey => $rval) {
-          echo $rval[0] . ':' . $rval[1] . ' ' . $rval[2] . '<br />';
+          if ($rval[0] == $ctkey) {
+            if ($tmp) $tmp .= ', ';
+            $tmp .= $rval[1] . ' ' . $rval[2];
+          }
         }
-        echo "</td>\n";
+        echo "   <td class='text'>" . ($tmp ? htmlspecialchars($tmp) : '&nbsp;') . "</td>\n";
       }
+
       while ($prow = sqlFetchArray($pres)) {
         echo "   <td class='text' align='right'>" . bucks($prow['pr_price']) . "</td>\n";
       }
