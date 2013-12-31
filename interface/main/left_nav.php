@@ -1,5 +1,5 @@
 <?php
- // Copyright (C) 2006-2010 Rod Roark <rod@sunsetsystems.com>
+ // Copyright (C) 2006-2013 Rod Roark <rod@sunsetsystems.com>
  //
  // This program is free software; you can redistribute it and/or
  // modify it under the terms of the GNU General Public License
@@ -940,7 +940,8 @@ if (!empty($reg)) {
       <?php if (acl_check('admin', 'acl'      )) genMiscLink('RTop','adm','0',xl('ACL'),'usergroup/adminacl.php'); ?>
       <?php if (acl_check('admin', 'super'    )) genMiscLink('RTop','adm','0',xl('Files'),'super/manage_site_files.php'); ?>
       <?php if (acl_check('admin', 'super'    )) genMiscLink('RTop','adm','0',xl('Backup'),'main/backup.php'); ?>
-      <?php if (acl_check('admin', 'super') && !empty($GLOBALS['code_types']['IPPF'])) genMiscLink('RTop','adm','0',xl('Export'),'main/ippf_export.php'); ?>
+      <?php if (acl_check('admin', 'super') && (!empty($GLOBALS['code_types']['IPPF']) || !empty($GLOBALS['code_types']['IPPF2'])))
+        genMiscLink('RTop','adm','0',xl('Export'),'main/ippf_export.php'); ?>
       <li><span><?php xl('Other','e') ?></span>
         <ul>
           <?php if (acl_check('admin', 'language')) genMiscLink('RTop','adm','0',xl('Language'),'language/language.php'); ?>
@@ -967,7 +968,7 @@ if (!empty($reg)) {
           <?php if (!$GLOBALS['disable_calendar']) genPopLink(xl('Appointments'),'appointments_report.php'); ?>
           <?php genPopLink(xl('Encounters'),'encounters_report.php'); ?>
           <?php if (!$GLOBALS['disable_calendar']) genPopLink(xl('Appt-Enc'),'appt_encounter_report.php'); ?>
-<?php if (empty($GLOBALS['code_types']['IPPF'])) { ?>
+<?php if (empty($GLOBALS['code_types']['IPPF']) && empty($GLOBALS['code_types']['IPPF2'])) { ?>
           <?php genPopLink(xl('Superbill'),'custom_report_range.php'); ?>
 <?php } ?>
           <?php if (!$GLOBALS['disable_chart_tracker']) genPopLink(xl('Chart Activity'),'chart_location_activity.php'); ?>
@@ -1024,12 +1025,19 @@ if (!empty($reg)) {
         </ul>
       </li>
 <?php } ?>
-<?php if (!empty($GLOBALS['code_types']['IPPF'])) { ?>
+<?php if (!empty($GLOBALS['code_types']['IPPF']) || !empty($GLOBALS['code_types']['IPPF2'])) { ?>
       <li><span><?php xl('Statistics','e') ?></span>
         <ul>
-          <?php if ($GLOBALS['gbl_menu_stats_ippf' ]) genPopLink(xl('IPPF Stats'),'ippf_statistics.php?t=i'); ?>
-          <?php if ($GLOBALS['gbl_menu_stats_gcac' ]) genPopLink(xl('GCAC Stats'),'ippf_statistics.php?t=g'); ?>
-          <?php if ($GLOBALS['gbl_menu_stats_ma'   ]) genPopLink(xl('MA Stats'),'ippf_statistics.php?t=m'); ?>
+<?php if (!empty($GLOBALS['code_types']['IPPF2'])) { ?>
+          <?php if ($GLOBALS['gbl_menu_stats_ippf' ]) genPopLink(xl('IPPF Stats'),'ippf_statistics_2.php?t=i'); ?>
+          <?php if ($GLOBALS['gbl_menu_stats_gcac' ]) genPopLink(xl('GCAC Stats'),'ippf_statistics_2.php?t=g'); ?>
+          <?php if ($GLOBALS['gbl_menu_stats_ma'   ]) genPopLink(xl('MA Stats'  ),'ippf_statistics_2.php?t=m'); ?>
+<?php } ?>
+<?php if (!empty($GLOBALS['code_types']['IPPF'])) { ?>
+          <?php if ($GLOBALS['gbl_menu_stats_ippf' ]) genPopLink(xl('Legacy IPPF Stats'),'ippf_statistics.php?t=i'); ?>
+          <?php if ($GLOBALS['gbl_menu_stats_gcac' ]) genPopLink(xl('Legacy GCAC Stats'),'ippf_statistics.php?t=g'); ?>
+          <?php if ($GLOBALS['gbl_menu_stats_ma'   ]) genPopLink(xl('Legacy MA Stats'  ),'ippf_statistics.php?t=m'); ?>
+<?php } ?>
           <?php if ($GLOBALS['gbl_menu_stats_cyp'  ]) genPopLink(xl('CYP'),'ippf_cyp_report.php'); ?>
           <?php if ($GLOBALS['gbl_menu_stats_daily']) genPopLink(xl('Daily Record'),'ippf_daily.php'); ?>
           <?php if ($GLOBALS['gbl_menu_stats_c3'   ]) genPopLink(xl('C3'),'ippf_c3.php'); ?>
