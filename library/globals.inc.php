@@ -380,8 +380,10 @@ $GLOBALS_METADATA = array(
       array(
         '0' => xl('Not applicable'),
         '1' => xl('Simplified; Contraceptive Start Date on Tally Sheet'),
+        /*************************************************************
         '2' => xl('Contraception Form; New Users to IPPF/Association'),
-        '3' => xl('Contraception Form; Acceptors New to Modern Contraception and New Users to IPPF/Association'),
+        *************************************************************/
+        '3' => xl('Contraception Form; Acceptors New to Modern Contraception'),
       ),
       '1',                              // default
       xl('Applicable only for family planning clinics')

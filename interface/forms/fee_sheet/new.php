@@ -18,6 +18,10 @@ require_once("$srcdir/options.inc.php");
 require_once("$srcdir/calendar_events.inc.php");
 require_once("$srcdir/classes/Prescription.class.php");
 
+// For now we want this script to handle both old and new IPPF frameworks, so
+// this flag will serve to indicate if the new one is in effect.
+$USING_IPPF2 = isset($code_types['IPPF2']);
+
 // IPPF doesn't want any payments to be made or displayed in the Fee Sheet,
 // but we'll use this switch and keep the code in case someone wants it.
 $ALLOW_COPAYS = false;
@@ -90,13 +94,37 @@ function visitChecksum($pid, $encounter) {
   return (0 + $rowb['checksum']) ^ (0 + $rowp['checksum']);
 }
 
-function checkRelatedForContraception($related_code) {
+function checkRelatedForContraception($related_code, $is_initial_consult=false) {
   global $line_contra_code, $line_contra_cyp, $line_contra_methtype;
 
   $line_contra_code     = '';
   $line_contra_cyp      = 0;
   $line_contra_methtype = 0; // 0 = None, 1 = Not initial, 2 = Initial consult
 
+  // This is for the new IPPF framework.
+  if ($GLOBALS['USING_IPPF2']) {
+    if (!empty($related_code)) {
+      $relcodes = explode(';', $related_code);
+      foreach ($relcodes as $relstring) {
+        if ($relstring === '') continue;
+        list($reltype, $relcode) = explode(':', $relstring);
+        if ($reltype !== 'IPPFCM') continue;
+        $methtype = $is_initial_consult ? 2 : 1;
+        $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
+          "code_type = '32' AND code = '$relcode' LIMIT 1");
+        $cyp = 0 + $tmprow['cyp_factor'];
+        if ($cyp > $line_contra_cyp) {
+          $line_contra_cyp      = $cyp;
+          // Note this is an IPPFCM code, not an IPPF2 code.
+          $line_contra_code     = $relcode;
+          $line_contra_methtype = $methtype;
+        }
+      }
+    }
+    return;
+  }
+
+  // The rest is to support the legacy IPPF framework.
   if (!empty($related_code)) {
     $relcodes = explode(';', $related_code);
     foreach ($relcodes as $relstring) {
@@ -206,10 +234,10 @@ function echoLine($lino, $codetype, $code, $modifier, $ndc_info='',
   // the option is chosen to use or auto-generate Contraception forms.
   // It adds contraceptive method and effectiveness to relevant lines.
   if ($GLOBALS['ippf_specific'] && $GLOBALS['gbl_new_acceptor_policy'] && $codetype == 'MA') {
-    $codesrow = sqlQuery("SELECT related_code FROM codes WHERE " .
+    $codesrow = sqlQuery("SELECT related_code, cyp_factor FROM codes WHERE " .
       "code_type = '" . $code_types[$codetype]['id'] .
       "' AND code = '$code' LIMIT 1");
-    checkRelatedForContraception($codesrow['related_code']);
+    checkRelatedForContraception($codesrow['related_code'], $codesrow['cyp_factor']);
     if ($line_contra_code) {
       echo "<input type='hidden' name='bill[$lino][method]' value='$line_contra_code' />";
       echo "<input type='hidden' name='bill[$lino][cyp]' value='$line_contra_cyp' />";
@@ -850,7 +878,7 @@ if (!$alertmsg && ($_POST['bn_save'] || $_POST['bn_save_close'])) {
         addForm($encounter, 'Contraception', $newid, 'LBFccicon', $pid, $userauthorized);
       }
     }
-    else if (empty($csrow) || $csrow['field_value'] != $ippfconmeth) {
+    else if (empty($csrow) || $csrow['field_value'] != "IPPFCM:$ippfconmeth") {
       // Contraceptive method does not match what is in an existing Contraception
       // form for this visit, or there is no such form.  Open the form.
       formJump("{$GLOBALS['rootdir']}/patient_file/encounter/view_form.php" .
@@ -1042,11 +1070,19 @@ function validate(f) {
     max_contra_code = tmp_meth;
    }
 <?php if ($patient_male) { ?>
+<?php if ($GLOBALS['USING_IPPF2']) { ?>
+   var male_compatible_method = (
+    // TBD: Fix hard coded dependency on IPPFCM codes here.
+    tmp_meth == '445' || // male condoms
+    tmp_meth == '457');  // male vasectomy
+<?php } else { ?>
    var tmp = tmp_meth.substring(0, 6);
-   if (tmp != '112141' // male condoms
-    && tmp != '122182' // male vasectomy
-    && tmp != '141200' // fp general counseling
-   ) {
+   var male_compatible_method = (
+    tmp == '112141' ||   // male condoms
+    tmp == '122182' ||   // male vasectomy
+    tmp == '141200');    // fp general counseling
+<?php } // end legacy framework ?>
+   if (!male_compatible_method) {
     if (!confirm('<?php echo xl('Warning: Contraceptive method is not compatible with a male patient.'); ?>'))
      return false;
    }
@@ -1057,7 +1093,10 @@ function validate(f) {
 <?php } // end if improper age ?>
 <?php if ($match_services_to_products) { ?>
    // Nonsurgical methods should normally include a corresponding product.
-   if (tmp_meth.substring(0, 2) != '12') {
+   // This takes advantage of the fact that only nonsurgical methods have CYP
+   // less than 10, in both the old and new frameworks.
+   if (tmp_cyp < 10.0) {
+   // Was: if (tmp_meth.substring(0, 2) != '12') {
     var got_prod = false;
     for (var plino = 1; f['prod['+plino+'][drug_id]']; ++plino) {
      var ppfx = 'prod[' + plino + ']';
@@ -1617,7 +1656,8 @@ if ($contraception_code && !$isBilled) {
       $date1 = substr($visit_row['date'], 0, 10);
       $ask_new_user = false;
       // If surgical
-      if (preg_match('/^12/', $contraception_code)) {
+      // Was: if (preg_match('/^12/', $contraception_code)) {
+      if ($contraception_cyp >= 10.0) {
         // Identify the method with the IPPF code for the corresponding surgical procedure.
         $ask_new_user = true;
       }

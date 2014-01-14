@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2008-2013 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2008-2014 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -48,7 +48,6 @@ if ($report_type == 'm') {
     102 => xl('Specific Service'),
     6   => xl('Contraceptive Method'),        // reactivated 2/2012 same as in ippf report
     105 => xl('Contraceptive Products'),      // new on 2/2012
-    // 104 => xl('Specific Contraceptive Service');
     17  => xl('Clients who had a visit'),
     9   => xl('Outbound Internal Referrals'),
     10  => xl('Outbound External Referrals'),
@@ -64,7 +63,6 @@ if ($report_type == 'm') {
     7 => xl('Unique Returning Clients'),
     6 => xl('Acceptors New to Modern Contraception'), // new on 2/2012
     5 => xl('Contraceptive Items Provided'),          // reactivated 2/2012
-    // 7 => xl('Administrative Services'),            // TBD: remove this
   );
   $arr_invalid = array(
     101 => array(5,6),
@@ -78,14 +76,6 @@ if ($report_type == 'm') {
     15  => array(5,6),
     103 => array(5,6),
     2   => array(5,6),
-  );
-  $arr_report = array(
-    // Items are content|row|column|column|...
-    /*****************************************************************
-    '2|2|3|4|5|8|11' => xl('Client Profile - Unique Clients'),
-    '4|2|3|4|5|8|11' => xl('Client Profile - New Clients'),
-    '7|2|3|4|5|8|11' => xl('Client Profile - Returning Clients'),
-    *****************************************************************/
   );
 }
 else if ($report_type == 'g') {
@@ -107,11 +97,6 @@ else if ($report_type == 'g') {
     4 => xl('Unique New Clients'),
     7 => xl('Unique Returning Clients'),
   );
-  $arr_report = array(
-    /*****************************************************************
-    '1|11|13' => xl('Complications by Service Provider'),
-    *****************************************************************/
-  );
 }
 else {
   $report_title = xl('IPPF Statistics Report 2014+');
@@ -127,10 +112,11 @@ else {
   );
   $arr_content = array(
     1 => xl('Services'),
+    /*****************************************************************
     3 => xl('New Acceptors'),
+    *****************************************************************/
+    6 => xl('Acceptors New to Modern Contraception'), // new for 2014
     5 => xl('Contraceptive Items Provided'),
-  );
-  $arr_report = array(
   );
 }
 
@@ -203,7 +189,6 @@ function getAge($dob, $asof='') {
   $a2 = explode('-', substr($asof, 0, 10));
   $age = $a2[0] - $a1[0];
   if ($a2[1] < $a1[1] || ($a2[1] == $a1[1] && $a2[2] < $a1[2])) --$age;
-  // echo "<!-- $dob $asof $age -->\n"; // debugging
   return $age;
 }
 
@@ -272,15 +257,15 @@ function genNumCell($num, $cnum, $clikey) {
   genAnyCell($num, 'right', 'detail');
 }
 
-// Translate an IPPF code to the corresponding descriptive name of its
+// Translate an IPPFCM code to the corresponding descriptive name of its
 // contraceptive method, or to an empty string if none applies.
-//
-// TBD: Correct this function for IPPF2 codes.
 //
 function getContraceptiveMethod($code) {
   global $contra_group_name;
   $contra_group_name = '00000 ' . xl('No Group');
   $key = '';
+
+  /*******************************************************************
   // Normalize contraception codes to the table values.
   if (preg_match('/^11/', $code)) {
     $code = substr($code, 0, 6) . '110';
@@ -306,10 +291,22 @@ function getContraceptiveMethod($code) {
   else if (preg_match('/^131191.10/', $code)) {
     $key = xl('Awareness-Based');
   }
+  *******************************************************************/
+  $row = sqlQuery("SELECT c.code_text, lo.title FROM codes AS c " .
+    "LEFT JOIN list_options AS lo ON lo.list_id = 'contrameth' AND " .
+    "lo.option_id = c.code_text_short " .
+    "WHERE c.code_type = '32' AND c.code = '$code'");
+  if (!empty($row['code_text'])) {
+    $key = $row['code_text'];
+    if (!empty($row['title'])) {
+      $contra_group_name = $row['title'];
+    }
+  }
+
   return $key;
 }
 
-// Helper function to find a contraception-related IPPF2 code from
+// Helper function to find a contraception-related IPPFCM code from
 // the related_code element of the given array.
 //
 function getRelatedContraceptiveCode($row) {
@@ -318,7 +315,10 @@ function getRelatedContraceptiveCode($row) {
     foreach ($relcodes as $codestring) {
       if ($codestring === '') continue;
       list($codetype, $code) = explode(':', $codestring);
+      /***************************************************************
       if ($codetype !== 'IPPF2') continue;
+      ***************************************************************/
+      if ($codetype !== 'IPPFCM') continue;
       // Check if the related code concerns contraception.
       $tmp = getContraceptiveMethod($code);
       if (!empty($tmp)) return $code;
@@ -326,6 +326,19 @@ function getRelatedContraceptiveCode($row) {
   }
   return '';
 }
+
+
+
+// Determine if the given IPPF2 code is related to contraception.
+// This includes modern (11) and natural (12) methods.
+function isIPPF2Contraceptive($code) {
+  if (preg_match('/^1/', $code)) {
+    return true;
+  }
+  return false;
+}
+
+
 
 // Helper function to find an abortion-method IPPF2 code from
 // the related_code element of the given array.
@@ -345,13 +358,13 @@ function getRelatedAbortionMethod($row) {
   return '';
 }
 
-// Translate an IPPF code to the corresponding descriptive name of its
+// Translate an IPPF2 code to the corresponding descriptive name of its
 // abortion method, or to an empty string if none applies.
-//
-// TBD: Correct this function for IPPF2 codes.
 //
 function getAbortionMethod($code) {
   $key = '';
+
+  /*******************************************************************
   if (preg_match('/^25222[34]/', $code)) {
     if (preg_match('/^2522231/', $code)) {
       $key = xl('D&C');
@@ -369,12 +382,45 @@ function getAbortionMethod($code) {
       $key = xl('Other Surgical');
     }
   }
+  *******************************************************************/
+  if (preg_match('/^2113230302301/', $code)) {
+    $key = xl('D&C');
+  }
+  else if (preg_match('/^2113230302302/', $code)) {
+    $key = xl('D&E');
+  }
+  else if (preg_match('/^2113230302304/', $code)) {
+    $key = xl('MVA');
+  }
+  else if (preg_match('/^2113230302305/', $code)) {
+    $key = xl('Other Surgical');
+  }
+  else if (preg_match('/^211313030110[123]/', $code)) {
+    $key = xl('Medical');
+  }
+
   return $key;
 }
 
-// Determine if a recent gcac service was performed.
+
+
+// Generate a SQL condition that tests if the specified column includes an
+// IPPF2 code for an abortion procedure.
 //
-// TBD: Correct this function for IPPF2 codes.
+function genAbortionSQL($col) {
+  return
+    "$col LIKE '%IPPF2:2113230302301%' OR " .
+    "$col LIKE '%IPPF2:2113230302302%' OR " .
+    "$col LIKE '%IPPF2:2113230302304%' OR " .
+    "$col LIKE '%IPPF2:2113230302305%' OR " .
+    "$col LIKE '%IPPF2:2113130301101%' OR " .
+    "$col LIKE '%IPPF2:2113130301102%' OR " .
+    "$col LIKE '%IPPF2:2113130301103%'";
+}
+
+
+
+// Determine if a recent gcac service was performed.
 //
 function hadRecentAbService($pid, $encdate, $includeIncomplete=false) {
   $query = "SELECT COUNT(*) AS count " .
@@ -388,10 +434,17 @@ function hadRecentAbService($pid, $encdate, $includeIncomplete=false) {
     "b.code_type = 'MA' AND " .
     "c.code_type = '12' AND " .
     "c.code = b.code AND c.modifier = b.modifier AND " .
+  /*******************************************************************
     "( c.related_code LIKE '%IPPF:252223%' OR c.related_code LIKE '%IPPF:252224%'";
   if ($includeIncomplete) {
     // In this case we want to include treatment for incomplete.
     $query .= " OR c.related_code LIKE '%IPPF:252225%'";
+  }
+  *******************************************************************/
+    "( " . genAbortionSQL('c.related_code');
+  if ($includeIncomplete) {
+    // In this case we want to include treatment for incomplete.
+    $query .= " OR c.related_code LIKE '%IPPF2:211403030%'";
   }
   $query .= " )";
   $tmp = sqlQuery($query);
@@ -399,8 +452,6 @@ function hadRecentAbService($pid, $encdate, $includeIncomplete=false) {
 }
 
 // Get the "client status" as descriptive text.
-//
-// TBD: Correct this function for IPPF2 codes.
 //
 function getGcacClientStatus($row) {
   $pid = $row['pid'];
@@ -441,11 +492,17 @@ function getGcacClientStatus($row) {
     "t.refer_date IS NOT NULL AND " .
     "t.refer_date <= '$encdate' AND " .
     "DATE_ADD(t.refer_date, INTERVAL 14 DAY) > '$encdate' AND " .
+
+    /*****************************************************************
     "( t.refer_related_code LIKE '%IPPF:252223%' OR " .
     "t.refer_related_code LIKE '%IPPF:252224%' OR " .
     "( c.related_code IS NOT NULL AND " .
     "( c.related_code LIKE '%IPPF:252223%' OR " .
     "c.related_code LIKE '%IPPF:252224%' )))";
+    *****************************************************************/
+    "( " . genAbortionSQL('t.refer_related_code') . " OR " .
+    "( c.related_code IS NOT NULL AND ( " .
+    genAbortionSQL('c.related_code') . " )))";
 
   $tmp = sqlQuery($query);
   if (!empty($tmp['count'])) return xl('Outbound Referral');
@@ -519,7 +576,10 @@ function loadColumnData($key, $row, $quantity=1) {
 
   // If we are counting new acceptors, then this must be a report of contraceptive
   // methods or contraceptive products, and a contraceptive start date is provided.
+  /*******************************************************************
   if ($form_content == '3' || $form_content == '6') {
+  *******************************************************************/
+  if ($form_content == '6') {
     if (empty($row['contrastart'])) return;
   }
 
@@ -544,11 +604,13 @@ function loadColumnData($key, $row, $quantity=1) {
     $areport[$key]['.dtl'] = array();
   }
 
-  // If we are counting unique clients, new acceptors, new or returning clients, then
+  // If we are counting unique clients, new or returning clients, then
   // require a unique patient.
+  /*******************************************************************
   if ($form_content == '2' || $form_content == '3' || $form_content == '4' ||
     $form_content == '6' || $form_content == '7')
-  {
+  *******************************************************************/
+  if (in_array($form_content, array(2, 4, 6, 7))) {
     if ($row['pid'] == $areport[$key]['.prp']) return;
   }
 
@@ -581,8 +643,6 @@ function loadColumnData($key, $row, $quantity=1) {
 
 // This determines a key for the product with highest CYP in a visit.
 //
-// TBD: Correct this function for IPPF2 codes.
-//
 function product_contraception_scan($pid, $encounter) {
   global $contra_group_name;
   $current_cyp = -1;
@@ -599,6 +659,8 @@ function product_contraception_scan($pid, $encounter) {
     foreach ($relcodes as $relstring) {
       if ($relstring === '') continue;
       list($reltype, $relcode) = explode(':', $relstring);
+
+      /***************************************************************
       if ($reltype !== 'IPPF') continue;
       if (
         preg_match('/^11....110/'    , $relcode) ||
@@ -619,23 +681,32 @@ function product_contraception_scan($pid, $encounter) {
           $current_name    = $dsrow['name'];
         }
       }
+      ***************************************************************/
+      if ($reltype !== 'IPPFCM') continue;
+      $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
+        "code_type = '32' AND code = '$relcode' LIMIT 1");
+      $cyp = 0 + $tmprow['cyp_factor'];
+      if ($cyp > $current_cyp) {
+        $current_cyp    = $cyp;
+        $current_ippfcm = $relcode;
+        $current_name   = $dsrow['name'];
+      }
+
     }
   }
   $key = '{(' . xl('None') . ')}(' . xl('No Product') . ')';
   if ($current_cyp > 0) {
-    getContraceptiveMethod($current_ippf);
+    getContraceptiveMethod($current_ippfcm);
     $key = '{' . $contra_group_name . '}' . $current_name;
   }
   return $key;
 }
 
-// This gets the "normalized" contraception code of the service with highest CYP
+// This gets the IPPFCM contraception code of the service with highest CYP
 // in a visit, similarly to the method that the Fee Sheet uses to assign a value
 // for newmethod.  Currently this function is only needed for the special case where
 // LBFccicon indicates a New User but no method is in the form, which in turn
 // happens only for conversions of old data from release 3.2.0.7.
-//
-// TBD: Correct this function for IPPF2 codes.
 //
 function service_contraception_scan($pid, $encounter) {
   $contraception_code = '';
@@ -653,6 +724,9 @@ function service_contraception_scan($pid, $encounter) {
     foreach ($relcodes as $codestring) {
       if ($codestring === '') continue;
       list($codetype, $relcode) = explode(':', $codestring);
+
+
+      /***************************************************************
       if ($codetype !== 'IPPF') continue;
       if (
         preg_match('/^11....110/'    , $relcode) ||
@@ -672,8 +746,20 @@ function service_contraception_scan($pid, $encounter) {
           $contraception_code = $relcode;
         }
       }
+      ***************************************************************/
+      if ($codetype !== 'IPPFCM') continue;
+      $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
+        "code_type = '32' AND code = '$relcode' LIMIT 1");
+      $cyp = 0 + $tmprow['cyp_factor'];
+      if ($cyp > $contraception_cyp) {
+        $contraception_cyp  = $cyp;
+        $contraception_code = $relcode;
+      }
+
     }
   } // end while
+
+  /*******************************************************************
   if ($contraception_code) {
     if (preg_match('/^12/', $contraception_code)) {
       // Identify the method with the IPPF code for the corresponding surgical procedure.
@@ -687,6 +773,8 @@ function service_contraception_scan($pid, $encounter) {
       if ($contraception_code == '112152110') $contraception_code = '112152010';
     }
   }
+  *******************************************************************/
+
   return $contraception_code;
 }
 
@@ -703,9 +791,6 @@ function get_adjustment_type($patient_id, $encounter_id, $code_type, $code) {
     "(adj_amount != 0.00 OR pay_amount = 0.00) AND memo != '' " .
     "ORDER BY code DESC, adj_amount DESC LIMIT 1");
   if (isset($row['memo'])) $adjreason = $row['memo'];
-
-  // echo "<!-- '$patient_id' '$encounter_id' '$code_type' '$code' = '$adjreason' / '$form_adjreason' -->\n"; // debugging
-
   return $adjreason;
 }
 
@@ -719,6 +804,7 @@ function process_ippf_code($row, $code, $quantity=1) {
   $key = 'Unspecified';
 
   // SRH including Family Planning
+  // This works for both IPPF2 and IPPF codes.
   //
   if ($form_by === '1') {
     if (preg_match('/^1/', $code)) {
@@ -733,6 +819,7 @@ function process_ippf_code($row, $code, $quantity=1) {
   }
 
   // General Service Category
+  // This works for both IPPF2 and IPPF codes.
   //
   else if ($form_by === '3') {
     if (preg_match('/^1/', $code)) {
@@ -752,9 +839,12 @@ function process_ippf_code($row, $code, $quantity=1) {
     }
   }
 
-  // Abortion-Related Category
+  // Abortion-Related Category.
+  // This follows the framework categories so the titles are somewhat different
+  // from the old framework.
   //
   else if ($form_by === '13') {
+    /*****************************************************************
     if (preg_match('/^252221/', $code)) {
       $key = xl('Pre-Abortion Counseling');
     }
@@ -779,24 +869,43 @@ function process_ippf_code($row, $code, $quantity=1) {
     else if (preg_match('/^25222/', $code)) {
       $key = xl('Other/Generic Abortion-Related');
     }
+    *****************************************************************/
+    if (preg_match('/^2111/', $code)) {
+      $key = xl('Abortion Counseling');
+    }
+    else if (preg_match('/^2112/', $code)) {
+      $key = xl('Abortion Consultation');
+    }
+    else if (preg_match('/^21131/', $code)) {
+      $key = xl('Medical Abortion Management');
+    }
+    else if (preg_match('/^21132/', $code)) {
+      $key = xl('Surgical Abortion Management');
+    }
+    else if (preg_match('/^2114/', $code)) {
+      $key = xl('Incomplete Abortion Management');
+    }
     else {
       if ($form_content != 5) return;
     }
   }
 
-  // Specific Services. One row for each IPPF code.
+  // Specific Services. One row for each IPPF2 code.
   //
   else if ($form_by === '4') {
     $key = $code;
   }
 
-  // Specific Contraceptive Services. One row for each IPPF code.
+  // Specific Contraceptive Services. One row for each IPPF2 code.
   //
   else if ($form_by === '104') {
     if ($form_content != 5) {
       // Skip codes not for contraceptive services.
+      /***************************************************************
       $tmp = getContraceptiveMethod($code);
       if (empty($tmp)) return;
+      ***************************************************************/
+      if (!isIPPF2Contraceptive($code)) return;
     }
     $key = $code;
   }
@@ -812,6 +921,7 @@ function process_ippf_code($row, $code, $quantity=1) {
     }
   }
 
+  /*******************************************************************
   // Contraceptive Method.
   //
   else if ($form_by === '6') {
@@ -853,13 +963,22 @@ function process_ippf_code($row, $code, $quantity=1) {
       if (empty($irow['count'])) return;
     }
   }
+  *******************************************************************/
 
   // Post-Abortion Care and Followup by Source.
   // Requirements just call for counting sessions, but this way the columns
   // can be anything - age category, religion, whatever.
   //
   else if ($form_by === '8') {
+    /*****************************************************************
     if (preg_match('/^25222[567]/', $code)) { // care, followup and incomplete abortion treatment
+    *****************************************************************/
+    if (in_array($code, array(
+      '2111010122000', // Abortion - Counselling - Post-abortion
+      '2112020202101', // Abortion - Consultation - Follow up consultation - Harm reduction model
+      '2113130301104', // Abortion - Management - Medical - follow up
+      '2113230302307', // Abortion - Management - Surgical - follow up
+    )) || preg_match('/^211403/', $code)) { // Incomplete abortion codes
       $key = getGcacClientStatus($row);
     } else {
       return;
@@ -872,7 +991,14 @@ function process_ippf_code($row, $code, $quantity=1) {
   //   Decided not to have the abortion
   //
   else if ($form_by === '12') {
+    /*****************************************************************
     if (preg_match('/^252221/', $code)) { // all pre-abortion counseling
+    *****************************************************************/
+    if (in_array($code, array(
+      '2111010121000', // Abortion - Counselling - Pre-abortion / Options Counselling
+      '2112020200000', // Abortion - Consultation
+      '2112020201101', // Abortion - Consultation - Initial consultation - Harm reduction model
+    ))) {
       $key = getGcacClientStatus($row);
     } else {
       return;
@@ -887,6 +1013,65 @@ function process_ippf_code($row, $code, $quantity=1) {
   loadColumnData($key, $row, $quantity);
 
 } // end function process_ippf_code()
+
+// This is called for each IPPFCM service code. These are the codes that tell
+// us which contraceptive method is involved.
+//
+function process_ippfcm_code($row, $code, $quantity=1) {
+  global $form_by, $form_content, $contra_group_name;
+
+  $key = 'Unspecified';
+
+  // Contraceptive Method.
+  //
+  if ($form_by === '6') {
+    $key = getContraceptiveMethod($code);
+    if (empty($key)) {
+      // If not a contraceptive service then skip unless counting Contraceptive Items Provided.
+      if ($form_content != 5) return;
+      $key = 'Unspecified';
+    }
+    $key = '{' . $contra_group_name . '}' . $key;
+  }
+
+  // Contraceptive method for new contraceptive adoption following abortion.
+  // Get it from the IPPFCM code if there is a suitable recent abortion service
+  // or GCAC form.
+  //
+  else if ($form_by === '7') {
+    $key = getContraceptiveMethod($code);
+    if (empty($key)) return;
+    $key = '{' . $contra_group_name . '}' . $key;
+    $patient_id = $row['pid'];
+    $encdate = $row['encdate'];
+    // Skip this if no recent gcac service nor gcac form with acceptance.
+    // Include incomplete abortion treatment services per AM's discussion
+    // with Dr. Celal on 2011-04-19.
+    if (!hadRecentAbService($patient_id, $encdate, true)) {
+      $query = "SELECT COUNT(*) AS count " .
+        "FROM forms AS f, form_encounter AS fe, lbf_data AS d " .
+        "WHERE f.pid = '$patient_id' AND " .
+        "f.formdir = 'LBFgcac' AND " .
+        "f.deleted = 0 AND " .
+        "fe.pid = f.pid AND fe.encounter = f.encounter AND " .
+        "fe.date <= '$encdate' AND " .
+        "DATE_ADD(fe.date, INTERVAL 14 DAY) > '$encdate' AND " .
+        "d.form_id = f.form_id AND " .
+        "d.field_id = 'client_status' AND " .
+        "( d.field_value = 'maaa' OR d.field_value = 'refout' )";
+      $irow = sqlQuery($query);
+      if (empty($irow['count'])) return;
+    }
+  }
+
+  else {
+    return; // no match, so do nothing
+  }
+
+  // OK we now have the reporting key for this issue.
+  loadColumnData($key, $row, $quantity);
+
+} // end function process_ippfcm_code()
 
 // This is called for each MA service code that is selected.
 //
@@ -1013,21 +1198,6 @@ function process_visit($row) {
   // present for inbound referrals.
   //
   if ($form_by === '7') {
-    // We think this case goes away, but not sure yet.
-    /*****************************************************************
-    $dres = LBFgcac_query($row['pid'], $row['encounter'], 'contrameth');
-    while ($drow = sqlFetchArray($dres)) {
-      $a = explode('|', $drow['field_value']);
-      foreach ($a as $methid) {
-        if (empty($methid)) continue;
-        $crow = sqlQuery("SELECT title FROM list_options WHERE " .
-          "list_id = 'contrameth' AND option_id = '$methid'");
-        $key = $crow['title'];
-        if (empty($key)) $key = xl('Indeterminate');
-        loadColumnData($key, $row);
-      }
-    }
-    *****************************************************************/
   }
 
   // Complications of abortion by abortion method and complication type.
@@ -1083,8 +1253,14 @@ function process_referral($row) {
           "code_type = '" . $code_types[$codetype]['id'] . "' AND " .
           "code = '$code' AND active = 1 " .
           "ORDER BY id LIMIT 1");
-        if (!empty($rrow['related_code'])) {
-          list($codetype, $code) = explode(':', $rrow['related_code']);
+        $relcodes2 = explode(';', $rrow['related_code']);
+        foreach ($relcodes2 as $codestring2) {
+          if ($codestring2 === '') continue;
+          list($codetype2, $code2) = explode(':', $codestring2);
+          if ($codetype2 !== 'IPPF2') continue;
+          $codetype = $codetype2;
+          $code = $code2;
+          break;
         }
       }
 
@@ -1211,39 +1387,6 @@ while ($lrow = sqlFetchArray($lres)) {
 <script type="text/javascript" src="../../library/dynarch_calendar_setup.js"></script>
 <script language="JavaScript">
  var mypcc = '<?php echo $GLOBALS['phone_country_code'] ?>';
-
- // Begin experimental code
-
- function selectByValue(sel, val) {
-  for (var i = 0; i < sel.options.length; ++i) {
-   if (sel.options[i].value == val) sel.options[i].selected = true;
-  }
- }
-
- function selreport() {
-  var f = document.forms[0];
-  var isdis = 'visible';
-  var s = f.form_report;
-  var v = (s.selectedIndex < 0) ? '' : s.options[s.selectedIndex].value;
-  if (v.length > 0) {
-   isdis = 'hidden';
-   var a = v.split("|");
-   f.form_content.selectedIndex = -1;
-   f.form_by.selectedIndex = -1;
-   f['form_show[]'].selectedIndex = -1;
-   selectByValue(f.form_content, a[0]);
-   selectByValue(f['form_by[]'], a[1]);
-   for (var i = 2; i < a.length; ++i) {
-    selectByValue(f['form_show[]'], a[i]);
-   }
-  }
-  f['form_by[]'].style.visibility = isdis;
-  f.form_content.style.visibility = isdis;
-  f['form_show[]'].style.visibility = isdis;
- }
-
- // End experimental code
-
 </script>
 </head>
 
@@ -1257,29 +1400,6 @@ while ($lrow = sqlFetchArray($lres)) {
  action='ippf_statistics_2.php?t=<?php echo $report_type ?>'>
 
 <table border='0' cellspacing='5' cellpadding='1'>
-
- <!-- Begin experimental code -->
- <tr<?php if (empty($arr_report)) echo " style='display:none'"; ?>>
-  <td valign='top' class='dehead' nowrap>
-   <?php xl('Report','e'); ?>:
-  </td>
-  <td valign='top' class='detail' colspan='3'>
-   <select name='form_report' title='Predefined reports' onchange='selreport()'>
-<?php
-  echo "    <option value=''>" . xl('Custom') . "</option>\n";
-  foreach ($arr_report as $key => $value) {
-    echo "    <option value='$key'";
-    if ($key == $form_report) echo " selected";
-    echo ">" . $value . "</option>\n";
-  }
-?>
-   </select>
-  </td>
-  <td valign='top' class='detail'>
-   &nbsp;
-  </td>
- </tr>
- <!-- End experimental code -->
 
  <tr>
   <td valign='top' class='dehead' nowrap>
@@ -1521,7 +1641,10 @@ if ($_POST['form_submit']) {
     else if ($form_sexes == '2') $sexcond = "AND pd.sex LIKE 'Male' ";
     else if ($form_sexes == '3') $sexcond = "AND pd.sex NOT LIKE 'Male' AND pd.sex NOT LIKE 'Female' ";
 
+    /*****************************************************************
     if ($form_by == '105' && $form_content != 5 && $form_content != 3 && $form_content != 6) {
+    *****************************************************************/
+    if ($form_by == '105' && !in_array($form_content, array(5, 6))) {
       $alertmsg = xl("Contraceptive Products report requires Contraceptive Items Provided or New Acceptors content type.");
     }
 
@@ -1586,8 +1709,8 @@ if ($_POST['form_submit']) {
           }
         }
 
-        // At this point $prodcode is the desired IPPF2 code, or empty if none.
-        process_ippf_code($row, $prodcode, $row['quantity']);
+        // At this point $prodcode is the desired IPPFCM code, or empty if none.
+        process_ippfcm_code($row, $prodcode, $row['quantity']);
 
         // This is for the Contraceptive Products report (105).
         if ($form_by === '105') {
@@ -1646,7 +1769,10 @@ if ($_POST['form_submit']) {
     // or by contraceptive product is a special case that gets one method or product
     // on each contraceptive start date.
     //
+    /*****************************************************************
     if ($form_content == 3 || $form_content == 6) {
+    *****************************************************************/
+    if ($form_content == 6) {
 
      // Per CV 2012-10-12 re the IPPF Stats report:
      // "the report should be modified so that the report can run when Content = New User and
@@ -1656,9 +1782,8 @@ if ($_POST['form_submit']) {
      if ($report_type == 'i' && $form_by !== '104') { // content is new acceptors but incompatible report type
       $alertmsg = xl("New Acceptors content type is valid only for contraceptive service reporting.");
      }
-     else
 
-     if ($form_by === '6' || $form_by === '7' || $form_by === '104' || $form_by === '105') {
+     else if (in_array($form_by, array('6', '7', '104', '105'))) {
 
       // This enumerates instances of "contraception starting" for the MA.  Note that a
       // client could be counted twice, once for nonsurgical and once for surgical.
@@ -1676,6 +1801,7 @@ if ($_POST['form_submit']) {
       if ($form_facility) {
         $query .= "AND fe.facility_id = '$form_facility' ";
       }
+      /***************************************************************
       if ($form_content == 3) {
         // Content type 3, IPPF new acceptors
         $query .=
@@ -1693,10 +1819,16 @@ if ($_POST['form_submit']) {
           "JOIN patient_data AS pd ON pd.pid = f.pid $sexcond " .
           "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 ";
       }
+      ***************************************************************/
+      // Content type 6, acceptors new to modern contraception
+      $query .=
+        "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' AND d1.field_value != '' " .
+        "JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'pastmodern' AND d2.field_value = '0' " .
+        "JOIN patient_data AS pd ON pd.pid = f.pid $sexcond " .
+        "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 ";
+
       $query .=
         "ORDER BY fe.pid, encdate DESC, fe.encounter DESC, f.form_id";
-
-      // echo "<!-- $query -->\n"; // debugging
 
       $res = sqlStatement($query);
       $lastpid = 0;
@@ -1704,16 +1836,25 @@ if ($_POST['form_submit']) {
       //
       while ($row = sqlFetchArray($res)) {
         $contrastart = $row['contrastart'];
-        $ippfconmeth = $row['ippfconmeth'];
         $thispid     = $row['pid'];
         $thisenc     = $row['encounter'];
         $thisyear    = substr($contrastart, 0, 4);
+        $ippfconmeth = '';
+        if (!empty($row['ippfconmeth']) && substr($row['ippfconmeth'], 0, 7) == 'IPPFCM:') {
+          $ippfconmeth = substr($row['ippfconmeth'], 7);
+        }
 
+        /*************************************************************
         // Leslie on 2012-03-12 says IPPF New Users may only be reported once per calendar year.
         // While on this, we'll also make sure "acceptors new to modern contraception" happen
         // only once regardless of the year.  Note we are sorting by descending date within
         // pid, so only the last occurrence per client will be reported.
         if ($thispid == $lastpid && ($thisyear == $lastyear || $form_content != 3)) {
+        *************************************************************/
+        // Make sure "acceptors new to modern contraception" happen only once
+        // regardless of the year.  Note we are sorting by descending date within
+        // pid, so only the last occurrence per client will be reported.
+        if ($thispid == $lastpid) {
           continue;
         }
 
@@ -1727,12 +1868,14 @@ if ($_POST['form_submit']) {
           loadColumnData(product_contraception_scan($thispid, $thisenc), $row);
         }
         else {
+          /***********************************************************
           // If the new method is missing, try to get it from the billing table.
           // That should happen only for old data from sites upgraded from release 3.2.0.7.
           if (empty($ippfconmeth)) {
             $ippfconmeth = service_contraception_scan($row['pid'], $row['encounter']);
           }
-          process_ippf_code($row, $ippfconmeth);
+          ***********************************************************/
+          process_ippfcm_code($row, $ippfconmeth);
         }
       } // end while
      }
@@ -1741,11 +1884,7 @@ if ($_POST['form_submit']) {
      }
     } // end if
 
-    else
-
-    if ($form_content != 5 && $form_by !== '9' && $form_by !== '10' &&
-      $form_by !== '14' && $form_by !== '15' && $form_by !== '20')
-    {
+    else if ($form_content != 5 && !in_array($form_by, array(9, 10, 14, 15, 20))) {
       // This gets us all MA and ADM codes, with encounter and patient
       // info attached and grouped by patient and encounter.
       $query = "SELECT " .
@@ -1789,8 +1928,12 @@ if ($_POST['form_submit']) {
             foreach ($relcodes as $codestring) {
               if ($codestring === '') continue;
               list($codetype, $code) = explode(':', $codestring);
-              if ($codetype !== 'IPPF2') continue;
-              process_ippf_code($row, $code);
+              if ($codetype === 'IPPF2') {
+                process_ippf_code($row, $code);
+              }
+              else if ($codetype === 'IPPFCM') {
+                process_ippfcm_code($row, $code);
+              }
             }
           }
         }
@@ -1942,9 +2085,11 @@ if ($_POST['form_submit']) {
         $this_group = $tmp[1];
         $display_key = $tmp[2];
       }
+      /**************************************************************
       if ($form_output != 3 && $form_content != '2' && $form_content != '3' &&
-        $form_content != '4' && $form_content != '7')
-      {
+        $form_content != '4' && $form_content != '7') {
+      **************************************************************/
+      if ($form_output != 3 && !in_array($form_content, array(2, 4, 7))) {
         // If it is a group change and there is a non-empty $last_group,
         // generate a subtotals line and clear subtotals array.
         // Set $last_group to the current group name.
@@ -2070,9 +2215,11 @@ if ($_POST['form_submit']) {
     // If we are exporting or counting unique clients, new acceptors, new or returning clients,
     // then the totals line is skipped.
     //
+    /*****************************************************************
     if ($form_output != 3 && $form_content != '2' && $form_content != '3' &&
-      $form_content != '4' && $form_content != '7')
-    {
+      $form_content != '4' && $form_content != '7') {
+    *****************************************************************/
+    if ($form_output != 3 && !in_array($form_content, array(2, 4, 7))) {
       // If there is a non-empty $last_group, generate a subtotals line.
       if ($last_group_count > 1) {
         writeSubtotals($last_group, $asubtotals, $form_by);
@@ -2117,7 +2264,6 @@ if ($_POST['form_submit']) {
 </center>
 
 <script language='JavaScript'>
- selreport();
  Calendar.setup({inputField:"form_from_date", ifFormat:"%Y-%m-%d", button:"img_from_date"});
  Calendar.setup({inputField:"form_to_date", ifFormat:"%Y-%m-%d", button:"img_to_date"});
 

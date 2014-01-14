@@ -38,6 +38,7 @@ if (isset($mode)) {
   $code       = $_POST['code'];
   $code_type  = $_POST['code_type'];
   $code_text  = $_POST['code_text'];
+  $code_text_short = $_POST['code_text_short'];
   $modifier   = $_POST['modifier'];
   $superbill  = $_POST['form_superbill'];
   $related_code = $_POST['related_code'];
@@ -69,6 +70,7 @@ if (isset($mode)) {
         "code = '"         . ffescape($code)         . "', " .
         "code_type = '"    . ffescape($code_type)    . "', " .
         "code_text = '"    . ffescape($code_text)    . "', " .
+        "code_text_short = '" . ffescape($code_text_short) . "', " .
         "modifier = '"     . ffescape($modifier)     . "', " .
         "superbill = '"    . ffescape($superbill)    . "', " .
         "related_code = '" . ffescape($related_code) . "', " .
@@ -93,7 +95,7 @@ if (isset($mode)) {
               "'$code_id', '', '$key', '$value' )");
           }
         }
-        $code = $code_type = $code_text = $modifier = $superbill = "";
+        $code = $code_type = $code_text = $code_text_short = $modifier = $superbill = "";
         $code_id = 0;
         $related_code = '';
         $cyp_factor = 0;
@@ -108,6 +110,7 @@ if (isset($mode)) {
     while ($row = mysql_fetch_assoc($results)) {
       $code         = $row['code'];
       $code_text    = $row['code_text'];
+      $code_text_short = $row['code_text_short'];
       $code_type    = $row['code_type'];
       $modifier     = $row['modifier'];
       // $units        = $row['units'];
@@ -313,13 +316,13 @@ foreach ($code_types as $key => $value) {
    </select>
    &nbsp;&nbsp;
    <?php xl('Code','e'); ?>:
-   <input type='text' size='6' name='code' value='<?php echo $code ?>'
+   <input type='text' size='6' maxlength='31' name='code' value='<?php echo $code ?>'
     onkeyup='maskkeyup(this,getCTMask())'
     onblur='maskblur(this,getCTMask())'
    />
 <?php if (modifiers_are_used()) { ?>
    &nbsp;&nbsp;<?php xl('Modifier','e'); ?>:
-   <input type='text' size='3' name='modifier' value='<?php echo $modifier ?>'>
+   <input type='text' size='3' maxlength='5' name='modifier' value='<?php echo $modifier ?>'>
 <?php } else { ?>
    <input type='hidden' name='modifier' value='<?php // echo $modifier; ?>'>
 <?php } ?>
@@ -334,7 +337,16 @@ foreach ($code_types as $key => $value) {
   <td><?php xl('Description','e'); ?>:</td>
   <td></td>
   <td>
-   <input type='text' size='50' name="code_text" value='<?php echo $code_text ?>'>
+   <input type='text' size='50' maxlength='255' name='code_text' value='<?php echo $code_text ?>'>
+  </td>
+ </tr>
+
+ <tr>
+  <td><?php xl('Note','e'); ?>:</td>
+  <td></td>
+  <td>
+   <input type='text' size='24' maxlength='24' name='code_text_short' value='<?php echo $code_text_short ?>'>&nbsp;
+   <?php if (!empty($GLOBALS['ippf_specific'])) echo xl('IPPFCM codes: Put contraceptive method ID here.'); ?>
   </td>
  </tr>
 
@@ -349,10 +361,11 @@ generate_form_field(array('data_type'=>1,'field_id'=>'superbill','list_id'=>'sup
  </tr>
 
  <tr<?php if (empty($GLOBALS['ippf_specific'])) echo " style='display:none'"; ?>>
-  <td><?php xl('CYP Factor','e'); ?>:</td>
+  <td><?php xl('Contraception','e'); ?>:</td>
   <td></td>
   <td>
-   <input type='text' size='10' maxlength='20' name="cyp_factor" value='<?php echo $cyp_factor ?>'>
+   <input type='text' size='10' maxlength='20' name="cyp_factor" value='<?php echo $cyp_factor ?>'>&nbsp;
+   <?php echo xl('IPPFCM codes: CYP factor. MA codes: 1 = initial consult.'); ?>
   </td>
  </tr>
 

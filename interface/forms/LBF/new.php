@@ -195,8 +195,10 @@ function set_related(codetype, code, selector, codedesc) {
 }
 
 // This invokes the find-code popup.
-function sel_related() {
- dlgopen('<?php echo $rootdir ?>/patient_file/encounter/find_code_popup.php', '_blank', 500, 400);
+function sel_related(elem, codetype) {
+ var url = '<?php echo $rootdir ?>/patient_file/encounter/find_code_popup.php';
+ if (codetype) url += '?codetype=' + codetype;
+ dlgopen(url, '_blank', 500, 400);
 }
 
 // Validation logic for form submission.

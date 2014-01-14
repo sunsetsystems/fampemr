@@ -468,14 +468,14 @@ if ($document_id) {
 //
 if ($GLOBALS['ippf_specific']) {
   $query = "SELECT " .
-    "fe.date AS contrastart, lo.title AS contrameth " .
+    "fe.date AS contrastart, c.code_text AS contrameth " .
     "FROM forms AS f " .
     "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
     "LEFT JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
-    "LEFT JOIN list_options AS lo ON lo.list_id = 'ippfconmeth' AND lo.option_id = d1.field_value " .
     "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
+    "LEFT JOIN codes AS c ON c.code_type = 32 AND d1.field_id IS NOT NULL AND d1.field_id = CONCAT('IPPFCM:', c.code) " .
     "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' AND " .
-    "(d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1')) " .
+    "((c.cyp_factor IS NOT NULL AND c.cyp_factor >= 10.0) OR (d2.field_value IS NOT NULL AND d2.field_value = '1')) " .
     "ORDER BY contrastart DESC LIMIT 1";
   $tmp = sqlQuery($query);
   if (!empty($tmp['contrastart'])) {
@@ -486,28 +486,6 @@ if ($GLOBALS['ippf_specific']) {
     }
     echo "</span><br />&nbsp;<br />\n";
   }
-  /*******************************************************************
-  $query = "SELECT " .
-    "d2.field_value AS contrastart, lo.title AS contrameth " .
-    "FROM forms AS f " .
-    "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'contratype' AND " .
-    "(d1.field_value >= '1' AND d1.field_value <= '3') " .
-    "JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'contrastart' AND " .
-    "d2.field_value IS NOT NULL " .
-    "LEFT JOIN lbf_data AS d3 ON d3.form_id = f.form_id AND d3.field_id = 'ippfconmeth' " .
-    "LEFT JOIN list_options AS lo ON lo.list_id = 'ippfconmeth' AND lo.option_id = d3.field_value " .
-    "WHERE f.formdir = 'LBFcontra' AND f.deleted = 0 AND f.pid = '$pid' " .
-    "ORDER BY contrastart DESC LIMIT 1";
-  $tmp = sqlQuery($query);
-  if (!empty($tmp['contrastart'])) {
-    echo "<span class='text'>" . xl('Contraception Start') . ': ';
-    echo oeFormatShortDate($tmp['contrastart']);
-    if (!empty($tmp['contrameth'])) {
-      echo ' ' . xl_list_label($tmp['contrameth']);
-    }
-    echo "</span><br />&nbsp;<br />\n";
-  }
-  *******************************************************************/
 }
 
 // Determine if an encounter exists for today.

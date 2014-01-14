@@ -28,6 +28,7 @@
 
 require_once("formdata.inc.php");
 require_once("formatting.inc.php");
+require_once(dirname(__FILE__) . "/../custom/code_types.inc.php");
 
 $date_init = "";
 
@@ -147,7 +148,7 @@ function dropdown_facility($selected = '', $name = 'form_facility', $allow_unspe
 // $currvalue is the current value, if any, of the associated item.
 //
 function generate_form_field($frow, $currvalue) {
-  global $rootdir, $date_init;
+  global $rootdir, $date_init, $code_types;
 
   $currescaped = htmlspecialchars($currvalue, ENT_QUOTES);
 
@@ -339,8 +340,12 @@ function generate_form_field($frow, $currvalue) {
     echo "</select>";
   }
 
-  // a billing code
+  // A billing code. If description matches an existing code type then that type is 
   else if ($data_type == 15) {
+    $codetype = '';
+    if (!empty($frow['description']) && isset($code_types[$frow['description']])) {
+      $codetype = $frow['description'];
+    }
     echo "<input type='text'" .
       " name='form_$field_id'" .
       " id='form_related_code'" .
@@ -348,7 +353,7 @@ function generate_form_field($frow, $currvalue) {
       " maxlength='" . $frow['max_length'] . "'" .
       " title='$description'" .
       " value='$currescaped'" .
-      " onclick='sel_related(this)' readonly" .
+      " onclick='sel_related(this,\"$codetype\")' readonly" .
       " />";
   }
 
