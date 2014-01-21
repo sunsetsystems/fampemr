@@ -38,7 +38,6 @@ if (isset($mode)) {
   $code       = $_POST['code'];
   $code_type  = $_POST['code_type'];
   $code_text  = $_POST['code_text'];
-  $code_text_short = $_POST['code_text_short'];
   $modifier   = $_POST['modifier'];
   $superbill  = $_POST['form_superbill'];
   $related_code = $_POST['related_code'];
@@ -66,17 +65,22 @@ if (isset($mode)) {
       $alertmsg = xl('Cannot add/update this entry because a duplicate already exists!');
     }
     else {
+      if (!empty($_POST['initial_consult_used'])) {
+        $cyp_factor = empty($_POST['initial_consult']) ? 0 : 1;
+      }
       $sql =
         "code = '"         . ffescape($code)         . "', " .
         "code_type = '"    . ffescape($code_type)    . "', " .
         "code_text = '"    . ffescape($code_text)    . "', " .
-        "code_text_short = '" . ffescape($code_text_short) . "', " .
         "modifier = '"     . ffescape($modifier)     . "', " .
         "superbill = '"    . ffescape($superbill)    . "', " .
         "related_code = '" . ffescape($related_code) . "', " .
         "cyp_factor = '"   . ffescape($cyp_factor)   . "', " .
         "taxrates = '"     . ffescape($taxrates)     . "', " .
         "active = $active";
+      if (isset($_POST['code_text_short'])) {
+        $sql .= ", code_text_short = '" . ffescape($_POST['code_text_short']) . "'";
+      }
       if ($code_id) {
         $query = "UPDATE codes SET $sql WHERE id = '$code_id'";
         sqlStatement($query);
@@ -203,11 +207,12 @@ function validEntry(f) {
  }
 <?php if ($GLOBALS['ippf_specific']) { ?>
  if (f.code_type.value == 12) {
+  /*******************************************************************
   // Count related IPPF codes. Must be 1.
   var icount = 0;
   var i = 0;
   while (i >= 0) {
-   i = f.related_code.value.indexOf('IPPF',i);
+   i = f.related_code.value.indexOf('IPPF:',i);
    if (i >= 0) {
     ++icount;
     ++i;
@@ -221,6 +226,7 @@ function validEntry(f) {
    alert('<?php echo xl('Only one related IPPF code is allowed!'); ?>');
    return false;
   }
+  *******************************************************************/
  }
 <?php } ?>
  return true;
@@ -280,6 +286,32 @@ foreach ($code_types as $key => $value) {
  return '';
 }
 
+function code_type_changed() {
+ var f = document.forms[0];
+ var sel = f.code_type;
+ var type = sel.value;
+ var showConsult = false;
+ var showMethod  = false;
+ var showCYP     = false;
+<?php if ($GLOBALS['ippf_specific']) { ?>
+ if (type == '12')      { // MA
+  showConsult = true;
+ }
+ else if (type == '32') { // IPPFCM
+  showMethod  = true;
+  showCYP     = true;
+ }
+ else if (type == '11') { // IPPF (obsolete)
+  showCYP     = true;
+ }
+<?php } ?>
+ document.getElementById('id_cyp_factor').style.display      = showCYP     ? '' : 'none';
+ document.getElementById('id_initial_consult').style.display = showConsult ? '' : 'none';
+ document.getElementById('id_code_text_short').style.display = showMethod  ? '' : 'none';
+ f.code_text_short.disabled = !showMethod;
+ f.initial_consult_used.value = showConsult ? '1' : '0';
+}
+
 </script>
 
 </head>
@@ -309,7 +341,7 @@ foreach ($code_types as $key => $value) {
   <td><?php xl('Type','e'); ?>:</td>
   <td width="5"></td>
   <td>
-   <select name="code_type">
+   <select name='code_type' onchange='code_type_changed()'>
 <?php foreach ($code_types as $key => $value) { ?>
     <option value="<?php  echo $value['id'] ?>"<?php if ($GLOBALS['code_type'] == $value['id']) echo " selected" ?>><?php echo $key ?></option>
 <?php } ?>
@@ -341,12 +373,15 @@ foreach ($code_types as $key => $value) {
   </td>
  </tr>
 
- <tr>
-  <td><?php xl('Note','e'); ?>:</td>
+ <tr id='id_code_text_short'>
+  <td><?php xl('Contraceptive Method','e'); ?>:</td>
   <td></td>
   <td>
+   <?php echo generate_select_list('code_text_short', 'contrameth', $code_text_short); ?>
+   <!--
    <input type='text' size='24' maxlength='24' name='code_text_short' value='<?php echo $code_text_short ?>'>&nbsp;
    <?php if (!empty($GLOBALS['ippf_specific'])) echo xl('IPPFCM codes: Put contraceptive method ID here.'); ?>
+   -->
   </td>
  </tr>
 
@@ -360,12 +395,20 @@ generate_form_field(array('data_type'=>1,'field_id'=>'superbill','list_id'=>'sup
   </td>
  </tr>
 
- <tr<?php if (empty($GLOBALS['ippf_specific'])) echo " style='display:none'"; ?>>
-  <td><?php xl('Contraception','e'); ?>:</td>
+ <tr id='id_cyp_factor'>
+  <td><?php echo xl('CYP Factor'); ?>:</td>
   <td></td>
   <td>
-   <input type='text' size='10' maxlength='20' name="cyp_factor" value='<?php echo $cyp_factor ?>'>&nbsp;
-   <?php echo xl('IPPFCM codes: CYP factor. MA codes: 1 = initial consult.'); ?>
+   <input type='text' size='10' maxlength='20' name="cyp_factor" value='<?php echo $cyp_factor ?>'>
+  </td>
+ </tr>
+
+ <tr id='id_initial_consult'>
+  <td><?php echo xl('Initial Consult'); ?>:</td>
+  <td></td>
+  <td>
+   <input type='checkbox' name="initial_consult" value='1' <?php echo $cyp_factor ? 'checked' : ''; ?> />
+   <input type='hidden' name='initial_consult_used' value='1' />
   </td>
  </tr>
 
@@ -559,6 +602,7 @@ if (!empty($all)) {
 </center>
 
 <script language="JavaScript">
+code_type_changed();
 <?php
  if ($alertmsg) {
   echo "alert('" . htmlentities($alertmsg) . "');\n";
