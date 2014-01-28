@@ -1033,15 +1033,19 @@ if (!empty($reg)) {
           <?php if ($GLOBALS['gbl_menu_stats_gcac' ]) genPopLink(xl('GCAC Stats'),'ippf_statistics_2.php?t=g'); ?>
           <?php if ($GLOBALS['gbl_menu_stats_ma'   ]) genPopLink(xl('MA Stats'  ),'ippf_statistics_2.php?t=m'); ?>
 <?php } ?>
-<?php if (!empty($GLOBALS['code_types']['IPPF'])) { ?>
-          <?php if ($GLOBALS['gbl_menu_stats_ippf' ]) genPopLink(xl('Legacy IPPF Stats'),'ippf_statistics.php?t=i'); ?>
-          <?php if ($GLOBALS['gbl_menu_stats_gcac' ]) genPopLink(xl('Legacy GCAC Stats'),'ippf_statistics.php?t=g'); ?>
-          <?php if ($GLOBALS['gbl_menu_stats_ma'   ]) genPopLink(xl('Legacy MA Stats'  ),'ippf_statistics.php?t=m'); ?>
-<?php } ?>
           <?php if ($GLOBALS['gbl_menu_stats_cyp'  ]) genPopLink(xl('CYP'),'ippf_cyp_report.php'); ?>
           <?php if ($GLOBALS['gbl_menu_stats_daily']) genPopLink(xl('Daily Record'),'ippf_daily.php'); ?>
           <?php if ($GLOBALS['gbl_menu_stats_c3'   ]) genPopLink(xl('C3'),'ippf_c3.php'); ?>
           <?php if (!empty($GLOBALS['code_types']['REPORT'])) genPopLink(xl('Visits by Item'),'famp_services_products_visits.php'); ?>
+<?php if (!empty($GLOBALS['code_types']['IPPF'])) { ?>
+          <li><span><?php xl('Legacy Statistics','e') ?></span>
+            <ul>
+              <?php if ($GLOBALS['gbl_menu_stats_ippf' ]) genPopLink(xl('IPPF Stats'),'ippf_statistics.php?t=i'); ?>
+              <?php if ($GLOBALS['gbl_menu_stats_gcac' ]) genPopLink(xl('GCAC Stats'),'ippf_statistics.php?t=g'); ?>
+              <?php if ($GLOBALS['gbl_menu_stats_ma'   ]) genPopLink(xl('MA Stats'  ),'ippf_statistics.php?t=m'); ?>
+            </ul>
+          </li>
+<?php } ?>
         </ul>
       </li>
 <?php } // end ippf-specific ?>
