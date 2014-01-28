@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2008-2013 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2008-2014 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -124,6 +124,7 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
     echo '"Description"';
     foreach ($ctarr as $ctkey => $dummy) {
       echo ',"' . addslashes(xl('Related') . ' ' . $ctkey) . '"';
+      echo ',"' . addslashes(xl('Description')) . '"';
     }
     while ($prow = sqlFetchArray($pres)) {
       echo ',"' . xl_list_label($prow['title']) . '"';
@@ -212,22 +213,28 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
       "WHERE list_id = 'pricelevel' ORDER BY lo.seq");
 
     if ($_POST['form_csvexport']) {
-      echo '"' . xl_list_label($category) . '",';
-      echo '"' . $key                     . '",';
-      echo '"' . $row['code']             . '",';
-      echo '"' . $row['modifier']         . '",';
-      echo '"' . $row['units']            . '",';
-      echo '"' . $row['code_text']        . '"';
+      echo '"' . addslashes(xl_list_label($category)) . '",';
+      echo '"' . addslashes($key             ) . '",';
+      echo '"' . addslashes($row['code']     ) . '",';
+      echo '"' . addslashes($row['modifier'] ) . '",';
+      echo '"' . addslashes($row['units']    ) . '",';
+      echo '"' . addslashes($row['code_text']) . '"';
 
       foreach ($ctarr as $ctkey => $dummy) {
-        $tmp = '';
+        $tmp1 = '';
+        $tmp2 = '';
         foreach ($relarr as $rkey => $rval) {
           if ($rval[0] == $ctkey) {
-            if ($tmp) $tmp .= ', ';
-            $tmp .= $rval[1];
+            if ($tmp1) {
+              $tmp1 .= ', ';
+              $tmp2 .= ', ';
+            }
+            $tmp1 .= $rval[1];
+            $tmp2 .= $rval[2];
           }
         }
-        echo ',"' . addslashes($tmp) . '"';
+        echo ',"' . addslashes($tmp1) . '"';
+        echo ',"' . addslashes($tmp2) . '"';
       }
 
       while ($prow = sqlFetchArray($pres)) {
