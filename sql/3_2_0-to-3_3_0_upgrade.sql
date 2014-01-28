@@ -566,3 +566,5 @@ UPDATE form_encounter SET billing_facility = facility_id;
 ALTER TABLE form_encounter ADD voucher_number varchar(255) NOT NULL DEFAULT '' COMMENT 'also called referral number';
 #EndIf
 
+ALTER TABLE codes CHANGE code code varchar(31) NOT NULL default '';
+

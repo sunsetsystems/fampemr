@@ -188,7 +188,7 @@ CREATE TABLE `codes` (
   `id` int(11) NOT NULL auto_increment,
   `code_text` varchar(255) NOT NULL default '',
   `code_text_short` varchar(24) NOT NULL default '',
-  `code` varchar(10) NOT NULL default '',
+  `code` varchar(31) NOT NULL default '',
   `code_type` tinyint(2) default NULL,
   `modifier` varchar(5) NOT NULL default '',
   `units` tinyint(3) default NULL,
