@@ -334,7 +334,7 @@ function code_type_changed() {
 <table border='0' cellpadding='0' cellspacing='0'>
 
  <tr>
-  <td colspan="3"> <?php xl('Not all fields are required for all codes or code types.','e'); ?><br><br></td>
+  <td colspan="4"> <?php xl('Not all fields are required for all codes or code types.','e'); ?><br><br></td>
  </tr>
 
  <tr>
@@ -358,8 +358,9 @@ function code_type_changed() {
 <?php } else { ?>
    <input type='hidden' name='modifier' value='<?php // echo $modifier; ?>'>
 <?php } ?>
-
-   &nbsp;&nbsp;
+   &nbsp;
+  </td>
+  <td>
    <input type='checkbox' name='active' value='1'<?php if (!empty($active)) echo ' checked'; ?> />
    <?php xl('Active','e'); ?>
   </td>
@@ -369,14 +370,19 @@ function code_type_changed() {
   <td><?php xl('Description','e'); ?>:</td>
   <td></td>
   <td>
-   <input type='text' size='50' maxlength='255' name='code_text' value='<?php echo $code_text ?>'>
+   <input type='text' size='40' maxlength='255' name='code_text' value='<?php echo $code_text ?>'>&nbsp;
+  </td>
+  <td id='id_initial_consult'>
+   <input type='checkbox' name="initial_consult" value='1' <?php echo $cyp_factor ? 'checked' : ''; ?> />
+   <input type='hidden' name='initial_consult_used' value='1' />
+   <?php xl('Initial Consult','e'); ?>
   </td>
  </tr>
 
  <tr id='id_code_text_short'>
   <td><?php xl('Contraceptive Method','e'); ?>:</td>
   <td></td>
-  <td>
+  <td colspan='2'>
    <?php echo generate_select_list('code_text_short', 'contrameth', $code_text_short); ?>
    <!--
    <input type='text' size='24' maxlength='24' name='code_text_short' value='<?php echo $code_text_short ?>'>&nbsp;
@@ -388,7 +394,7 @@ function code_type_changed() {
  <tr>
   <td><?php xl('Category','e'); ?>:</td>
   <td></td>
-  <td>
+  <td colspan='2'>
 <?php
 generate_form_field(array('data_type'=>1,'field_id'=>'superbill','list_id'=>'superbill'), $superbill);
 ?>
@@ -398,25 +404,16 @@ generate_form_field(array('data_type'=>1,'field_id'=>'superbill','list_id'=>'sup
  <tr id='id_cyp_factor'>
   <td><?php echo xl('CYP Factor'); ?>:</td>
   <td></td>
-  <td>
+  <td colspan='2'>
    <input type='text' size='10' maxlength='20' name="cyp_factor" value='<?php echo $cyp_factor ?>'>
-  </td>
- </tr>
-
- <tr id='id_initial_consult'>
-  <td><?php echo xl('Initial Consult'); ?>:</td>
-  <td></td>
-  <td>
-   <input type='checkbox' name="initial_consult" value='1' <?php echo $cyp_factor ? 'checked' : ''; ?> />
-   <input type='hidden' name='initial_consult_used' value='1' />
   </td>
  </tr>
 
  <tr<?php if (!related_codes_are_used()) echo " style='display:none'"; ?>>
   <td><?php xl('Relate To','e'); ?>:</td>
   <td></td>
-  <td>
-   <input type='text' size='50' name='related_desc'
+  <td colspan='2'>
+   <input type='text' size='40' name='related_desc'
     value='<?php echo $related_desc ?>' onclick="sel_related()"
     title='<?php xl('Click to select related code','e'); ?>' readonly />
    <input type='hidden' name='related_code' value='<?php echo $related_code ?>' />
@@ -426,7 +423,7 @@ generate_form_field(array('data_type'=>1,'field_id'=>'superbill','list_id'=>'sup
  <tr>
   <td><?php xl('Fees','e'); ?>:</td>
   <td></td>
-  <td>
+  <td colspan='2'>
 <?php
 $pres = sqlStatement("SELECT lo.option_id, lo.title, p.pr_price " .
   "FROM list_options AS lo LEFT OUTER JOIN prices AS p ON " .
@@ -458,14 +455,14 @@ if ($taxline) {
  <tr>
   <td><?php xl('Taxes','e'); ?>:</td>
   <td></td>
-  <td>
+  <td colspan='2'>
    <?php echo $taxline ?>
   </td>
  </tr>
 <?php } ?>
 
  <tr>
-  <td colspan="3" align="center">
+  <td colspan="4" align="center">
    <input type="hidden" name="code_id" value="<?php echo $code_id ?>"><br>
    <a href='javascript:submitUpdate();' class='link'>[<?php xl('Update','e'); ?>]</a>
    &nbsp;&nbsp;
