@@ -114,7 +114,7 @@ else if ($report_type == 'g') {
   );
 }
 else {
-  $report_title = xl('IPPF Statistics Report');
+  $report_title = xl('IPPF Statistics Report (old framework)');
   $arr_by = array(
     3  => xl('General Service Category'),
     4  => xl('Specific Service'),
@@ -1233,7 +1233,7 @@ while ($lrow = sqlFetchArray($lres)) {
     header("Expires: 0");
     header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
     header("Content-Type: application/force-download; charset=utf-8");
-    header("Content-Disposition: attachment; filename=service_statistics_report.csv");
+    header("Content-Disposition: attachment; filename=IPPF_Statistics_Report_oldversion.csv");
     header("Content-Description: File Transfer");
     // Prepend a BOM (Byte Order Mark) header to mark the data as UTF-8.  This is
     // said to work for Excel 2007 pl3 and up and perhaps also Excel 2003 pl3.  See:

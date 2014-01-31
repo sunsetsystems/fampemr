@@ -61,7 +61,7 @@ if ($report_type == 'm') {
     2 => xl('Unique Clients'),
     4 => xl('Unique New Clients'),
     7 => xl('Unique Returning Clients'),
-    6 => xl('Acceptors New to Modern Contraception'), // new on 2/2012
+    6 => xl('New Users'),                             // new on 2/2012 (as "Acceptors New to Modern Contraception")
     5 => xl('Contraceptive Items Provided'),          // reactivated 2/2012
   );
   $arr_invalid = array(
@@ -99,7 +99,7 @@ else if ($report_type == 'g') {
   );
 }
 else {
-  $report_title = xl('IPPF Statistics Report 2014+');
+  $report_title = xl('IPPF Statistics Report');
   $arr_by = array(
     3  => xl('General Service Category'),
     4  => xl('Specific Service'),
@@ -112,11 +112,17 @@ else {
   );
   $arr_content = array(
     1 => xl('Services'),
-    /*****************************************************************
-    3 => xl('New Acceptors'),
-    *****************************************************************/
-    6 => xl('Acceptors New to Modern Contraception'), // new for 2014
+    6 => xl('New Users'),                     // new for 2014
     5 => xl('Contraceptive Items Provided'),
+  );
+  $arr_invalid = array(                       // Per CV email 2014-01-30
+    3   => array(5,6),
+    4   => array(5,6),
+    104 => array(5,6),
+    9   => array(5,6),
+    10  => array(5,6),
+    14  => array(5,6),
+    15  => array(5,6),
   );
 }
 
@@ -1361,7 +1367,7 @@ while ($lrow = sqlFetchArray($lres)) {
     header("Expires: 0");
     header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
     header("Content-Type: application/force-download; charset=utf-8");
-    header("Content-Disposition: attachment; filename=service_statistics_report.csv");
+    header("Content-Disposition: attachment; filename=IPPF_Statistics_Report.csv");
     header("Content-Description: File Transfer");
     // Prepend a BOM (Byte Order Mark) header to mark the data as UTF-8.  This is
     // said to work for Excel 2007 pl3 and up and perhaps also Excel 2003 pl3.  See:
@@ -1645,7 +1651,7 @@ if ($_POST['form_submit']) {
     if ($form_by == '105' && $form_content != 5 && $form_content != 3 && $form_content != 6) {
     *****************************************************************/
     if ($form_by == '105' && !in_array($form_content, array(5, 6))) {
-      $alertmsg = xl("Contraceptive Products report requires Contraceptive Items Provided or New Acceptors content type.");
+      $alertmsg = xl("Contraceptive Products report requires Contraceptive Items Provided or New Users content type.");
     }
 
     // In the case where content is contraceptive item sales, we
@@ -1677,10 +1683,13 @@ if ($_POST['form_submit']) {
       while ($row = sqlFetchArray($res)) {
         $desired = false;
         $prodcode = '';
+
+        // TBD: I think this is obsolete.
         if ($row['cyp_factor'] > 0) {
           $desired = true;
         }
-        $tmp = getRelatedContraceptiveCode($row);
+
+        $tmp = getRelatedContraceptiveCode($row); // Returns an IPPFCM code or ''
         $my_group_name = $contra_group_name;
         if (!empty($tmp)) {
           $desired = true;
@@ -1774,6 +1783,7 @@ if ($_POST['form_submit']) {
     *****************************************************************/
     if ($form_content == 6) {
 
+     /****************************************************************
      // Per CV 2012-10-12 re the IPPF Stats report:
      // "the report should be modified so that the report can run when Content = New User and
      // Row = Contraceptive Service [...] There should be a warning when it’s run for Contraceptive
@@ -1782,8 +1792,9 @@ if ($_POST['form_submit']) {
      if ($report_type == 'i' && $form_by !== '104') { // content is new acceptors but incompatible report type
       $alertmsg = xl("New Acceptors content type is valid only for contraceptive service reporting.");
      }
-
-     else if (in_array($form_by, array('6', '7', '104', '105'))) {
+     else
+     if (in_array($form_by, array('6', '7', '104', '105'))) {
+     ****************************************************************/
 
       // This enumerates instances of "contraception starting" for the MA.  Note that a
       // client could be counted twice, once for nonsurgical and once for surgical.
@@ -1801,6 +1812,7 @@ if ($_POST['form_submit']) {
       if ($form_facility) {
         $query .= "AND fe.facility_id = '$form_facility' ";
       }
+
       /***************************************************************
       if ($form_content == 3) {
         // Content type 3, IPPF new acceptors
@@ -1820,6 +1832,7 @@ if ($_POST['form_submit']) {
           "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 ";
       }
       ***************************************************************/
+
       // Content type 6, acceptors new to modern contraception
       $query .=
         "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' AND d1.field_value != '' " .
@@ -1851,6 +1864,7 @@ if ($_POST['form_submit']) {
         // pid, so only the last occurrence per client will be reported.
         if ($thispid == $lastpid && ($thisyear == $lastyear || $form_content != 3)) {
         *************************************************************/
+
         // Make sure "acceptors new to modern contraception" happen only once
         // regardless of the year.  Note we are sorting by descending date within
         // pid, so only the last occurrence per client will be reported.
@@ -1878,10 +1892,14 @@ if ($_POST['form_submit']) {
           process_ippfcm_code($row, $ippfconmeth);
         }
       } // end while
+
+     /****************************************************************
      }
      else { // content is new acceptors but incompatible report type
       $alertmsg = xl("New Acceptors content type is valid only for contraceptive method or product reporting.");
      }
+     ****************************************************************/
+
     } // end if
 
     else if ($form_content != 5 && !in_array($form_by, array(9, 10, 14, 15, 20))) {
