@@ -215,7 +215,12 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
     if ($_POST['form_csvexport']) {
       echo '"' . addslashes(xl_list_label($category)) . '",';
       echo '"' . addslashes($key             ) . '",';
-      echo '"' . addslashes($row['code']     ) . '",';
+      if ($row['code'] !== '') {
+        echo '"\'' . addslashes($row['code']) . '",';
+      }
+      else {
+        echo '"",';
+      }
       echo '"' . addslashes($row['modifier'] ) . '",';
       echo '"' . addslashes($row['units']    ) . '",';
       echo '"' . addslashes($row['code_text']) . '"';
@@ -233,7 +238,13 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
             $tmp2 .= $rval[2];
           }
         }
-        echo ',"' . addslashes($tmp1) . '"';
+        // echo ',"' . addslashes($tmp1) . '"';
+        if ($tmp1 !== '') {
+          echo ',"\'' . addslashes($tmp1) . '"';
+        }
+        else {
+          echo ',""';
+        }
         echo ',"' . addslashes($tmp2) . '"';
       }
 
