@@ -27,10 +27,13 @@ td { font-size:10pt; }
 <script language="JavaScript">
 
  function selcode(codetype, code, selector, codedesc) {
-  if (opener.closed || ! opener.set_related)
+  if (opener.closed || ! opener.set_related) {
    alert('The destination form was closed; I cannot act on your selection.');
-  else
-   opener.set_related(codetype, code, selector, codedesc);
+  }
+  else {
+   var msg = opener.set_related(codetype, code, selector, codedesc);
+   if (msg) alert(msg);
+  }
   window.close();
   return false;
  }

@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2007-2010 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2007-2014 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -1038,7 +1038,27 @@ function generate_display_field($frow, $currvalue) {
 
   // billing code
   else if ($data_type == 15) {
-    $s = $currvalue;
+    $s = '';
+    if (!empty($currvalue)) {
+      $relcodes = explode(';', $currvalue);
+      foreach ($relcodes as $codestring) {
+        if ($codestring === '') continue;
+        list($codetype, $code) = explode(':', $codestring);
+        $query = "SELECT c.code_text FROM codes AS c, code_types AS ct WHERE " .
+          "ct.ct_key = '$codetype' AND " .
+          "c.code_type = ct.ct_id AND " .
+          "c.code = '$code' AND c.active = 1 " .
+          "ORDER BY c.id LIMIT 1";
+        $nrow = sqlQuery($query);
+        if ($s !== '') $s .= '; ';
+        if (!empty($nrow['code_text'])) {
+          $s .= $nrow['code_text'];
+        }
+        else {
+          $s .= $codestring . ' (' . xl('not found') . ')';
+        }
+      }
+    }
   }
 
   // a set of labeled checkboxes
