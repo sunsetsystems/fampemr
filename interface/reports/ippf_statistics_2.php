@@ -43,6 +43,7 @@ $form_periods  = isset($_POST['form_periods']) ? 0 + $_POST['form_periods'] : 0;
 //
 if ($report_type == 'm') {
   $report_title = xl('Member Association Statistics Report');
+  $report_name_prefix = 'MA';
   $arr_by = array(
     101 => xl('MA Category'),
     102 => xl('Specific Service'),
@@ -80,6 +81,7 @@ if ($report_type == 'm') {
 }
 else if ($report_type == 'g') {
   $report_title = xl('GCAC Statistics Report');
+  $report_name_prefix = 'GCAC';
   $arr_by = array(
     13 => xl('Abortion-Related Categories'),
     1  => xl('Total SRH & Family Planning'),
@@ -100,6 +102,7 @@ else if ($report_type == 'g') {
 }
 else {
   $report_title = xl('IPPF Statistics Report');
+  $report_name_prefix = 'IPPF';
   $arr_by = array(
     3  => xl('General Service Category'),
     4  => xl('Specific Service'),
@@ -118,7 +121,7 @@ else {
   $arr_invalid = array(                       // Per CV email 2014-01-30
     3   => array(5,6),
     4   => array(5,6),
-    104 => array(5,6),
+    104 => array(5),
     9   => array(5,6),
     10  => array(5,6),
     14  => array(5,6),
@@ -333,8 +336,6 @@ function getRelatedContraceptiveCode($row) {
   return '';
 }
 
-
-
 // Determine if the given IPPF2 code is related to contraception.
 // This includes modern (11) and natural (12) methods.
 function isIPPF2Contraceptive($code) {
@@ -343,8 +344,6 @@ function isIPPF2Contraceptive($code) {
   }
   return false;
 }
-
-
 
 // Helper function to find an abortion-method IPPF2 code from
 // the related_code element of the given array.
@@ -408,8 +407,6 @@ function getAbortionMethod($code) {
   return $key;
 }
 
-
-
 // Generate a SQL condition that tests if the specified column includes an
 // IPPF2 code for an abortion procedure.
 //
@@ -423,8 +420,6 @@ function genAbortionSQL($col) {
     "$col LIKE '%IPPF2:2113130301102%' OR " .
     "$col LIKE '%IPPF2:2113130301103%'";
 }
-
-
 
 // Determine if a recent gcac service was performed.
 //
@@ -581,7 +576,7 @@ function loadColumnData($key, $row, $quantity=1) {
   global $form_clinics, $form_periods, $arr_periods;
 
   // If we are counting new acceptors, then this must be a report of contraceptive
-  // methods or contraceptive products, and a contraceptive start date is provided.
+  // (methods or services or products), and a contraceptive start date is provided.
   /*******************************************************************
   if ($form_content == '3' || $form_content == '6') {
   *******************************************************************/
@@ -710,12 +705,14 @@ function product_contraception_scan($pid, $encounter) {
 
 // This gets the IPPFCM contraception code of the service with highest CYP
 // in a visit, similarly to the method that the Fee Sheet uses to assign a value
-// for newmethod.  Currently this function is only needed for the special case where
-// LBFccicon indicates a New User but no method is in the form, which in turn
-// happens only for conversions of old data from release 3.2.0.7.
+// for newmethod.  Also get the associated IPPF2 code to support reporting of
+// specific IPPF2 service for new user content type.
 //
 function service_contraception_scan($pid, $encounter) {
+  global $contraception_ippf2_code;
+
   $contraception_code = '';
+  $contraception_ippf2_code = '';
   $contraception_cyp  = -1;
   $query = "SELECT " .
     "b.code_type, b.code, c.related_code " .
@@ -727,10 +724,20 @@ function service_contraception_scan($pid, $encounter) {
   $bres = sqlStatement($query);
   while ($brow = sqlFetchArray($bres)) {
     $relcodes = explode(';', $brow['related_code']);
+
+    // Get the associated IPPF2 code for this service.
+    $tmp_ippf2_code = '';
     foreach ($relcodes as $codestring) {
       if ($codestring === '') continue;
       list($codetype, $relcode) = explode(':', $codestring);
+      if ($codetype === 'IPPF2') {
+        $tmp_ippf2_code = $relcode;
+      }
+    }
 
+    foreach ($relcodes as $codestring) {
+      if ($codestring === '') continue;
+      list($codetype, $relcode) = explode(':', $codestring);
 
       /***************************************************************
       if ($codetype !== 'IPPF') continue;
@@ -753,6 +760,7 @@ function service_contraception_scan($pid, $encounter) {
         }
       }
       ***************************************************************/
+
       if ($codetype !== 'IPPFCM') continue;
       $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
         "code_type = '32' AND code = '$relcode' LIMIT 1");
@@ -760,6 +768,7 @@ function service_contraception_scan($pid, $encounter) {
       if ($cyp > $contraception_cyp) {
         $contraception_cyp  = $cyp;
         $contraception_code = $relcode;
+        $contraception_ippf2_code = $tmp_ippf2_code;
       }
 
     }
@@ -801,8 +810,6 @@ function get_adjustment_type($patient_id, $encounter_id, $code_type, $code) {
 }
 
 // This is called for each IPPF service code that is selected.
-//
-// TBD: Correct this function for IPPF2 codes.
 //
 function process_ippf_code($row, $code, $quantity=1) {
   global $form_by, $form_content, $contra_group_name;
@@ -1367,7 +1374,7 @@ while ($lrow = sqlFetchArray($lres)) {
     header("Expires: 0");
     header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
     header("Content-Type: application/force-download; charset=utf-8");
-    header("Content-Disposition: attachment; filename=IPPF_Statistics_Report.csv");
+    header("Content-Disposition: attachment; filename={$report_name_prefix}_Statistics_Report.csv");
     header("Content-Description: File Transfer");
     // Prepend a BOM (Byte Order Mark) header to mark the data as UTF-8.  This is
     // said to work for Excel 2007 pl3 and up and perhaps also Excel 2003 pl3.  See:
@@ -1774,8 +1781,8 @@ if ($_POST['form_submit']) {
       }
     }
 
-    // Reporting New Acceptors by contraceptive method (or method after abortion)
-    // or by contraceptive product is a special case that gets one method or product
+    // Reporting New Acceptors by contraceptive method (or method after abortion),
+    // service or product is a special case that gets one method, service or product
     // on each contraceptive start date.
     //
     /*****************************************************************
@@ -1875,7 +1882,12 @@ if ($_POST['form_submit']) {
         $lastpid = $thispid;
         $lastyear = $thisyear;
 
-        if ($form_by == '105') {
+        if ($form_by == '104') {
+          // Specific contraceptive service.
+          service_contraception_scan($thispid, $thisenc);
+          process_ippf_code($row, $contraception_ippf2_code);
+        }
+        else if ($form_by == '105') {
           // For contraceptive product reporting we build a key containing
           // the group and product names of the associated product sale with
           // highest CYP.
