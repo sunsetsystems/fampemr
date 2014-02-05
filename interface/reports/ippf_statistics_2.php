@@ -122,6 +122,7 @@ else {
     3   => array(5,6),
     4   => array(5,6),
     104 => array(5),
+    6   => array(6),
     9   => array(5,6),
     10  => array(5,6),
     14  => array(5,6),
@@ -228,7 +229,7 @@ function getListTitle($list, $option) {
 
 // Usually this generates one cell, but allows for two or more.
 //
-function genAnyCell($data, $align='left', $class='', $colspan=1) {
+function genAnyCell($data, $align='left', $class='', $colspan=1, $forcetext=false) {
   global $cellcount, $form_output;
   if (!is_array($data)) {
     $data = array(0 => $data);
@@ -236,6 +237,10 @@ function genAnyCell($data, $align='left', $class='', $colspan=1) {
   foreach ($data as $datum) {
     if ($form_output == 3) {
       if ($cellcount) echo ',';
+      // Next line is to force the spreadsheet app to recognize the column as
+      // text and not a number.  We don't like IPPF2 codes shown in floating
+      // point notation.  :)
+      if ($forcetext) echo '=';
       echo '"' . $datum . '"';
       while ($colspan-- > 1) echo ',""';
     }
@@ -2124,15 +2129,18 @@ if ($_POST['form_submit']) {
         // generate a subtotals line and clear subtotals array.
         // Set $last_group to the current group name.
         if ($this_group != $last_group) {
-          if ($last_group_count > 1) {
-            // Write subtotals only if more than one row in the group.
-            writeSubtotals($last_group, $asubtotals, $form_by);  
-          }
-          if ($last_group !== '' && !$form_clinics) {
-            // Add some space before the next group.
-            genStartRow("bgcolor='#dddddd'");
-            genHeadCell('&nbsp;', 'left', $report_col_count);
-            genEndRow();
+          // IPPF Stats does not get subtotals.
+          if ($report_type !== 'i') {
+            if ($last_group_count > 1) {
+              // Write subtotals only if more than one row in the group.
+              writeSubtotals($last_group, $asubtotals, $form_by);  
+            }
+            if ($last_group !== '' && !$form_clinics) {
+              // Add some space before the next group.
+              genStartRow("bgcolor='#dddddd'");
+              genHeadCell('&nbsp;', 'left', $report_col_count);
+              genEndRow();
+            }
           }
           $last_group = $this_group;
           $last_group_count = 0;
@@ -2169,7 +2177,7 @@ if ($_POST['form_submit']) {
       // If writing clinic-specific rows then write a title line for the key.
       if ($form_clinics) {
         genStartRow("bgcolor='#dddddd'");
-        genAnyCell($dispkey, 'left', 'detail', $dispspan);
+        genAnyCell($dispkey, 'left', 'detail', $dispspan, true);
         genAnyCell('', 'left', 'detail', $report_col_count - 2);
         genEndRow();
         $encount = 0;
@@ -2195,7 +2203,7 @@ if ($_POST['form_submit']) {
           genAnyCell($cliname, 'right', 'detail', 2);
         }
         else {
-          genAnyCell($dispkey, 'left', 'detail', $dispspan);
+          genAnyCell($dispkey, 'left', 'detail', $dispspan, true);
         }
 
         // This is the column index for accumulating column totals.
@@ -2250,9 +2258,12 @@ if ($_POST['form_submit']) {
       $form_content != '4' && $form_content != '7') {
     *****************************************************************/
     if ($form_output != 3 && !in_array($form_content, array(2, 4, 7))) {
-      // If there is a non-empty $last_group, generate a subtotals line.
-      if ($last_group_count > 1) {
-        writeSubtotals($last_group, $asubtotals, $form_by);
+
+      if ($report_type !== 'i') {
+        // If there is a non-empty $last_group, generate a subtotals line.
+        if ($last_group_count > 1) {
+          writeSubtotals($last_group, $asubtotals, $form_by);
+        }
       }
 
       if ($last_group !== '' && !$form_clinics) {

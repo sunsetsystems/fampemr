@@ -216,7 +216,8 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
       echo '"' . addslashes(xl_list_label($category)) . '",';
       echo '"' . addslashes($key             ) . '",';
       if ($row['code'] !== '') {
-        echo '"\'' . addslashes($row['code']) . '",';
+        // Prefix "=" prevents Excel from showing an IPPF2 code as floating point.
+        echo '="' . addslashes($row['code']) . '",';
       }
       else {
         echo '"",';
@@ -240,7 +241,7 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
         }
         // echo ',"' . addslashes($tmp1) . '"';
         if ($tmp1 !== '') {
-          echo ',"\'' . addslashes($tmp1) . '"';
+          echo ',="' . addslashes($tmp1) . '"';
         }
         else {
           echo ',""';
