@@ -1036,7 +1036,7 @@ function process_ippf_code($row, $code, $quantity=1) {
 // us which contraceptive method is involved.
 //
 function process_ippfcm_code($row, $code, $quantity=1) {
-  global $form_by, $form_content, $contra_group_name;
+  global $form_by, $form_content, $contra_group_name, $report_type;
 
   $key = 'Unspecified';
 
@@ -1049,7 +1049,13 @@ function process_ippfcm_code($row, $code, $quantity=1) {
       if ($form_content != 5) return;
       $key = 'Unspecified';
     }
-    $key = '{' . $contra_group_name . '}' . $key;
+    if ($report_type == 'i') {
+      // Per CV we want to sort methods by IPPFCM code for IPPF Stats.
+      $key = "$code $key" . '{' . $contra_group_name . '}';
+    }
+    else {
+      $key = '{' . $contra_group_name . '}' . $key;
+    }
   }
 
   // Contraceptive method for new contraceptive adoption following abortion.
@@ -2118,6 +2124,11 @@ if ($_POST['form_submit']) {
       $this_group = '';
       if (preg_match('/^{(.*)}(.*)/', $key, $tmp)) {
         $this_group = $tmp[1];
+        $display_key = $tmp[2];
+      }
+      // This key pattern is used for contraceptive methods for IPPF Stats only.
+      else if (preg_match('/^([\S]*) (.*){(.*)}$/', $key, $tmp)) {
+        $this_group = $tmp[3];
         $display_key = $tmp[2];
       }
       /**************************************************************

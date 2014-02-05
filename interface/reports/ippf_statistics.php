@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2008-2012 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2008-2014 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -42,7 +42,7 @@ $form_periods  = isset($_POST['form_periods']) ? 0 + $_POST['form_periods'] : 0;
 // One or more of these are chosen as the left column, or Y-axis, of the report.
 //
 if ($report_type == 'm') {
-  $report_title = xl('Member Association Statistics Report');
+  $report_title = xl('Member Association Statistics Report (old framework)');
   $arr_by = array(
     101 => xl('MA Category'),
     102 => xl('Specific Service'),
@@ -89,7 +89,7 @@ if ($report_type == 'm') {
   );
 }
 else if ($report_type == 'g') {
-  $report_title = xl('GCAC Statistics Report');
+  $report_title = xl('GCAC Statistics Report (old framework)');
   $arr_by = array(
     13 => xl('Abortion-Related Categories'),
     1  => xl('Total SRH & Family Planning'),
