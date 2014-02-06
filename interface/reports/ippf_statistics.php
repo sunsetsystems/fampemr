@@ -936,6 +936,86 @@ function process_ippf_code($row, $code, $quantity=1) {
 
 } // end function process_ippf_code()
 
+// Translate an IPPFCM code to the corresponding descriptive name of its
+// contraceptive method, or to an empty string if none applies.
+//
+function getContraceptiveMethodNew($code) {
+  global $contra_group_name;
+  $contra_group_name = '00000 ' . xl('No Group');
+  $key = '';
+  $row = sqlQuery("SELECT c.code_text, lo.title FROM codes AS c " .
+    "LEFT JOIN list_options AS lo ON lo.list_id = 'contrameth' AND " .
+    "lo.option_id = c.code_text_short " .
+    "WHERE c.code_type = '32' AND c.code = '$code'");
+  if (!empty($row['code_text'])) {
+    $key = $row['code_text'];
+    if (!empty($row['title'])) {
+      $contra_group_name = $row['title'];
+    }
+  }
+
+  return $key;
+}
+
+// This is called for each IPPFCM service code. These are the codes that tell
+// us which contraceptive method is involved.
+//
+function process_ippfcm_code($row, $code, $quantity=1) {
+  global $form_by, $form_content, $contra_group_name, $report_type;
+
+  $key = 'Unspecified';
+
+  // Contraceptive Method.
+  //
+  if ($form_by === '6') {
+    $key = getContraceptiveMethodNew($code);
+    if (empty($key)) {
+      // If not a contraceptive service then skip unless counting Contraceptive Items Provided.
+      if ($form_content != 5) return;
+      $key = 'Unspecified';
+    }
+    $key = '{' . $contra_group_name . '}' . $key;
+  }
+
+  // Contraceptive method for new contraceptive adoption following abortion.
+  // Get it from the IPPFCM code if there is a suitable recent abortion service
+  // or GCAC form.
+  //
+  else if ($form_by === '7') {
+    $key = getContraceptiveMethod($code);
+    if (empty($key)) return;
+    $key = '{' . $contra_group_name . '}' . $key;
+    $patient_id = $row['pid'];
+    $encdate = $row['encdate'];
+    // Skip this if no recent gcac service nor gcac form with acceptance.
+    // Include incomplete abortion treatment services per AM's discussion
+    // with Dr. Celal on 2011-04-19.
+    if (!hadRecentAbService($patient_id, $encdate, true)) {
+      $query = "SELECT COUNT(*) AS count " .
+        "FROM forms AS f, form_encounter AS fe, lbf_data AS d " .
+        "WHERE f.pid = '$patient_id' AND " .
+        "f.formdir = 'LBFgcac' AND " .
+        "f.deleted = 0 AND " .
+        "fe.pid = f.pid AND fe.encounter = f.encounter AND " .
+        "fe.date <= '$encdate' AND " .
+        "DATE_ADD(fe.date, INTERVAL 14 DAY) > '$encdate' AND " .
+        "d.form_id = f.form_id AND " .
+        "d.field_id = 'client_status' AND " .
+        "( d.field_value = 'maaa' OR d.field_value = 'refout' )";
+      $irow = sqlQuery($query);
+      if (empty($irow['count'])) return;
+    }
+  }
+
+  else {
+    return; // no match, so do nothing
+  }
+
+  // OK we now have the reporting key for this issue.
+  loadColumnData($key, $row, $quantity);
+
+} // end function process_ippfcm_code()
+
 // This is called for each MA service code that is selected.
 //
 function process_ma_code($row, $code='', $quantity=1) {
@@ -1753,10 +1833,14 @@ if ($_POST['form_submit']) {
       //
       while ($row = sqlFetchArray($res)) {
         $contrastart = $row['contrastart'];
-        $ippfconmeth = $row['ippfconmeth'];
+        // $ippfconmeth = $row['ippfconmeth'];
         $thispid     = $row['pid'];
         $thisenc     = $row['encounter'];
         $thisyear    = substr($contrastart, 0, 4);
+        $ippfconmeth = '';
+        if (!empty($row['ippfconmeth']) && substr($row['ippfconmeth'], 0, 7) == 'IPPFCM:') {
+          $ippfconmeth = substr($row['ippfconmeth'], 7);
+        }
 
         // Leslie on 2012-03-12 says IPPF New Users may only be reported once per calendar year.
         // While on this, we'll also make sure "acceptors new to modern contraception" happen
@@ -1769,19 +1853,25 @@ if ($_POST['form_submit']) {
         $lastpid = $thispid;
         $lastyear = $thisyear;
 
-        if ($form_by == '105') {
+        if ($form_by == '104') { // Specific contractptive service
+          process_ippf_code($row, service_contraception_scan($thispid, $thisenc));
+        }
+        else if ($form_by == '105') { // Contraceptive Product
           // For contraceptive product reporting we build a key containing
           // the group and product names of the associated product sale with
           // highest CYP.
           loadColumnData(product_contraception_scan($thispid, $thisenc), $row);
         }
-        else {
+        else { // Contraceptive Method
+          /***********************************************************
           // If the new method is missing, try to get it from the billing table.
           // That should happen only for old data from sites upgraded from release 3.2.0.7.
           if (empty($ippfconmeth)) {
             $ippfconmeth = service_contraception_scan($row['pid'], $row['encounter']);
           }
           process_ippf_code($row, $ippfconmeth);
+          ***********************************************************/
+          process_ippfcm_code($row, $ippfconmeth);
         }
       } // end while
      }

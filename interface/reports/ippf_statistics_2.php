@@ -1012,11 +1012,14 @@ function process_ippf_code($row, $code, $quantity=1) {
     /*****************************************************************
     if (preg_match('/^252221/', $code)) { // all pre-abortion counseling
     *****************************************************************/
+    /*****************************************************************
     if (in_array($code, array(
       '2111010121000', // Abortion - Counselling - Pre-abortion / Options Counselling
       '2112020200000', // Abortion - Consultation
       '2112020201101', // Abortion - Consultation - Initial consultation - Harm reduction model
     ))) {
+    *****************************************************************/
+    if (preg_match('/^211101/', $code)) { // all pre-abortion counseling
       $key = getGcacClientStatus($row);
     } else {
       return;
