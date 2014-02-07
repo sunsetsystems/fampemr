@@ -5,11 +5,11 @@
 // upgrade file is the starting point for the next upgrade.
 $v_major = '3';
 $v_minor = '2';
-$v_patch = '0';
-$v_tag   = '.9-p4'; // minor revision number, should be empty for production releases
+$v_patch = '1';
+$v_tag   = ''; // minor revision number, should be empty for production releases
 
 // Database version identifier, this is to be incremented whenever there
 // is a database change in the course of development.  It is used
 // internally to determine when a database upgrade is needed.
-$v_database = 20;
+$v_database = 21;
 ?>

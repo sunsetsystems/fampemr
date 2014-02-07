@@ -1,5 +1,5 @@
 <?php
- // Copyright (C) 2006-2012 Rod Roark <rod@sunsetsystems.com>
+ // Copyright (C) 2006-2014 Rod Roark <rod@sunsetsystems.com>
  //
  // This program is free software; you can redistribute it and/or
  // modify it under the terms of the GNU General Public License
@@ -114,12 +114,18 @@ function set_related(codetype, code, selector, codedesc) {
  var f = document.forms[0];
  var s = f.form_related_code.value;
  if (code) {
+  if (codetype != 'PROD') {
+   if (s.indexOf(codetype + ':') == 0 || s.indexOf(';' + codetype + ':') > 0) {
+    return '<?php echo xl('A code of this type is already selected. Erase the field first if you need to replace it.') ?>';
+   }
+  }
   if (s.length > 0) s += ';';
   s += codetype + ':' + code;
  } else {
   s = '';
  }
  f.form_related_code.value = s;
+ return '';
 }
 
 // This invokes the find-code popup.

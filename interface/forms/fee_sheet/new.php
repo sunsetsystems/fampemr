@@ -1073,8 +1073,8 @@ function validate(f) {
 <?php if ($GLOBALS['USING_IPPF2']) { ?>
    var male_compatible_method = (
     // TBD: Fix hard coded dependency on IPPFCM codes here.
-    tmp_meth == '445' || // male condoms
-    tmp_meth == '457');  // male vasectomy
+    tmp_meth == '4450' || // male condoms
+    tmp_meth == '4570');  // male vasectomy
 <?php } else { ?>
    var tmp = tmp_meth.substring(0, 6);
    var male_compatible_method = (

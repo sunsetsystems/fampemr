@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2006-2013 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2006-2014 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -381,6 +381,11 @@ function thisLineItem($patient_id, $encounter_id, $code_type, $code, $rowcat,
   $productqty    += $qty;
   $catqty        += $qty;
   $grandqty      += $qty;
+
+  // Clear out this line item's numbers in case the same code appears again.
+  for ($i = 1; $i < count($aItems[$invno][$codekey]); ++$i) {
+    $aItems[$invno][$codekey][$i] = 0;
+  }
 } // end function thisLineItem
 
 function clearTaxTotals($level) {

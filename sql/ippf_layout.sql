@@ -2036,7 +2036,7 @@ INSERT INTO layout_options VALUES ('LBFccicon', 'newmauser', '1', 'First contrac
 INSERT INTO layout_options VALUES ('LBFccicon', 'curmethod', '1', 'Current Method',
   2,  1, 1, 0, 0, 'contrameth' , 1, 3, '', '', 'Method in use at start of visit');
 INSERT INTO layout_options VALUES ('LBFccicon', 'pastmodern','1', 'Previous modern contraceptive use?',
-  3,  1, 1, 0, 0, 'boolean'    , 1, 3, '', '', 'Was a modern contraceptive method used at some time in the past?');
+  3,  1, 2, 0, 0, 'boolean'    , 1, 3, '', '', 'Was a modern contraceptive method used at some time in the past?');
 INSERT INTO layout_options VALUES ('LBFccicon', 'reqmethod', '1', 'Requested Method',
   4,  1, 1, 0, 0, 'contrameth' , 1, 3, '', '', 'Method requested by the client');
 INSERT INTO layout_options VALUES ('LBFccicon', 'newmethod', '1', 'Adopted Method',

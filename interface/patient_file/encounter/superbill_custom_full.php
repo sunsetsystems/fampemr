@@ -213,26 +213,20 @@ function validEntry(f) {
  }
 <?php if ($GLOBALS['ippf_specific']) { ?>
  if (f.code_type.value == 12) {
-  /*******************************************************************
-  // Count related IPPF codes. Must be 1.
+  // Count related IPPF2 codes. Must be 1.
   var icount = 0;
   var i = 0;
   while (i >= 0) {
-   i = f.related_code.value.indexOf('IPPF:',i);
+   i = f.related_code.value.indexOf('IPPF2:',i);
    if (i >= 0) {
     ++icount;
     ++i;
    }
   }
   if (icount < 1) {
-   alert('<?php echo xl('A related IPPF code is required!'); ?>');
+   alert('<?php echo xl('A related IPPF2 code is required!'); ?>');
    return false;
   }
-  if (icount > 1) {
-   alert('<?php echo xl('Only one related IPPF code is allowed!'); ?>');
-   return false;
-  }
-  *******************************************************************/
  }
 <?php } ?>
  return true;

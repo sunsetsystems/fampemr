@@ -1806,13 +1806,15 @@ if ($_POST['form_submit']) {
         $query .= "AND fe.facility_id = '$form_facility' ";
       }
       if ($form_content == 3) {
-        // Content type 3, IPPF new acceptors
+        // Content type 3, IPPF new acceptors.
+        // Note VSC (IPPFCM:4560 or 4570) is always a new user regardless of newmauser status.
         $query .=
           "LEFT JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
           "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
           "JOIN patient_data AS pd ON pd.pid = f.pid $sexcond " .
           "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND " .
-          "d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1') ";
+          "((d1.field_value IS NOT NULL AND (d1.field_value LIKE 'IPPFCM:4560' OR d1.field_value LIKE 'IPPFCM:4570')) " .
+          "OR (d2.field_value IS NOT NULL AND d2.field_value = '1')) ";
       }
       else {
         // Content type 6, acceptors new to modern contraception
