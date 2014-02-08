@@ -1491,24 +1491,21 @@ UPDATE drugs SET related_code = CONCAT(related_code, ';IPPF2:3150000000800') WHE
 
 # Add the IPPFCM code set to represent contraceptive methods. This obsoletes the "ippfconmeth" list.
 INSERT INTO code_types (ct_key,ct_id,ct_seq,ct_mod,ct_just,ct_fee,ct_rel,ct_nofs,ct_diag) VALUES ('IPPFCM',32,8,0,'',0,0,1,0);
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4360','', 0.066667,'or' ,'Oral Contraceptives COC&POC');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4370','', 0.076923,'inj','Injectable Contraceptives CICs');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4380','', 0.166667,'inj','Injectable Contraceptives POIs - 2 mo');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4390','', 0.250000,'inj','Injectable Contraceptives POIs - 3 mo');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4400','', 3.800000,'imp','Subdermal Implants Implants 6 rods');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4410','', 3.200000,'imp','Subdermal Implants Implants 2 rods');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4420','', 2.500000,'imp','Subdermal Implants Implants 1 rod');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4430','', 0.066667,'pat','Other Hormonal Transdermal Patch');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4440','', 0.066667,'pat','Other Hormonal Vaginal Ring');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4450','', 0.008333,'con','Condoms - Male');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4460','', 0.008333,'con','Condoms - Female');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4470','', 1.000000,'dia','Diapraghms - Totals');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4480','', 1.000000,'cap','Caps - Totals');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4490','', 0.133333,'sp' ,'Spermicides Foams Tabs');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4500','', 0.133333,'sp' ,'Spermicides Foam Strips');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4510','', 0.133333,'sp' ,'Spermicides Foam Cans');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4520','', 0.133333,'sp' ,'Spermicides Creams & Jellies');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4530','', 0.133333,'sp' ,'Spermicides Pessaries - Film');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4360','', 0.066667,'or' ,'Oral Contraceptives (combined)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4361','', 0.066667,'or' ,'Oral Contraceptives (progestin only)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4370','', 0.076923,'inj','Injectables (1 month)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4380','', 0.166667,'inj','Injectables (2 month)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4390','', 0.250000,'inj','Injectables (3 month)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4400','', 3.800000,'imp','Implants (5 year)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4410','', 3.200000,'imp','Implants (4 year)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4420','', 2.500000,'imp','Implants (3 year)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4430','', 0.066667,'pat','Patch');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4440','', 0.066667,'pat','Ring');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4450','', 0.008333,'con','Condoms (Male)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4460','', 0.008333,'con','Condoms (Female)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4470','', 1.000000,'dia','Diapraghms');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4480','', 1.000000,'cap','Cervical Caps');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4490','', 0.133333,'sp' ,'Spermicides');
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4540','', 3.300000,'iud','IUD Hormone 5 yr');
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4550','', 4.600000,'iud','IUD Copper 10 yr');
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4560','',10.000000,'vsc','Voluntary Surgical Contraception - Female');
@@ -1517,7 +1514,7 @@ INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text)
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4590','', 0.000000,'fab','Awareness-Based Methods - CBM');
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4600','', 0.000000,'fab','Awareness-Based Methods - STM');
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4610','', 0.000000,'fab','Awareness-Based Methods - SDM');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4620','', 0.050000,'ec' ,'Emergency Contraception - Therapy');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4620','', 0.050000,'ec' ,'Emergency Contraception (progestin only pills)');
 
 # This transforms "newmethod" values in LBFccicon forms from IPPF codes to IPPFCM codes.
 UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4360' WHERE ld.field_value LIKE '111101%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
@@ -1534,10 +1531,10 @@ UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4460' WHERE ld.fi
 UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4470' WHERE ld.field_value LIKE '112151%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
 UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4480' WHERE ld.field_value LIKE '112152%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
 UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4490' WHERE ld.field_value LIKE '112161%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
-UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4500' WHERE ld.field_value LIKE '112162%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
-UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4510' WHERE ld.field_value LIKE '112163%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
-UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4520' WHERE ld.field_value LIKE '112164%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
-UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4530' WHERE ld.field_value LIKE '112165%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
+UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4490' WHERE ld.field_value LIKE '112162%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
+UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4490' WHERE ld.field_value LIKE '112163%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
+UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4490' WHERE ld.field_value LIKE '112164%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
+UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4490' WHERE ld.field_value LIKE '112165%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
 UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4540' WHERE ld.field_value LIKE '113171%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
 UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4550' WHERE ld.field_value LIKE '113172%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
 UPDATE forms AS f, lbf_data AS ld SET ld.field_value = 'IPPFCM:4560' WHERE ld.field_value LIKE '121181%' AND f.formdir = 'LBFccicon' AND f.deleted = 0 AND ld.form_id = f.form_id AND ld.field_id = 'newmethod';
@@ -1573,14 +1570,14 @@ UPDATE codes SET related_code = CONCAT(related_code, ';IPPFCM:4480') WHERE code_
 UPDATE drugs SET related_code = CONCAT(related_code, ';IPPFCM:4480') WHERE related_code IS NOT NULL AND related_code LIKE '%IPPF:112152%' AND related_code NOT LIKE '%IPPFCM:%';
 UPDATE codes SET related_code = CONCAT(related_code, ';IPPFCM:4490') WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:112161%' AND related_code NOT LIKE '%IPPFCM:%';
 UPDATE drugs SET related_code = CONCAT(related_code, ';IPPFCM:4490') WHERE related_code IS NOT NULL AND related_code LIKE '%IPPF:112161%' AND related_code NOT LIKE '%IPPFCM:%';
-UPDATE codes SET related_code = CONCAT(related_code, ';IPPFCM:4500') WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:112162%' AND related_code NOT LIKE '%IPPFCM:%';
-UPDATE drugs SET related_code = CONCAT(related_code, ';IPPFCM:4500') WHERE related_code IS NOT NULL AND related_code LIKE '%IPPF:112162%' AND related_code NOT LIKE '%IPPFCM:%';
-UPDATE codes SET related_code = CONCAT(related_code, ';IPPFCM:4510') WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:112163%' AND related_code NOT LIKE '%IPPFCM:%';
-UPDATE drugs SET related_code = CONCAT(related_code, ';IPPFCM:4510') WHERE related_code IS NOT NULL AND related_code LIKE '%IPPF:112163%' AND related_code NOT LIKE '%IPPFCM:%';
-UPDATE codes SET related_code = CONCAT(related_code, ';IPPFCM:4520') WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:112164%' AND related_code NOT LIKE '%IPPFCM:%';
-UPDATE drugs SET related_code = CONCAT(related_code, ';IPPFCM:4520') WHERE related_code IS NOT NULL AND related_code LIKE '%IPPF:112164%' AND related_code NOT LIKE '%IPPFCM:%';
-UPDATE codes SET related_code = CONCAT(related_code, ';IPPFCM:4530') WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:112165%' AND related_code NOT LIKE '%IPPFCM:%';
-UPDATE drugs SET related_code = CONCAT(related_code, ';IPPFCM:4530') WHERE related_code IS NOT NULL AND related_code LIKE '%IPPF:112165%' AND related_code NOT LIKE '%IPPFCM:%';
+UPDATE codes SET related_code = CONCAT(related_code, ';IPPFCM:4490') WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:112162%' AND related_code NOT LIKE '%IPPFCM:%';
+UPDATE drugs SET related_code = CONCAT(related_code, ';IPPFCM:4490') WHERE related_code IS NOT NULL AND related_code LIKE '%IPPF:112162%' AND related_code NOT LIKE '%IPPFCM:%';
+UPDATE codes SET related_code = CONCAT(related_code, ';IPPFCM:4490') WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:112163%' AND related_code NOT LIKE '%IPPFCM:%';
+UPDATE drugs SET related_code = CONCAT(related_code, ';IPPFCM:4490') WHERE related_code IS NOT NULL AND related_code LIKE '%IPPF:112163%' AND related_code NOT LIKE '%IPPFCM:%';
+UPDATE codes SET related_code = CONCAT(related_code, ';IPPFCM:4490') WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:112164%' AND related_code NOT LIKE '%IPPFCM:%';
+UPDATE drugs SET related_code = CONCAT(related_code, ';IPPFCM:4490') WHERE related_code IS NOT NULL AND related_code LIKE '%IPPF:112164%' AND related_code NOT LIKE '%IPPFCM:%';
+UPDATE codes SET related_code = CONCAT(related_code, ';IPPFCM:4490') WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:112165%' AND related_code NOT LIKE '%IPPFCM:%';
+UPDATE drugs SET related_code = CONCAT(related_code, ';IPPFCM:4490') WHERE related_code IS NOT NULL AND related_code LIKE '%IPPF:112165%' AND related_code NOT LIKE '%IPPFCM:%';
 UPDATE codes SET related_code = CONCAT(related_code, ';IPPFCM:4540') WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:113171%' AND related_code NOT LIKE '%IPPFCM:%';
 UPDATE drugs SET related_code = CONCAT(related_code, ';IPPFCM:4540') WHERE related_code IS NOT NULL AND related_code LIKE '%IPPF:113171%' AND related_code NOT LIKE '%IPPFCM:%';
 UPDATE codes SET related_code = CONCAT(related_code, ';IPPFCM:4550') WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:113172%' AND related_code NOT LIKE '%IPPFCM:%';
@@ -1595,19 +1592,11 @@ UPDATE drugs SET related_code = CONCAT(related_code, ';IPPFCM:4620') WHERE relat
 # This updates MA services, setting "Initial Consult" indicators deduced from legacy IPPF codes.
 UPDATE codes SET cyp_factor = 0 WHERE code_type = 12;
 UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:11____110%';
-UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:11___1999%';
-UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:11___2999%';
-UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:11___3999%';
-UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:11___4999%';
-UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:11___5999%';
 UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:112152010%';
-UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:113171111%';
-UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:113172111%';
 UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:121181_13%';
-UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:121182_13%';
-UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:121181999%';
 UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:122182_13%';
-UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:122182999%';
+UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:131191_10%';
+UPDATE codes SET cyp_factor = 1 WHERE code_type = 12 AND related_code IS NOT NULL AND related_code LIKE '%IPPF:145212_10%';
 
 # Modify LBFccicon form to use IPPFCM codes instead of the ippfconmeth list.
 UPDATE layout_options SET data_type = 15, list_id = '', description = 'IPPFCM' WHERE form_id = 'LBFccicon' AND field_id = 'newmethod';

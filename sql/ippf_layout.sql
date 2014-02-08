@@ -2295,24 +2295,21 @@ INSERT INTO codes ( code_type, code, modifier, code_text ) VALUES ( 31, '3150050
 INSERT INTO codes ( code_type, code, modifier, code_text ) VALUES ( 31, '3150000000800', '', 'Non-SRH Medical - unable to categorise' );
 
 INSERT INTO code_types (ct_key,ct_id,ct_seq,ct_mod,ct_just,ct_fee,ct_rel,ct_nofs,ct_diag) VALUES ('IPPFCM',32,8,0,'',0,0,1,0);
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4360','', 0.066667,'or' ,'Oral Contraceptives COC&POC');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4370','', 0.076923,'inj','Injectable Contraceptives CICs');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4380','', 0.166667,'inj','Injectable Contraceptives POIs - 2 mo');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4390','', 0.250000,'inj','Injectable Contraceptives POIs - 3 mo');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4400','', 3.800000,'imp','Subdermal Implants Implants 6 rods');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4410','', 3.200000,'imp','Subdermal Implants Implants 2 rods');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4420','', 2.500000,'imp','Subdermal Implants Implants 1 rod');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4430','', 0.066667,'pat','Other Hormonal Transdermal Patch');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4440','', 0.066667,'pat','Other Hormonal Vaginal Ring');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4450','', 0.008333,'con','Condoms - Male');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4460','', 0.008333,'con','Condoms - Female');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4470','', 1.000000,'dia','Diapraghms - Totals');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4480','', 1.000000,'cap','Caps - Totals');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4490','', 0.133333,'sp' ,'Spermicides Foams Tabs');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4500','', 0.133333,'sp' ,'Spermicides Foam Strips');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4510','', 0.133333,'sp' ,'Spermicides Foam Cans');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4520','', 0.133333,'sp' ,'Spermicides Creams & Jellies');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4530','', 0.133333,'sp' ,'Spermicides Pessaries - Film');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4360','', 0.066667,'or' ,'Oral Contraceptives (combined)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4361','', 0.066667,'or' ,'Oral Contraceptives (progestin only)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4370','', 0.076923,'inj','Injectables (1 month)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4380','', 0.166667,'inj','Injectables (2 month)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4390','', 0.250000,'inj','Injectables (3 month)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4400','', 3.800000,'imp','Implants (5 year)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4410','', 3.200000,'imp','Implants (4 year)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4420','', 2.500000,'imp','Implants (3 year)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4430','', 0.066667,'pat','Patch');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4440','', 0.066667,'pat','Ring');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4450','', 0.008333,'con','Condoms (Male)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4460','', 0.008333,'con','Condoms (Female)');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4470','', 1.000000,'dia','Diapraghms');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4480','', 1.000000,'cap','Cervical Caps');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4490','', 0.133333,'sp' ,'Spermicides');
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4540','', 3.300000,'iud','IUD Hormone 5 yr');
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4550','', 4.600000,'iud','IUD Copper 10 yr');
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4560','',10.000000,'vsc','Voluntary Surgical Contraception - Female');
@@ -2321,5 +2318,5 @@ INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text)
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4590','', 0.000000,'fab','Awareness-Based Methods - CBM');
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4600','', 0.000000,'fab','Awareness-Based Methods - STM');
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4610','', 0.000000,'fab','Awareness-Based Methods - SDM');
-INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4620','', 0.050000,'ec' ,'Emergency Contraception - Therapy');
+INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4620','', 0.050000,'ec' ,'Emergency Contraception (progestin only pills)');
 
