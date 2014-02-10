@@ -134,6 +134,36 @@ else {
   );
 }
 
+// This is needed for legacy IPPF statistics, so that legacy IPPF
+// "initial consult" codes can be re-derived from IPPFCM codes.
+//
+$method_to_ippf_code = array (
+  '4360' => '111101110',
+  '4361' => '111101110',
+  '4370' => '111111110',
+  '4380' => '111112110',
+  '4390' => '111113110',
+  '4400' => '111122110',
+  '4410' => '111123110',
+  '4420' => '111124110',
+  '4430' => '111132110',
+  '4440' => '111133110',
+  '4450' => '112141110',
+  '4460' => '112142110',
+  '4470' => '112151110',
+  '4480' => '112152010',
+  '4490' => '112161110',
+  '4490' => '112162110',
+  '4490' => '112163110',
+  '4490' => '112164110',
+  '4490' => '112165110',
+  '4540' => '113171110',
+  '4550' => '113172110',
+  '4560' => '121181000',
+  '4570' => '122182000',
+  '4620' => '145212000',
+);
+
 // Default Rows selection is just the first one in the list.
 if (empty($form_by_arr)) {
   $tmp = array_keys($arr_by);
@@ -712,7 +742,12 @@ function service_contraception_scan($pid, $encounter) {
         preg_match('/^12118[1-2].13/', $relcode) ||
         preg_match('/^121181999/'    , $relcode) ||
         preg_match('/^122182.13/'    , $relcode) ||
-        preg_match('/^122182999/'    , $relcode)
+        preg_match('/^122182999/'    , $relcode) ||
+        preg_match('/^145212.10/'    , $relcode) ||
+        preg_match('/^14521.999/'    , $relcode)
+        /*************************************************************
+        preg_match('/^1......../', $relcode) && !preg_match('/^......112/', $relcode)
+        *************************************************************/
       ) {
         $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
           "code_type = '11' AND code = '$relcode' LIMIT 1");
@@ -729,7 +764,7 @@ function service_contraception_scan($pid, $encounter) {
       // Identify the method with the IPPF code for the corresponding surgical procedure.
       $contraception_code = substr($contraception_code, 0, 7) . '13';
     }
-    else {
+    else if (preg_match('/^11/', $contraception_code)) {
       // Xavier confirms that the codes for Cervical Cap (112152010 and 112152011) are
       // an unintended change in pattern, but at this point we have to live with it.
       // -- Rod 2011-09-26
@@ -841,11 +876,12 @@ function process_ippf_code($row, $code, $quantity=1) {
   // Specific Contraceptive Services. One row for each IPPF code.
   //
   else if ($form_by === '104') {
-    if ($form_content != 5) {
+    if ($form_content != 5 && $form_content != 3 && $form_content != 6) {
       // Skip codes not for contraceptive services.
       $tmp = getContraceptiveMethod($code);
       if (empty($tmp)) return;
     }
+    if ($code === '') return;
     $key = $code;
   }
 
@@ -1839,9 +1875,18 @@ if ($_POST['form_submit']) {
         $thispid     = $row['pid'];
         $thisenc     = $row['encounter'];
         $thisyear    = substr($contrastart, 0, 4);
+        /*************************************************************
         $ippfconmeth = '';
         if (!empty($row['ippfconmeth']) && substr($row['ippfconmeth'], 0, 7) == 'IPPFCM:') {
           $ippfconmeth = substr($row['ippfconmeth'], 7);
+        }
+        *************************************************************/
+        $ippfconmeth = '';
+        if (!empty($row['ippfconmeth'])) {
+          $ippfcm = substr($row['ippfconmeth'], 7);
+          if (isset($method_to_ippf_code[$ippfcm])) {
+            $ippfconmeth = $method_to_ippf_code[$ippfcm];
+          }
         }
 
         // Leslie on 2012-03-12 says IPPF New Users may only be reported once per calendar year.
@@ -1856,7 +1901,12 @@ if ($_POST['form_submit']) {
         $lastyear = $thisyear;
 
         if ($form_by == '104') { // Specific contractptive service
-          process_ippf_code($row, service_contraception_scan($thispid, $thisenc));
+          // If the new method is missing, try to get it from the billing table.
+          // That should happen only for old data from sites upgraded from release 3.2.0.7.
+          if (empty($ippfconmeth)) {
+            $ippfconmeth = service_contraception_scan($row['pid'], $row['encounter']);
+          }
+          process_ippf_code($row, $ippfconmeth);
         }
         else if ($form_by == '105') { // Contraceptive Product
           // For contraceptive product reporting we build a key containing
@@ -1873,7 +1923,7 @@ if ($_POST['form_submit']) {
           }
           process_ippf_code($row, $ippfconmeth);
           ***********************************************************/
-          process_ippfcm_code($row, $ippfconmeth);
+          process_ippfcm_code($row, substr($row['ippfconmeth'], 7));
         }
       } // end while
      }

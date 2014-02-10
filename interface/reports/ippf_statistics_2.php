@@ -130,6 +130,35 @@ else {
   );
 }
 
+// This is needed so that a IPPMCM method can be expressed as an IPPF2 code.
+//
+$method_to_ippf2_code = array (
+  '4360' => '1121120000000',
+  '4361' => '1121120000000',
+  '4370' => '1122120000000',
+  '4380' => '1122120000000',
+  '4390' => '1122120000000',
+  '4400' => '1131120000000',
+  '4410' => '1131120000000',
+  '4420' => '1131120000000',
+  '4430' => '1123020000000',
+  '4440' => '1123020000000',
+  '4450' => '1124120000000',
+  '4460' => '1124220000000',
+  '4470' => '1125020000000',
+  '4480' => '1125020000000',
+  '4490' => '1126020000000',
+  '4490' => '1126020000000',
+  '4490' => '1126020000000',
+  '4490' => '1126020000000',
+  '4490' => '1126020000000',
+  '4540' => '1132120000000',
+  '4550' => '1132120000000',
+  '4560' => '1141100000000',
+  '4570' => '1142000000000',
+  '4620' => '1151020000000',
+);
+
 // Default Rows selection is just the first one in the list.
 if (empty($form_by_arr)) {
   $tmp = array_keys($arr_by);
@@ -405,7 +434,13 @@ function getAbortionMethod($code) {
   else if (preg_match('/^2113230302305/', $code)) {
     $key = xl('Other Surgical');
   }
+  else if (preg_match('/^2113230302800/', $code)) {
+    $key = xl('Other Surgical');
+  }
   else if (preg_match('/^211313030110[123]/', $code)) {
+    $key = xl('Medical');
+  }
+  else if (preg_match('/^2113130301800/', $code)) {
     $key = xl('Medical');
   }
 
@@ -421,9 +456,11 @@ function genAbortionSQL($col) {
     "$col LIKE '%IPPF2:2113230302302%' OR " .
     "$col LIKE '%IPPF2:2113230302304%' OR " .
     "$col LIKE '%IPPF2:2113230302305%' OR " .
+    "$col LIKE '%IPPF2:2113230302800%' OR " .
     "$col LIKE '%IPPF2:2113130301101%' OR " .
     "$col LIKE '%IPPF2:2113130301102%' OR " .
-    "$col LIKE '%IPPF2:2113130301103%'";
+    "$col LIKE '%IPPF2:2113130301103%' OR " .
+    "$col LIKE '%IPPF2:2113130301800%'";
 }
 
 // Determine if a recent gcac service was performed.
@@ -729,7 +766,6 @@ function service_contraception_scan($pid, $encounter) {
   $bres = sqlStatement($query);
   while ($brow = sqlFetchArray($bres)) {
     $relcodes = explode(';', $brow['related_code']);
-
     // Get the associated IPPF2 code for this service.
     $tmp_ippf2_code = '';
     foreach ($relcodes as $codestring) {
@@ -739,33 +775,9 @@ function service_contraception_scan($pid, $encounter) {
         $tmp_ippf2_code = $relcode;
       }
     }
-
     foreach ($relcodes as $codestring) {
       if ($codestring === '') continue;
       list($codetype, $relcode) = explode(':', $codestring);
-
-      /***************************************************************
-      if ($codetype !== 'IPPF') continue;
-      if (
-        preg_match('/^11....110/'    , $relcode) ||
-        preg_match('/^11...[1-5]999/', $relcode) ||
-        preg_match('/^112152010/'    , $relcode) ||
-        preg_match('/^11317[1-2]111/', $relcode) ||
-        preg_match('/^12118[1-2].13/', $relcode) ||
-        preg_match('/^121181999/'    , $relcode) ||
-        preg_match('/^122182.13/'    , $relcode) ||
-        preg_match('/^122182999/'    , $relcode)
-      ) {
-        $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
-          "code_type = '11' AND code = '$relcode' LIMIT 1");
-        $cyp = 0 + $tmprow['cyp_factor'];
-        if ($cyp > $contraception_cyp) {
-          $contraception_cyp = $cyp;
-          $contraception_code = $relcode;
-        }
-      }
-      ***************************************************************/
-
       if ($codetype !== 'IPPFCM') continue;
       $tmprow = sqlQuery("SELECT cyp_factor FROM codes WHERE " .
         "code_type = '32' AND code = '$relcode' LIMIT 1");
@@ -775,26 +787,8 @@ function service_contraception_scan($pid, $encounter) {
         $contraception_code = $relcode;
         $contraception_ippf2_code = $tmp_ippf2_code;
       }
-
     }
   } // end while
-
-  /*******************************************************************
-  if ($contraception_code) {
-    if (preg_match('/^12/', $contraception_code)) {
-      // Identify the method with the IPPF code for the corresponding surgical procedure.
-      $contraception_code = substr($contraception_code, 0, 7) . '13';
-    }
-    else {
-      // Xavier confirms that the codes for Cervical Cap (112152010 and 112152011) are
-      // an unintended change in pattern, but at this point we have to live with it.
-      // -- Rod 2011-09-26
-      $contraception_code = substr($contraception_code, 0, 6) . '110';
-      if ($contraception_code == '112152110') $contraception_code = '112152010';
-    }
-  }
-  *******************************************************************/
-
   return $contraception_code;
 }
 
@@ -1898,8 +1892,20 @@ if ($_POST['form_submit']) {
 
         if ($form_by == '104') {
           // Specific contraceptive service.
+          /***********************************************************
           service_contraception_scan($thispid, $thisenc);
           process_ippf_code($row, $contraception_ippf2_code);
+          ***********************************************************/
+          if (isset($method_to_ippf2_code[$ippfconmeth])) {
+            $ippf2code = $method_to_ippf2_code[$ippfconmeth];
+          }
+          // If the new method is missing, try to get it from the billing table.
+          // That should happen only for old data from sites upgraded from release 3.2.0.7.
+          if (empty($ippf2code)) {
+            service_contraception_scan($row['pid'], $row['encounter']);
+            $ippf2code = $contraception_ippf2_code;
+          }
+          process_ippf_code($row, $ippf2code);
         }
         else if ($form_by == '105') {
           // For contraceptive product reporting we build a key containing
