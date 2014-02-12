@@ -1609,3 +1609,25 @@ update globals SET gl_value = 3 WHERE gl_name = 'gbl_new_acceptor_policy' AND gl
 # Modify LBFccicon form to make "Previous modern contraceptive use?" a required field.
 UPDATE layout_options SET uor = 2 WHERE form_id = 'LBFccicon' AND field_id = 'pastmodern';
 
+# Assign related codes to IPPFCM codes for statistical reporting purposes.
+UPDATE codes SET related_code = 'IPPF:111101110;IPPF2:1121120000000' WHERE code_type = 32 AND code = '4360';
+UPDATE codes SET related_code = 'IPPF:111101110;IPPF2:1121120000000' WHERE code_type = 32 AND code = '4361';
+UPDATE codes SET related_code = 'IPPF:111111110;IPPF2:1122120000000' WHERE code_type = 32 AND code = '4370';
+UPDATE codes SET related_code = 'IPPF:111112110;IPPF2:1122120000000' WHERE code_type = 32 AND code = '4380';
+UPDATE codes SET related_code = 'IPPF:111113110;IPPF2:1122120000000' WHERE code_type = 32 AND code = '4390';
+UPDATE codes SET related_code = 'IPPF:111122110;IPPF2:1131120000000' WHERE code_type = 32 AND code = '4400';
+UPDATE codes SET related_code = 'IPPF:111123110;IPPF2:1131120000000' WHERE code_type = 32 AND code = '4410';
+UPDATE codes SET related_code = 'IPPF:111124110;IPPF2:1131120000000' WHERE code_type = 32 AND code = '4420';
+UPDATE codes SET related_code = 'IPPF:111132110;IPPF2:1123020000000' WHERE code_type = 32 AND code = '4430';
+UPDATE codes SET related_code = 'IPPF:111133110;IPPF2:1123020000000' WHERE code_type = 32 AND code = '4440';
+UPDATE codes SET related_code = 'IPPF:112141110;IPPF2:1124120000000' WHERE code_type = 32 AND code = '4450';
+UPDATE codes SET related_code = 'IPPF:112142110;IPPF2:1124220000000' WHERE code_type = 32 AND code = '4460';
+UPDATE codes SET related_code = 'IPPF:112151110;IPPF2:1125020000000' WHERE code_type = 32 AND code = '4470';
+UPDATE codes SET related_code = 'IPPF:112152010;IPPF2:1125020000000' WHERE code_type = 32 AND code = '4480';
+UPDATE codes SET related_code = 'IPPF:112160000;IPPF2:1126020000000' WHERE code_type = 32 AND code = '4490';
+UPDATE codes SET related_code = 'IPPF:113171110;IPPF2:1132120000000' WHERE code_type = 32 AND code = '4540';
+UPDATE codes SET related_code = 'IPPF:113172110;IPPF2:1132120000000' WHERE code_type = 32 AND code = '4550';
+UPDATE codes SET related_code = 'IPPF:121181000;IPPF2:1141130000800' WHERE code_type = 32 AND code = '4560';
+UPDATE codes SET related_code = 'IPPF:122182000;IPPF2:1142030000800' WHERE code_type = 32 AND code = '4570';
+UPDATE codes SET related_code = 'IPPF:145212000;IPPF2:1151020000000' WHERE code_type = 32 AND code = '4620';
+

@@ -2320,3 +2320,25 @@ INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text)
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4610','', 0.000000,'fab','Awareness-Based Methods - SDM');
 INSERT INTO codes (code_type,code,modifier,cyp_factor,code_text_short,code_text) VALUES (32,'4620','', 0.050000,'ec' ,'Emergency Contraception (progestin only pills)');
 
+# Assign related codes to IPPFCM codes for statistical reporting purposes.
+UPDATE codes SET related_code = 'IPPF:111101110;IPPF2:1121120000000' WHERE code_type = 32 AND code = '4360';
+UPDATE codes SET related_code = 'IPPF:111101110;IPPF2:1121120000000' WHERE code_type = 32 AND code = '4361';
+UPDATE codes SET related_code = 'IPPF:111111110;IPPF2:1122120000000' WHERE code_type = 32 AND code = '4370';
+UPDATE codes SET related_code = 'IPPF:111112110;IPPF2:1122120000000' WHERE code_type = 32 AND code = '4380';
+UPDATE codes SET related_code = 'IPPF:111113110;IPPF2:1122120000000' WHERE code_type = 32 AND code = '4390';
+UPDATE codes SET related_code = 'IPPF:111122110;IPPF2:1131120000000' WHERE code_type = 32 AND code = '4400';
+UPDATE codes SET related_code = 'IPPF:111123110;IPPF2:1131120000000' WHERE code_type = 32 AND code = '4410';
+UPDATE codes SET related_code = 'IPPF:111124110;IPPF2:1131120000000' WHERE code_type = 32 AND code = '4420';
+UPDATE codes SET related_code = 'IPPF:111132110;IPPF2:1123020000000' WHERE code_type = 32 AND code = '4430';
+UPDATE codes SET related_code = 'IPPF:111133110;IPPF2:1123020000000' WHERE code_type = 32 AND code = '4440';
+UPDATE codes SET related_code = 'IPPF:112141110;IPPF2:1124120000000' WHERE code_type = 32 AND code = '4450';
+UPDATE codes SET related_code = 'IPPF:112142110;IPPF2:1124220000000' WHERE code_type = 32 AND code = '4460';
+UPDATE codes SET related_code = 'IPPF:112151110;IPPF2:1125020000000' WHERE code_type = 32 AND code = '4470';
+UPDATE codes SET related_code = 'IPPF:112152010;IPPF2:1125020000000' WHERE code_type = 32 AND code = '4480';
+UPDATE codes SET related_code = 'IPPF:112160000;IPPF2:1126020000000' WHERE code_type = 32 AND code = '4490';
+UPDATE codes SET related_code = 'IPPF:113171110;IPPF2:1132120000000' WHERE code_type = 32 AND code = '4540';
+UPDATE codes SET related_code = 'IPPF:113172110;IPPF2:1132120000000' WHERE code_type = 32 AND code = '4550';
+UPDATE codes SET related_code = 'IPPF:121181000;IPPF2:1141130000800' WHERE code_type = 32 AND code = '4560';
+UPDATE codes SET related_code = 'IPPF:122182000;IPPF2:1142030000800' WHERE code_type = 32 AND code = '4570';
+UPDATE codes SET related_code = 'IPPF:145212000;IPPF2:1151020000000' WHERE code_type = 32 AND code = '4620';
+

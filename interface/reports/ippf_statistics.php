@@ -134,36 +134,6 @@ else {
   );
 }
 
-// This is needed for legacy IPPF statistics, so that legacy IPPF
-// "initial consult" codes can be re-derived from IPPFCM codes.
-//
-$method_to_ippf_code = array (
-  '4360' => '111101110',
-  '4361' => '111101110',
-  '4370' => '111111110',
-  '4380' => '111112110',
-  '4390' => '111113110',
-  '4400' => '111122110',
-  '4410' => '111123110',
-  '4420' => '111124110',
-  '4430' => '111132110',
-  '4440' => '111133110',
-  '4450' => '112141110',
-  '4460' => '112142110',
-  '4470' => '112151110',
-  '4480' => '112152010',
-  '4490' => '112161110',
-  '4490' => '112162110',
-  '4490' => '112163110',
-  '4490' => '112164110',
-  '4490' => '112165110',
-  '4540' => '113171110',
-  '4550' => '113172110',
-  '4560' => '121181000',
-  '4570' => '122182000',
-  '4620' => '145212000',
-);
-
 // Default Rows selection is just the first one in the list.
 if (empty($form_by_arr)) {
   $tmp = array_keys($arr_by);
@@ -300,6 +270,26 @@ function genNumCell($num, $cnum, $clikey) {
   }
   if (empty($num) && $form_output != 3) $num = '&nbsp;';
   genAnyCell($num, 'right', 'detail');
+}
+
+// Get the IPPF code related to a given IPPFCM code.
+//
+function method_to_ippf_code($ippfcm) {
+  global $code_types;
+  $ret = '';
+  $rrow = sqlQuery("SELECT related_code FROM codes WHERE " .
+    "code_type = '" . $code_types[$codetype]['IPPFCM'] . "' AND " .
+    "code = '$ippfcm' AND active = 1 " .
+    "ORDER BY id LIMIT 1");
+  $relcodes = explode(';', $rrow['related_code']);
+  foreach ($relcodes as $codestring) {
+    if ($codestring === '') continue;
+    list($codetype, $code) = explode(':', $codestring);
+    if ($codetype !== 'IPPF') continue;
+    $ret = $code;
+    break;
+  }
+  return $ret;
 }
 
 // Translate an IPPF code to the corresponding descriptive name of its
@@ -1875,18 +1865,10 @@ if ($_POST['form_submit']) {
         $thispid     = $row['pid'];
         $thisenc     = $row['encounter'];
         $thisyear    = substr($contrastart, 0, 4);
-        /*************************************************************
-        $ippfconmeth = '';
-        if (!empty($row['ippfconmeth']) && substr($row['ippfconmeth'], 0, 7) == 'IPPFCM:') {
-          $ippfconmeth = substr($row['ippfconmeth'], 7);
-        }
-        *************************************************************/
         $ippfconmeth = '';
         if (!empty($row['ippfconmeth'])) {
           $ippfcm = substr($row['ippfconmeth'], 7);
-          if (isset($method_to_ippf_code[$ippfcm])) {
-            $ippfconmeth = $method_to_ippf_code[$ippfcm];
-          }
+          $ippfconmeth = method_to_ippf_code($ippfcm);
         }
 
         // Leslie on 2012-03-12 says IPPF New Users may only be reported once per calendar year.

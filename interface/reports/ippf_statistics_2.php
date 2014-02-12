@@ -130,35 +130,6 @@ else {
   );
 }
 
-// This is needed so that a IPPMCM method can be expressed as an IPPF2 code.
-//
-$method_to_ippf2_code = array (
-  '4360' => '1121120000000',
-  '4361' => '1121120000000',
-  '4370' => '1122120000000',
-  '4380' => '1122120000000',
-  '4390' => '1122120000000',
-  '4400' => '1131120000000',
-  '4410' => '1131120000000',
-  '4420' => '1131120000000',
-  '4430' => '1123020000000',
-  '4440' => '1123020000000',
-  '4450' => '1124120000000',
-  '4460' => '1124220000000',
-  '4470' => '1125020000000',
-  '4480' => '1125020000000',
-  '4490' => '1126020000000',
-  '4490' => '1126020000000',
-  '4490' => '1126020000000',
-  '4490' => '1126020000000',
-  '4490' => '1126020000000',
-  '4540' => '1132120000000',
-  '4550' => '1132120000000',
-  '4560' => '1141100000000',
-  '4570' => '1142000000000',
-  '4620' => '1151020000000',
-);
-
 // Default Rows selection is just the first one in the list.
 if (empty($form_by_arr)) {
   $tmp = array_keys($arr_by);
@@ -298,6 +269,26 @@ function genNumCell($num, $cnum, $clikey) {
   }
   if (empty($num) && $form_output != 3) $num = '&nbsp;';
   genAnyCell($num, 'right', 'detail');
+}
+
+// Get the IPPF2 code related to a given IPPFCM code.
+//
+function method_to_ippf2_code($ippfcm) {
+  global $code_types;
+  $ret = '';
+  $rrow = sqlQuery("SELECT related_code FROM codes WHERE " .
+    "code_type = '" . $code_types[$codetype]['IPPFCM'] . "' AND " .
+    "code = '$ippfcm' AND active = 1 " .
+    "ORDER BY id LIMIT 1");
+  $relcodes = explode(';', $rrow['related_code']);
+  foreach ($relcodes as $codestring) {
+    if ($codestring === '') continue;
+    list($codetype, $code) = explode(':', $codestring);
+    if ($codetype !== 'IPPF2') continue;
+    $ret = $code;
+    break;
+  }
+  return $ret;
 }
 
 // Translate an IPPFCM code to the corresponding descriptive name of its
@@ -1896,9 +1887,7 @@ if ($_POST['form_submit']) {
           service_contraception_scan($thispid, $thisenc);
           process_ippf_code($row, $contraception_ippf2_code);
           ***********************************************************/
-          if (isset($method_to_ippf2_code[$ippfconmeth])) {
-            $ippf2code = $method_to_ippf2_code[$ippfconmeth];
-          }
+          $ippf2code = method_to_ippf2_code($ippfconmeth);
           // If the new method is missing, try to get it from the billing table.
           // That should happen only for old data from sites upgraded from release 3.2.0.7.
           if (empty($ippf2code)) {
