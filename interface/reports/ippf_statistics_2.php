@@ -980,7 +980,9 @@ function process_ippf_code($row, $code, $quantity=1) {
       '2111010122000', // Abortion - Counselling - Post-abortion
       '2112020202101', // Abortion - Consultation - Follow up consultation - Harm reduction model
       '2113130301104', // Abortion - Management - Medical - follow up
+      '2113130301110', // Abortion - Management - Medical - Treatment of complications
       '2113230302307', // Abortion - Management - Surgical - follow up
+      '2113230302310', // Abortion - Management - Surgical - Treatment of complications
     )) || preg_match('/^211403/', $code)) { // Incomplete abortion codes
       $key = getGcacClientStatus($row);
     } else {
