@@ -687,6 +687,7 @@ function doinvopen(ptid,encid) {
 
     // Write totals for last category.
     writeCatTotals($category, '', $catqty, $cattotal, $catadjtotal, $catpaytotal);
+    clearTaxTotals(1); // Clear category-level tax totals.
 
     // Write total for overpayments if there are any.
     if ($overpayments != 0.00) {

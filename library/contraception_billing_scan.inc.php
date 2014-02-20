@@ -21,12 +21,16 @@ function _contraception_billing_check($code_type, $code, $provider) {
   global $code_types;
   global $contraception_billing_code, $contraception_billing_cyp, $contraception_billing_prov;
 
+  if ($code_type != 'MA') return;
+
+  // The cyp_factor test in this query is to select only MA codes that
+  // are flagged as Initial Consult.
   $sql = "SELECT related_code FROM codes WHERE " .
     "code_type = '" . $code_types[$code_type]['id'] .
-    "' AND code = '$code' LIMIT 1";
+    "' AND code = '$code' AND cyp_factor != 0 LIMIT 1";
   $codesrow = sqlQuery($sql);
 
-  if (!empty($codesrow['related_code']) && $code_type == 'MA') {
+  if (!empty($codesrow['related_code'])) {
     $relcodes = explode(';', $codesrow['related_code']);
     foreach ($relcodes as $relstring) {
       if ($relstring === '') continue;
