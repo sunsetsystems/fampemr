@@ -8,6 +8,7 @@
 
 require_once("../globals.php");
 require_once("$srcdir/acl.inc");
+require_once("$srcdir/log.inc");
 require_once("$srcdir/formdata.inc.php");
 require_once("../../custom/code_types.inc.php");
 
@@ -132,6 +133,7 @@ if ($_POST['formaction']=='save' && $list_id && $alertmsg == '') {
             }
         }
     }
+    newEvent("edit_list", $_SESSION['authUser'], $_SESSION['authProvider'], "List = $list_id");
 }
 else if ($_POST['formaction']=='addlist') {
     // make a new list ID from the new list name
@@ -151,12 +153,15 @@ else if ($_POST['formaction']=='addlist') {
                 "'".($row['maxseq']+1)."',".
                 "'1', '0')"
                 );
+    newEvent("add_list", $_SESSION['authUser'], $_SESSION['authProvider'], "List = $newlistID");
 }
 else if ($_POST['formaction']=='deletelist') {
     // delete the lists options
     sqlStatement("DELETE FROM list_options WHERE list_id = '".$_POST['list_id']."'");
     // delete the list from the master list-of-lists
     sqlStatement("DELETE FROM list_options WHERE list_id = 'lists' and option_id='".$_POST['list_id']."'");
+    //
+    newEvent("delete_list", $_SESSION['authUser'], $_SESSION['authProvider'], "List = " . $_POST['list_id']);
 }
 
 $opt_line_no = 0;
