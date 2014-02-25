@@ -136,12 +136,21 @@ $fstart = $_REQUEST['fstart'] + 0;
 $filter = $_REQUEST['filter'] + 0;
 $search = $_REQUEST['search'];
 
+// Determine if we are listing only active entries. Default is yes.
+$activeonly = 1;
+if (isset($_REQUEST['fstart'])) {
+  $activeonly = empty($_REQUEST['activeonly']) ? 0 : 1;
+}
+
 $where = "1 = 1";
 if ($filter) {
   $where .= " AND code_type = '$filter'";
 }
 if (!empty($search)) {
   $where .= " AND code LIKE '" . ffescape($search) . "%'";
+}
+if ($activeonly) {
+  $where .= " AND active = 1";
 }
 
 $crow = sqlQuery("SELECT count(*) AS count FROM codes WHERE $where");
@@ -348,7 +357,7 @@ function code_type_changed() {
    </select>
    &nbsp;&nbsp;
    <?php xl('Code','e'); ?>:
-   <input type='text' size='6' maxlength='31' name='code' value='<?php echo $code ?>'
+   <input type='text' size='10' maxlength='31' name='code' value='<?php echo $code ?>'
     onkeyup='maskkeyup(this,getCTMask())'
     onblur='maskblur(this,getCTMask())'
    />
@@ -370,7 +379,7 @@ function code_type_changed() {
   <td><?php xl('Description','e'); ?>:</td>
   <td></td>
   <td>
-   <input type='text' size='40' maxlength='255' name='code_text' value='<?php echo $code_text ?>'>&nbsp;
+   <input type='text' size='60' maxlength='255' name='code_text' value='<?php echo $code_text ?>'>&nbsp;
   </td>
   <td id='id_initial_consult'>
    <input type='checkbox' name="initial_consult" value='1' <?php echo $cyp_factor ? 'checked' : ''; ?> />
@@ -413,7 +422,7 @@ generate_form_field(array('data_type'=>1,'field_id'=>'superbill','list_id'=>'sup
   <td><?php xl('Relate To','e'); ?>:</td>
   <td></td>
   <td colspan='2'>
-   <input type='text' size='40' name='related_desc'
+   <input type='text' size='80' name='related_desc'
     value='<?php echo $related_desc ?>' onclick="sel_related()"
     title='<?php xl('Click to select related code','e'); ?>' readonly />
    <input type='hidden' name='related_code' value='<?php echo $related_code ?>' />
@@ -488,8 +497,11 @@ foreach ($code_types as $key => $value) {
    </select>
    &nbsp;&nbsp;&nbsp;&nbsp;
 
-   <input type="text" name="search" size="5" value="<?php echo $search ?>">&nbsp;
-   <input type="submit" name="go" value=<?php xl('Search','e','\'','\''); ?>>
+   <input type="text" name="search" size="5" value="<?php echo $search ?>" />&nbsp;
+   <input type="submit" name="go" value="<?php echo xl('Search'); ?>" />&nbsp;
+   <input type="checkbox" name="activeonly" value="1"
+    onclick="submitList(0)" <?php echo $activeonly ? 'checked' : ''; ?> />
+   <?php echo xl('Active Only'); ?>
    <input type='hidden' name='fstart' value='<?php echo $fstart ?>'>
   </td>
 
@@ -514,13 +526,16 @@ foreach ($code_types as $key => $value) {
 
 <table border='0' cellpadding='5' cellspacing='0' width='96%'>
  <tr>
-  <td><span class='bold'><?php xl('Code','e'); ?></span></td>
-  <td><span class='bold'><?php xl('Mod','e'); ?></span></td>
-  <td><span class='bold'><?php xl('Act','e'); ?></span></td>
-  <td><span class='bold'><?php xl('Type','e'); ?></span></td>
-  <td><span class='bold'><?php xl('Description','e'); ?></span></td>
+  <td class='bold'><?php xl('Code','e'); ?></td>
+  <td class='bold'><?php xl('Mod','e'); ?></td>
+  <td class='bold' title='<?php echo xl('Active'); ?>'><?php xl('Act','e'); ?></td>
+<?php if ($GLOBALS['ippf_specific']) { ?>
+  <td class='bold' title='<?php echo xl('Initial Consult'); ?>'><?php echo xl('IC'); ?></td>
+<?php } ?>
+  <td class='bold'><?php xl('Type','e'); ?></td>
+  <td class='bold'><?php xl('Description','e'); ?></td>
 <?php if (related_codes_are_used()) { ?>
-  <td><span class='bold'><?php xl('Related','e'); ?></span></td>
+  <td class='bold'><?php xl('Related','e'); ?></td>
 <?php } ?>
 <?php
 $pres = sqlStatement("SELECT title FROM list_options " .
@@ -556,6 +571,19 @@ if (!empty($all)) {
     echo "  <td class='text'>" . $iter["code"] . "</td>\n";
     echo "  <td class='text'>" . $iter["modifier"] . "</td>\n";
     echo "  <td class='text'>" . ($iter["active"] ? xl('Yes') : xl('No')) . "</td>\n";
+
+    if ($GLOBALS['ippf_specific']) {
+      // IC (Initial Consult) column. Yes, No, or blank if not applicable.
+      echo "  <td class='text'>";
+      if ('12' == $iter['code_type']) {
+        echo $iter['cyp_factor'] == 0.00 ? xl('No') : xl('Yes');
+      }
+      else {
+        echo '&nbsp;';
+      }
+      echo "</td>\n";
+    }
+
     echo "  <td class='text'>$key</td>\n";
     echo "  <td class='text'>" . $iter['code_text'] . "</td>\n";
 

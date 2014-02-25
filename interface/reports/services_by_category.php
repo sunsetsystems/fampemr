@@ -44,9 +44,18 @@ while ($ctrow = sqlFetchArray($ctres)) {
 }
 ksort($ctarr);
 
+
+// Determine if we are listing only active entries. Default is yes.
+$activeonly = 1;
+if (isset($_REQUEST['filter'])) {
+  $activeonly = empty($_REQUEST['activeonly']) ? 0 : 1;
+}
+$where = "1 = 1";
+if ($activeonly) $where .= " AND c.active = 1";
+
 $filter = $_REQUEST['filter'] + 0;
-$where = "c.active = 1";
 if ($filter) $where .= " AND c.code_type = '$filter'";
+
 if (empty($_REQUEST['include_uncat']))
   $where .= " AND c.superbill != '' AND c.superbill != '0'";
 
@@ -93,6 +102,9 @@ foreach ($code_types as $key => $value) {
 ?>
    </select>
    &nbsp;
+   <input type='checkbox' name='activeonly' value='1'<?php if ($activeonly) echo " checked"; ?> />
+   <?php echo xl('Active Only'); ?>
+   &nbsp;
    <input type='checkbox' name='include_uncat' value='1'<?php if (!empty($_REQUEST['include_uncat'])) echo " checked"; ?> />
    <?php xl('Include Uncategorized','e'); ?>
    &nbsp;
@@ -116,12 +128,15 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
 
   if ($_POST['form_csvexport']) {
     // CSV headers:
-    echo '"Category",';
-    echo '"Type",';
-    echo '"Code",';
-    echo '"Mod",';
-    echo '"Units",';
-    echo '"Description"';
+    echo '"' . xl('Category'       ) . '",';
+    echo '"' . xl('Type'           ) . '",';
+    echo '"' . xl('Code'           ) . '",';
+    echo '"' . xl('Mod'            ) . '",';
+    echo '"' . xl('Active'         ) . '",';
+    if ($GLOBALS['ippf_specific']) {
+      echo '"' . xl('Initial Consult') . '",';
+    }
+    echo '"' . xl('Description'    ) . '"';
     foreach ($ctarr as $ctkey => $dummy) {
       echo ',"' . addslashes(xl('Related') . ' ' . $ctkey) . '"';
       echo ',"' . addslashes(xl('Description')) . '"';
@@ -141,7 +156,10 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
    <th class='bold'><?php xl('Type'       ,'e'); ?></th>
    <th class='bold'><?php xl('Code'       ,'e'); ?></th>
    <th class='bold'><?php xl('Mod'        ,'e'); ?></th>
-   <th class='bold'><?php xl('Units'      ,'e'); ?></th>
+   <th class='bold' title='<?php echo xl('Active'); ?>'><?php echo xl('Act'); ?></th>
+<?php if ($GLOBALS['ippf_specific']) { ?>
+   <th class='bold' title='<?php echo xl('Initial Consult'); ?>'><?php echo xl('IC'); ?></th>
+<?php } ?>
    <th class='bold'><?php xl('Description','e'); ?></th>
 <?php
     foreach ($ctarr as $ctkey => $dummy) {
@@ -223,7 +241,15 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
         echo '"",';
       }
       echo '"' . addslashes($row['modifier'] ) . '",';
-      echo '"' . addslashes($row['units']    ) . '",';
+      echo '"' . addslashes($row['active'] ? xl('Yes') : xl('No')) . '",';
+      if ($GLOBALS['ippf_specific']) {
+        // IC (Initial Consult) column. Yes, No, or blank if not applicable.
+        echo '"';
+        if ('12' == $row['code_type']) {
+          echo addslashes($row['cyp_factor'] == 0.00 ? xl('No') : xl('Yes'));
+        }
+        echo '",';
+      }
       echo '"' . addslashes($row['code_text']) . '"';
 
       foreach ($ctarr as $ctkey => $dummy) {
@@ -262,7 +288,18 @@ if ($_POST['form_submit'] || $_POST['form_csvexport']) {
       echo "   <td class='text'>$key</td>\n";
       echo "   <td class='text'>" . $row['code'] . "</td>\n";
       echo "   <td class='text'>" . $row['modifier'] . "</td>\n";
-      echo "   <td class='text'>" . $row['units'] . "</td>\n";
+      echo "   <td class='text'>" . ($row["active"] ? xl('Yes') : xl('No')) . "</td>\n";
+      if ($GLOBALS['ippf_specific']) {
+        // IC (Initial Consult) column. Yes, No, or blank if not applicable.
+        echo "  <td class='text'>";
+        if ('12' == $row['code_type']) {
+          echo $row['cyp_factor'] == 0.00 ? xl('No') : xl('Yes');
+        }
+        else {
+          echo '&nbsp;';
+        }
+        echo "</td>\n";
+      }
       echo "   <td class='text'>" . $row['code_text'] . "</td>\n";
 
       foreach ($ctarr as $ctkey => $dummy) {
