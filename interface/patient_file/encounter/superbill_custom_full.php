@@ -379,7 +379,7 @@ function code_type_changed() {
   <td><?php xl('Description','e'); ?>:</td>
   <td></td>
   <td>
-   <input type='text' size='60' maxlength='255' name='code_text' value='<?php echo $code_text ?>'>&nbsp;
+   <input type='text' size='60' maxlength='255' name='code_text' value='<?php echo htmlspecialchars($code_text, ENT_QUOTES); ?>'>&nbsp;
   </td>
   <td id='id_initial_consult'>
    <input type='checkbox' name="initial_consult" value='1' <?php echo $cyp_factor ? 'checked' : ''; ?> />

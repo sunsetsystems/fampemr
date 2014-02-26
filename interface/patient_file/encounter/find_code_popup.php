@@ -112,14 +112,18 @@ else {
       "ORDER BY d.name, dt.selector, dt.drug_id";
     $res = sqlStatement($query);
     while ($row = sqlFetchArray($res)) {
-      $drug_id = addslashes($row['drug_id']);
-      $selector = addslashes($row['selector']);
-      $desc = addslashes($row['name']);
+      $drug_id  = $row['drug_id'];
+      $selector = $row['selector'];
+      $desc     = $row['name'];
       $anchor = "<a href='' " .
-        "onclick='return selcode(\"PROD\", \"$drug_id\", \"$selector\", \"$desc\")'>";
+        "onclick='return selcode(\"PROD\", \"" .
+        $drug_id . "\", \"" .
+        // Onclick value is an html attribute including javascript literals.
+        htmlspecialchars(addslashes($selector), ENT_QUOTES) . "\", \"" .
+        htmlspecialchars(addslashes($desc    ), ENT_QUOTES) . "\")'>";
       echo " <tr>";
-      echo "  <td>$anchor$drug_id:$selector</a></td>\n";
-      echo "  <td>$anchor$desc</a></td>\n";
+      echo "  <td>$anchor$drug_id:" . htmlspecialchars($selector, ENT_NOQUOTES) . "</a></td>\n";
+      echo "  <td>$anchor" . htmlspecialchars($desc, ENT_NOQUOTES) . "</a></td>\n";
       echo " </tr>";
     }
   }
@@ -132,13 +136,16 @@ else {
     // echo "\n<!-- $query -->\n"; // debugging
     $res = sqlStatement($query);
     while ($row = sqlFetchArray($res)) {
-      $itercode = addslashes($row['code']);
-      $itertext = addslashes(ucfirst(strtolower(trim($row['code_text']))));
+      $itercode = $row['code'];
+      $itertext = ucfirst(strtolower(trim($row['code_text'])));
       $anchor = "<a href='' " .
-        "onclick='return selcode(\"$form_code_type\", \"$itercode\", \"\", \"$itertext\")'>";
+        "onclick='return selcode(\"$form_code_type\", \"" .
+        // Onclick value is an html attribute including javascript literals.
+        htmlspecialchars(addslashes($itercode), ENT_QUOTES) . "\", \"\", \"" .
+        htmlspecialchars(addslashes($itertext), ENT_QUOTES) . "\")'>";
       echo " <tr>";
-      echo "  <td>$anchor$itercode</a></td>\n";
-      echo "  <td>$anchor$itertext</a></td>\n";
+      echo "  <td>$anchor" . htmlspecialchars($itercode, ENT_NOQUOTES) . "</a></td>\n";
+      echo "  <td>$anchor" . htmlspecialchars($itertext, ENT_NOQUOTES) . "</a></td>\n";
       echo " </tr>";
     }
   }
