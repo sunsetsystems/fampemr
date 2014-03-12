@@ -62,9 +62,7 @@ function current_method_changed() {
       contraMapping[f.form_curmethod.value] == '0') &&
      !pastmodern_autoset)
  {
-  // Also do not enable the past-modern question if the global option is set to
-  // record all acceptors new to modern contraception.
-  f.form_pastmodern.disabled = " . ($GLOBALS['gbl_new_acceptor_policy'] == '3' ? 'false' : 'true') . ";
+  f.form_pastmodern.disabled = false;
  }
  else {
   f.form_pastmodern.selectedIndex = 2;

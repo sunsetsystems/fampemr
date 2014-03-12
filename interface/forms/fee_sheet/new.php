@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2005-2013 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2005-2014 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -867,12 +867,16 @@ if (!$alertmsg && ($_POST['bn_save'] || $_POST['bn_save_close'])) {
       "ORDER BY f.form_id DESC LIMIT 1");
     if (isset($_POST['newmauser'])) {
       $newmauser   = $_POST['newmauser'];
+      // pastmodern is 0 iff new to modern contraception
+      $pastmodern = $newmauser == '2' ? 0 : 1;
+      if ($newmauser == '2') $newmauser = '1';
       $ippfconmeth = $_POST['ippfconmeth'];
       // Add contraception form but only if it does not already exist
       // (if it does, must be 2 users working on the visit concurrently).
       if (empty($csrow)) {
         $newid = insert_lbf_item(0, 'newmauser', $newmauser);
-        insert_lbf_item($newid, 'newmethod', $ippfconmeth);
+        insert_lbf_item($newid, 'newmethod', "IPPFCM:$ippfconmeth");
+        insert_lbf_item($newid, 'pastmodern', $pastmodern);
         // Do we care about a service-specific provider here?
         insert_lbf_item($newid, 'provider', $main_provid);
         addForm($encounter, 'Contraception', $newid, 'LBFccicon', $pid, $userauthorized);
@@ -1655,61 +1659,37 @@ if ($contraception_code && !$isBilled) {
     if ($csrow['count'] == 0) {
       $date1 = substr($visit_row['date'], 0, 10);
       $ask_new_user = false;
-      // If surgical
-      // Was: if (preg_match('/^12/', $contraception_code)) {
-      if ($contraception_cyp >= 10.0) {
-        // Identify the method with the IPPF code for the corresponding surgical procedure.
+      // Determine if this client ever started contraception with the MA.
+      // Even if only a method change, we assume they have.
+      // *************************************************************
+      //// But this version would be used if method changes don't count:
+      // $query = "SELECT f.form_id FROM forms AS f " .
+      //   "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
+      //   "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
+      //   "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
+      //   "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' AND " .
+      //   "(d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1')) " .
+      //   "ORDER BY fe.date DESC LIMIT 1";
+      // *************************************************************
+      $query = "SELECT f.form_id FROM forms AS f " .
+        "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
+        "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' " .
+        "ORDER BY fe.date DESC LIMIT 1";
+      $csrow = sqlQuery($query);
+      if (empty($csrow)) {
         $ask_new_user = true;
-      }
-      else {
-        // Determine if this client ever started contraception with the MA.
-        // Even if only a method change, we assume they have.
-        /***************************************************************
-        // But this version would be used if method changes don't count.
-        $query = "SELECT f.form_id FROM forms AS f " .
-          "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
-          "JOIN lbf_data AS d1 ON d1.form_id = f.form_id AND d1.field_id = 'newmethod' " .
-          "LEFT JOIN lbf_data AS d2 ON d2.form_id = f.form_id AND d2.field_id = 'newmauser' " .
-          "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' AND " .
-          "(d1.field_value LIKE '12%' OR (d2.field_value IS NOT NULL AND d2.field_value = '1')) " .
-          "ORDER BY fe.date DESC LIMIT 1";
-        ***************************************************************/
-        $query = "SELECT f.form_id FROM forms AS f " .
-          "JOIN form_encounter AS fe ON fe.pid = f.pid AND fe.encounter = f.encounter " .
-          "WHERE f.formdir = 'LBFccicon' AND f.deleted = 0 AND f.pid = '$pid' " .
-          "ORDER BY fe.date DESC LIMIT 1";
-        $csrow = sqlQuery($query);
-        if (empty($csrow)) {
-          $ask_new_user = true;
-        }
       }
       if ($ask_new_user) {
         echo "<select name='newmauser'>\n";
-        echo " <option value='1'>" . xl('First contraception at this clinic') . "</option>\n";
-        echo " <option value='0'>" . xl('Method change') . "</option>\n";
+        echo " <option value='2'>" . xl('First Modern Contraceptive Use (Lifetime)') . "</option>\n";
+        echo " <option value='1'>" . xl('First Modern Contraception at this Clinic (with Prior Contraceptive Use)') . "</option>\n";
+        echo " <option value='0'>" . xl('Method Change at this Clinic') . "</option>\n";
         echo "</select>\n";
         echo "<p>&nbsp;\n";
       }
     }
   }
 }
-
-// Following removed as warehouse choice is now at the line item level.
-//
-/*********************************************************************
-// If there is a choice of warehouses, allow override of user default.
-if ($prod_lino > 0) { // if any products are in this form
-  $trow = sqlQuery("SELECT count(*) AS count FROM list_options WHERE list_id = 'warehouse'");
-  if ($trow['count'] > 1) {
-    $trow = sqlQuery("SELECT default_warehouse FROM users WHERE username = '" .
-      $_SESSION['authUser'] . "'");
-    echo "   <span class='billcell'><b>" . xl('Warehouse') . ":</b></span>\n";
-    echo generate_select_list('default_warehouse', 'warehouse',
-      $trow['default_warehouse'], '', ' ', '', 'warehouse_changed(this);');
-    echo "&nbsp; &nbsp; &nbsp;\n";
-  }
-}
-*********************************************************************/
 
 // Allow the patient price level to be fixed here.
 $plres = sqlStatement("SELECT option_id, title FROM list_options " .
