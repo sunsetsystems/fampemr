@@ -1247,7 +1247,7 @@ function process_visit($row) {
 // Row keys are the first specified MA code, if any.
 //
 function process_referral($row) {
-  global $form_by, $code_types;
+  global $form_by, $code_types, $report_type;
   $key = 'Unspecified';
 
   // For followups we care about the actual service provided, otherwise
@@ -1261,25 +1261,26 @@ function process_referral($row) {
       if ($codestring === '') continue;
       list($codetype, $code) = explode(':', $codestring);
 
-      if ($codetype == 'MA' || $codetype == 'REF') {
-        // In the case of a MA or REF code, look up the associated IPPF2 code.
-        $rrow = sqlQuery("SELECT related_code FROM codes WHERE " .
-          "code_type = '" . $code_types[$codetype]['id'] . "' AND " .
-          "code = '$code' AND active = 1 " .
-          "ORDER BY id LIMIT 1");
-        $relcodes2 = explode(';', $rrow['related_code']);
-        foreach ($relcodes2 as $codestring2) {
-          if ($codestring2 === '') continue;
-          list($codetype2, $code2) = explode(':', $codestring2);
-          if ($codetype2 !== 'IPPF2') continue;
-          $codetype = $codetype2;
-          $code = $code2;
-          break;
+      if ($report_type != 'm') {
+        if ($codetype == 'MA' || $codetype == 'REF') {
+          // In the case of a MA or REF code, look up the associated IPPF2 code.
+          $rrow = sqlQuery("SELECT related_code FROM codes WHERE " .
+            "code_type = '" . $code_types[$codetype]['id'] . "' AND " .
+            "code = '$code' AND active = 1 " .
+            "ORDER BY id LIMIT 1");
+          $relcodes2 = explode(';', $rrow['related_code']);
+          foreach ($relcodes2 as $codestring2) {
+            if ($codestring2 === '') continue;
+            list($codetype2, $code2) = explode(':', $codestring2);
+            if ($codetype2 !== 'IPPF2') continue;
+            $codetype = $codetype2;
+            $code = $code2;
+            break;
+          }
         }
+        // Alternatively a direct IPPF2 code is also supported.
+        if ($codetype !== 'IPPF2') continue;
       }
-
-      // Alternatively a direct IPPF2 code is also supported.
-      if ($codetype !== 'IPPF2') continue;
 
       if ($form_by === '1') {
         if (preg_match('/^[12]/', $code)) {
@@ -1289,7 +1290,8 @@ function process_referral($row) {
         }
       }
       else { // $form_by is 9/14 (internal) or 10/15/20 (external) referrals
-        $key = $code;
+        // $key = $code;
+        $key = "$codetype:$code";
         break;
       }
     } // end foreach
@@ -2163,15 +2165,16 @@ if ($_POST['form_submit']) {
       $dispkey = $display_key;
       $dispspan = 2;
 
-      // If the key is an MA or IPPF2 code, then add a column for its description.
+      // If the key is an MA or REF or IPPF2 code, then add a column for its description.
       if (uses_description($form_by)) {
         $dispkey = array($display_key, '');
         $dispspan = 1;
         $sqltype = $form_by === '102' ? 'MA' : 'IPPF2'; // MA or IPPF2
         $sqlcode = $display_key;
-        if (substr($display_key, 0, 4) == 'ADM:') {
-          $sqltype = 'ADM';
-          $sqlcode = substr($display_key, 4);
+        // If key is of the form codetype:code, extract accordingly.
+        if (preg_match('/^([A-Za-z0-9]+):(.+)/', $display_key, $tmp)) {
+          $sqltype = $tmp[1];
+          $sqlcode = $tmp[2];
         }
         $crow = sqlQuery("SELECT c.code_text FROM codes AS c, code_types AS ct WHERE " .
           "ct.ct_key = '$sqltype' AND c.code_type = ct.ct_id AND c.code = '$sqlcode' " .

@@ -460,14 +460,15 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
 
   // Get adjustments and other payments from ar_activity table.
   $query = "SELECT " .
-    "a.pid, a.encounter, a.code_type, a.code, a.adj_amount, a.pay_amount, a.post_time, a.memo, " .
+    "a.pid, a.encounter, a.code_type, a.code, a.adj_amount, a.pay_amount, a.post_date, a.post_time, a.memo, " .
     "fas.pos_code, fab.facility_npi " .
     "FROM ar_activity AS a " .
     "JOIN form_encounter AS fe ON fe.pid = a.pid AND fe.encounter = a.encounter " .
     "LEFT JOIN facility AS fas ON fas.id = fe.facility_id " .
     "LEFT JOIN facility AS fab ON fab.id = fe.billing_facility " .
     "WHERE " .
-    "a.post_time >= '$from_date 00:00:00' AND a.post_time <= '$to_date 23:59:59'";
+    "((a.post_date IS NOT NULL AND a.post_date >= '$from_date' AND a.post_date <= '$to_date') OR " .
+    "(a.post_date IS NULL AND a.post_time >= '$from_date 00:00:00' AND a.post_time <= '$to_date 23:59:59'))";
   // If a facility was specified.
   if ($form_facility) $query .= " AND fe.facility_id = '$form_facility'";
   $query .= " ORDER BY fe.pid, fe.encounter, a.sequence_no";
@@ -479,6 +480,7 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
     $patient_id = $row['pid'];
     $encounter_id = $row['encounter'];
     $invno = $patient_id . '.' . $encounter_id;
+    $post_date = empty($row['post_date']) ? substr($row['post_time'], 0, 10) : $row['post_date'];
 
     if (!isset($aItems[$invno])) {
       // We have a visit with payments or adjustments in the reporting date range,
@@ -530,13 +532,13 @@ if ($_POST['form_refresh'] || $_POST['form_csvexport']) {
 
     // Accumulate adjustments by adjustment reason within charge (or at invoice level).
     if ($row['adj_amount'] != 0.00) {
-      accumulateAdjustment($patient_id, $encounter_id, $codekey, $row['memo'], $row['adj_amount'], $row['post_time']);
+      accumulateAdjustment($patient_id, $encounter_id, $codekey, $row['memo'], $row['adj_amount'], $post_date);
     }
 
     // Accumulate payments by payment method within charge (or at invoice level).
     if ($row['pay_amount'] != 0.00) {
       $tmp = explode(' ', $row['memo']);
-      accumulatePayment($patient_id, $encounter_id, $codekey, $tmp[0], $row['pay_amount'], $row['post_time']);
+      accumulatePayment($patient_id, $encounter_id, $codekey, $tmp[0], $row['pay_amount'], $post_date);
     }
   }
 
