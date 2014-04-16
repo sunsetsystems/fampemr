@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2008 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2008-2014 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -28,7 +28,7 @@ td { font-size:10pt; }
 
  function selcode(codetype, code, selector, codedesc) {
   if (opener.closed || ! opener.set_related) {
-   alert('The destination form was closed; I cannot act on your selection.');
+   alert('<?php echo addslashes( xl('The destination form was closed; I cannot act on your selection.') ); ?>');
   }
   else {
    var msg = opener.set_related(codetype, code, selector, codedesc);

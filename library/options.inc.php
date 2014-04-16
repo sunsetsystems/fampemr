@@ -25,6 +25,7 @@
 // V = Vendor types only (address book)
 // R = Distributor types only (address book)
 // 1 = Write Once (not editable when not empty) (text fields)
+// 2 = Show descriptions instead of codes for billing code input
 
 require_once("formdata.inc.php");
 require_once("formatting.inc.php");
@@ -340,21 +341,65 @@ function generate_form_field($frow, $currvalue) {
     echo "</select>";
   }
 
-  // A billing code. If description matches an existing code type then that type is 
+  // A billing code. If description matches an existing code type then that type is used.
   else if ($data_type == 15) {
     $codetype = '';
     if (!empty($frow['description']) && isset($code_types[$frow['description']])) {
       $codetype = $frow['description'];
+    }      
+    if (strpos($frow['edit_options'], '2') !== FALSE && substr($frow['form_id'], 0, 3) == 'LBF') {
+      // Option "2" generates a hidden input for the codes, and a matching visible field
+      // displaying their descriptions. First step is computing the description string.
+      $currdescstring = '';
+      if (!empty($currvalue)) {
+        $relcodes = explode(';', $currvalue);
+        foreach ($relcodes as $codestring) {
+          if ($codestring === '') continue;
+          list($codetype, $code) = explode(':', $codestring);
+          $query = "SELECT c.code_text FROM codes AS c, code_types AS ct WHERE " .
+            "ct.ct_key = '$codetype' AND " .
+            "c.code_type = ct.ct_id AND " .
+            "c.code = '$code' AND c.active = 1 " .
+            "ORDER BY c.id LIMIT 1";
+          $nrow = sqlQuery($query);
+          if ($currdescstring !== '') $currdescstring .= '; ';
+          if (!empty($nrow['code_text'])) {
+            $currdescstring .= $nrow['code_text'];
+          }
+          else {
+            $currdescstring .= $codestring;
+          }
+        }
+      }
+      $currdescstring = htmlspecialchars($currdescstring, ENT_QUOTES);
+      //
+      echo "<input type='text'" .
+        " name='form_$field_id'" .
+        " id='form_related_code'" .
+        " size='" . $frow['fld_length'] . "'" .
+        " value='$currescaped'" .
+        " style='display:none'" .
+        " readonly />";
+      // Extra readonly input field for optional display of code description(s).
+      echo "<input type='text'" .
+        " name='form_$field_id" . "__desc'" .
+        " size='" . $frow['fld_length'] . "'" .
+        " title='$description'" .
+        " value='$currdescstring'" .
+        " onclick='sel_related(this,\"$codetype\")'" .
+        " readonly />";
     }
-    echo "<input type='text'" .
-      " name='form_$field_id'" .
-      " id='form_related_code'" .
-      " size='" . $frow['fld_length'] . "'" .
-      " maxlength='" . $frow['max_length'] . "'" .
-      " title='$description'" .
-      " value='$currescaped'" .
-      " onclick='sel_related(this,\"$codetype\")' readonly" .
-      " />";
+    else {
+      echo "<input type='text'" .
+        " name='form_$field_id'" .
+        " id='form_related_code'" .
+        " size='" . $frow['fld_length'] . "'" .
+        " maxlength='" . $frow['max_length'] . "'" .
+        " title='$description'" .
+        " value='$currescaped'" .
+        " onclick='sel_related(this,\"$codetype\")'" .
+        " readonly />";
+    }
   }
 
   // a set of labeled checkboxes

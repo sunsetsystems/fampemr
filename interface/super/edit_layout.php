@@ -1,5 +1,5 @@
 <?php
-// Copyright (C) 2007-2013 Rod Roark <rod@sunsetsystems.com>
+// Copyright (C) 2007-2014 Rod Roark <rod@sunsetsystems.com>
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -447,7 +447,9 @@ function writeFieldLine($linedata) {
       ", R = " . xl('Distributor') .
       ", V = " . xl('Vendor') .
       ", 1 = " . xl('Write Once') .
+      ", 2 = " . xl('Billing Code Descriptions') . 
       "'>";
+
     echo "<input type='text' name='fld[$fld_line_no][edit_options]' value='" .
          htmlspecialchars($linedata['edit_options'], ENT_QUOTES) . "' size='3' maxlength='36' class='optin' />";
     echo "</td>\n";
