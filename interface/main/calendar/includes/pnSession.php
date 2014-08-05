@@ -149,15 +149,13 @@ function pnSessionGetVar($name)
  */
 function pnSessionSetVar($name, $value)
 {
-	global $HTTP_SESSION_VARS;
-    	$var = "PNSV$name";
-
-    	global $$var;
-	$$var = $value;
-	$HTTP_SESSION_VARS[$var] = $value;
-	session_register($var);
-
-    	return true;
+  global $HTTP_SESSION_VARS;
+  $var = "PNSV$name";
+  global $$var;
+  $$var = $value;
+  $HTTP_SESSION_VARS[$var] = $value;
+  $_SESSION[$var] = $value;
+  return true;
 }
 
 /**
