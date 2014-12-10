@@ -140,6 +140,7 @@ body {
  border-spacing: 0;
  border-collapse: collapse;
  border-color: #999999;
+ page-break-after: always;
 }
 td.toprow {
  height: 1px;
@@ -476,7 +477,7 @@ else {
 </table>
 
 <?php
-  if ($pages > 0) echo "<p style='page-break-after: always' />\n";
+  // if ($pages > 0) echo "<p style='page-break-after: always' />\n";
 } // end while
 ?>
 <div id='hideonprint'>
